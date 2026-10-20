@@ -1,4 +1,4 @@
-// Сквозной сценарий этапа 1 на запущенном приложении: node tests/e2e/stage1-flow.mjs
+// Сквозной сценарий (этапы 1–2) на запущенном приложении: node tests/e2e/flow.mjs
 // Нужен супер-админ +998900000000 с паролем superadmin-1 (или ADMIN_PW).
 import { chromium } from "playwright";
 
@@ -119,6 +119,8 @@ await shop.getByRole("button", { name: "Зарегистрировать маг�
 await shop.waitForURL(`${BASE}/shop`, { timeout: 15000, waitUntil: "commit" });
 await shop.waitForTimeout(1000);
 await shot(shop, "07-shop-home-mobile");
+await shop.goto(`${BASE}/shop/suppliers`);
+await shop.waitForTimeout(800);
 log("магазин видит поставщика:", await shop.getByText(SUPNAME).locator("visible=true").count() > 0);
 
 // 5. Магазин в Ургенче поставщика не видит
@@ -136,6 +138,7 @@ await far.getByRole("button", { name: /Моё местоположение/ }).c
 await far.waitForTimeout(500);
 await far.getByRole("button", { name: "Зарегистрировать магазин" }).click();
 await far.waitForURL(`${BASE}/shop`, { timeout: 15000, waitUntil: "commit" });
+await far.goto(`${BASE}/shop/suppliers`);
 await far.waitForTimeout(800);
 log("ургенчский магазин видит поставщика:", await far.getByText(SUPNAME).locator("visible=true").count() > 0);
 // Прямая ссылка на чужого поставщика
@@ -188,5 +191,96 @@ for (let i = 0; i < 6; i++) {
   await bf.waitForTimeout(700);
 }
 log("блок после перебора:", await bf.getByText("Слишком много неудачных попыток").locator("visible=true").count() > 0);
+
+// ═════════ Этап 2: каталог и склад ═════════
+const fs = await import("node:fs");
+// маленькая картинка для фото товара
+const png = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c4944415408d763f8cfc000000301010018dd8db00000000049454e44ae426082", "hex");
+fs.writeFileSync(`${OUT}/water.png`, png);
+
+await sup.goto(`${BASE}/supplier/catalog/categories`);
+await sup.locator("input[name=name]:visible").last().fill("Напитки");
+await sup.getByRole("button", { name: "Добавить" }).click();
+await sup.waitForTimeout(1200);
+log("категория:", await sup.getByText("Добавлена категория «Напитки»").locator("visible=true").count() > 0);
+
+await sup.goto(`${BASE}/supplier/catalog/new`);
+await sup.locator("[name=name]:visible").fill("Вода питьевая 1 л");
+await sup.getByLabel("Категория").selectOption({ label: "Напитки" });
+await sup.getByLabel("Бренд").fill("Hydrolife");
+await sup.getByLabel("Характеристики").fill("Объём: 1 л\nГаз: без газа");
+await sup.locator("input[name=photos]").setInputFiles(`${OUT}/water.png`);
+await sup.locator("[name=unitPrice]").first().fill("3 000");
+await sup.locator("[name=unitQty]").first().fill("100");
+await sup.getByRole("button", { name: "+ Единица" }).click();
+await sup.locator("[name=unitKind]").nth(1).selectOption("BOX");
+await sup.locator("[name=unitPrice]").nth(1).fill("70000");
+await sup.locator("[name=unitQty]").nth(1).fill("5");
+await shot(sup, "10-new-product");
+await sup.getByRole("button", { name: "Создать товар" }).click();
+await sup.waitForURL(/supplier\/catalog\/[^/]+\?created=1/, { timeout: 15000, waitUntil: "commit" });
+await sup.waitForTimeout(1000);
+const productUrl = sup.url().split("?")[0];
+log("товар создан:", productUrl);
+
+// списание больше остатка → ошибка
+await sup.getByLabel("Операция").selectOption("WRITE_OFF");
+await sup.locator("[name=qty]").fill("200");
+await sup.locator("[name=reason]").fill("Бой");
+await sup.getByRole("button", { name: "Провести" }).click();
+await sup.waitForTimeout(1200);
+log("списание сверх остатка:", await sup.getByText("Недостаточно доступного остатка").locator("visible=true").count() > 0);
+await sup.getByLabel("Операция").selectOption("INCOME");
+await sup.locator("[name=qty]").fill("50");
+await sup.locator("[name=reason]").fill("Накладная 15");
+await sup.getByRole("button", { name: "Провести" }).click();
+await sup.waitForTimeout(1500);
+log("приход:", await sup.getByText("Остаток обновлён").locator("visible=true").count() > 0, (await sup.getByText(/Доступно:/).first().innerText()));
+
+// снижение цены 3000 → 1500
+await sup.locator("[name=existingPrice]").first().fill("1500");
+await sup.getByRole("button", { name: "Сохранить цены" }).click();
+await sup.waitForTimeout(1500);
+log("антифрод при снижении:", await sup.getByText(/отправлено на проверку/).locator("visible=true").count() > 0);
+await shot(sup, "11-product-page");
+
+await admin.goto(`${BASE}/admin/antifraud`);
+await admin.waitForTimeout(1000);
+await shot(admin, "12-antifraud");
+log("антифрод у админа:", await admin.getByText("Вода питьевая 1 л").locator("visible=true").count() > 0);
+await admin.getByRole("button", { name: "Отклонить и вернуть цену" }).first().click();
+await admin.waitForTimeout(1500);
+log("решение антифрода:", await admin.getByText("Решение сохранено").locator("visible=true").count() > 0);
+
+await sup.goto(`${BASE}/supplier/stock`);
+await sup.waitForTimeout(800);
+await shot(sup, "13-stock");
+
+// магазин видит товар и цену 3 000
+await shop.goto(`${BASE}/shop/suppliers/${supplierId}`);
+await shop.waitForTimeout(1200);
+await shot(shop, "14-shop-catalog-mobile");
+const card = await shop.locator("a", { hasText: "Вода питьевая 1 л" }).locator("visible=true").first().innerText();
+log("карточка в каталоге магазина:", JSON.stringify(card));
+await shop.locator("a", { hasText: "Вода питьевая 1 л" }).first().click();
+await shop.waitForURL(/products\//, { waitUntil: "commit" });
+await shop.waitForTimeout(1000);
+await shot(shop, "15-shop-product-mobile");
+
+// журнал склада
+await sup.goto(productUrl);
+await sup.getByText("Журнал склада →").first().click();
+await sup.waitForURL(/supplier\/stock\//, { waitUntil: "commit" });
+await sup.waitForTimeout(1000);
+log("журнал:", (await sup.locator("tbody tr:visible").count()), "операций");
+
+// удаление из каталога — магазин больше не видит
+await sup.goto(productUrl);
+sup.once("dialog", (d) => d.accept());
+await sup.getByRole("button", { name: "Удалить из каталога" }).click();
+await sup.waitForTimeout(1500);
+await shop.goto(`${BASE}/shop/suppliers/${supplierId}`);
+await shop.waitForTimeout(1000);
+log("после удаления магазин видит товар:", await shop.getByText("Вода питьевая 1 л").locator("visible=true").count() > 0);
 
 await browser.close();

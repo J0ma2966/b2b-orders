@@ -11,7 +11,7 @@ import { addMemberAction, resetMemberPasswordAction } from "../actions";
 export function AddMemberForm({ roles }: { roles: [string, string][] }) {
   const [state, action, pending] = useActionState(addMemberAction, initialFormState);
   return (
-    <ActionForm key={state.ok ? state.message : "add"} action={action} pending={pending} className="space-y-3">
+    <ActionForm key={state.at ?? "add"} action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
       <Field label="Роль" name="role">
         <Select name="role" defaultValue={state.values?.role ?? roles[roles.length - 1][0]}>

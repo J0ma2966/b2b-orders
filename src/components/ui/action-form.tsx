@@ -18,7 +18,9 @@ export function ActionForm({
         {...props}
         onSubmit={(e) => {
           e.preventDefault();
-          const fd = new FormData(e.currentTarget);
+          // submitter — чтобы name/value нажатой кнопки попали в данные формы
+          const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+          const fd = new FormData(e.currentTarget, submitter);
           startTransition(() => action(fd));
         }}
       />

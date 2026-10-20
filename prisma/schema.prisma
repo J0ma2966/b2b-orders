@@ -1,5 +1,6 @@
 // Схема данных B2B-платформы заказов (ТЗ v2.1).
 // Этап 1: пользователи, роли, сессии, поставщики, магазины, территории, аудит, уведомления.
+// Этап 2: категории, товары, единицы измерения, цены, остатки, журнал складских операций.
 
 generator client {
   provider = "prisma-client"
@@ -140,6 +141,9 @@ model Supplier {
   members     SupplierMember[]
   territories SupplierTerritory[]
   statusHistory SupplierStatusHistory[]
+  categories  Category[]
+  products    Product[]
+  antifraudEvents AntifraudEvent[]
 }
 
 enum SupplierRole {
@@ -302,4 +306,163 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+// ───────────── Каталог (ТЗ п. 14–17) ─────────────
+
+model Category {
+  id         String     @id @default(cuid())
+  supplierId String
+  supplier   Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name       String
+  sortOrder  Int        @default(0)
+  isArchived Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  products   Product[]
+
+  @@unique([supplierId, name])
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  supplierId  String
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  brand       String?
+  sku         String?   // артикул поставщика
+  weightKg    Decimal?  @db.Decimal(10, 3)
+  // Характеристики: [{ name, value }]
+  attributes  Json      @default("[]")
+  photoPaths  String[]
+  // Доступность для заказа (поставщик может временно снять товар с продажи)
+  isAvailable Boolean   @default(true)
+  // Товар можно заменить по заявке магазина (ТЗ п. 14, 45)
+  allowReplacement Boolean @default(true)
+  // Удаление из актуального каталога без потери истории (ТЗ п. 17)
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  units ProductUnit[]
+
+  @@index([supplierId, archivedAt])
+  @@index([categoryId])
+}
+
+enum UnitKind {
+  PIECE  // штука
+  BOX    // коробка
+  BLOCK  // блок
+  KG     // килограмм
+  PACK   // упаковка
+  LITER  // литр
+  OTHER  // другая (название в customName)
+}
+
+// Единица продажи товара со своей ценой и своим остатком.
+// Связи между единицами (1 коробка = 24 шт.) в обязательную функциональность не входят (ТЗ п. 15),
+// поэтому остаток ведётся по каждой единице отдельно.
+model ProductUnit {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  kind        UnitKind
+  customName  String   @default("")
+  // Нет цены — заказ в этой единице невозможен (ТЗ п. 15)
+  price       Decimal? @db.Decimal(14, 2)
+  physicalQty Decimal  @default(0) @db.Decimal(14, 3)
+  reservedQty Decimal  @default(0) @db.Decimal(14, 3)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  movements    StockMovement[]
+  priceHistory PriceHistory[]
+  antifraudEvents AntifraudEvent[]
+
+  @@unique([productId, kind, customName])
+}
+
+model PriceHistory {
+  id            String      @id @default(cuid())
+  productUnitId String
+  productUnit   ProductUnit @relation(fields: [productUnitId], references: [id], onDelete: Cascade)
+  oldPrice      Decimal?    @db.Decimal(14, 2)
+  newPrice      Decimal?    @db.Decimal(14, 2)
+  userId        String?
+  createdAt     DateTime    @default(now())
+
+  @@index([productUnitId, createdAt])
+}
+
+// ───────────── Журнал складских операций (ТЗ п. 20) ─────────────
+
+enum StockMovementType {
+  INITIAL           // начальный остаток
+  INCOME            // приход
+  RESERVE           // резервирование
+  RELEASE           // освобождение резерва
+  SALE              // продажа (из резерва в реализованное)
+  BONUS             // бонус
+  FORCED_SALE       // принудительная продажа
+  RETURN_UNACCEPTED // возврат непринятого товара
+  TO_RETURNED       // перевод в возвращённые товары
+  BACK_TO_STOCK     // возврат в оборот
+  WRITE_OFF         // списание
+  ADJUSTMENT        // ручная корректировка
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  productUnitId String
+  productUnit   ProductUnit       @relation(fields: [productUnitId], references: [id], onDelete: Cascade)
+  type          StockMovementType
+  // Изменение физического и зарезервированного остатка (со знаком)
+  physicalDelta Decimal           @db.Decimal(14, 3)
+  reservedDelta Decimal           @db.Decimal(14, 3)
+  physicalAfter Decimal           @db.Decimal(14, 3)
+  reservedAfter Decimal           @db.Decimal(14, 3)
+  userId        String?
+  onBehalfOfUserId String?
+  reason        String?
+  relatedEntity String?
+  relatedId     String?
+  createdAt     DateTime          @default(now())
+
+  @@index([productUnitId, createdAt])
+  @@index([relatedEntity, relatedId])
+}
+
+// ───────────── Антифрод цен (ТЗ п. 54–56) ─────────────
+
+enum AntifraudStatus {
+  OPEN
+  CONFIRMED   // изменение подтверждено
+  REJECTED    // отклонено, цена восстановлена
+  WATCHING    // под наблюдением
+}
+
+model AntifraudEvent {
+  id            String          @id @default(cuid())
+  supplierId    String
+  supplier      Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  productUnitId String
+  productUnit   ProductUnit     @relation(fields: [productUnitId], references: [id], onDelete: Cascade)
+  oldPrice      Decimal         @db.Decimal(14, 2)
+  newPrice      Decimal         @db.Decimal(14, 2)
+  changePct     Decimal         @db.Decimal(6, 2)
+  userId        String?
+  onBehalfOfUserId String?
+  status        AntifraudStatus @default(OPEN)
+  resolution    String?
+  resolvedById  String?
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([status, createdAt])
+  @@index([supplierId])
 }

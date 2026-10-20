@@ -12,7 +12,7 @@ import { normalizePhone } from "@/lib/phone";
 import { isRealFile, saveImage, UploadError } from "@/lib/storage";
 import { supplierTransition } from "@/lib/statuses";
 import { canManageMember } from "@/lib/supplier-roles";
-import { coord, formValues, invalid, opt, parseForm, req, type FormState } from "@/lib/forms";
+import { coord, formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
 
 function roleTag(role: string) {
   return role === "OWNER" ? "SUPPLIER_OWNER" : role === "ADMIN" ? "SUPPLIER_ADMIN" : "COURIER";
@@ -176,7 +176,7 @@ export async function addMemberAction(_prev: FormState, formData: FormData): Pro
   });
   revalidatePath("/supplier/team");
   return {
-    ok: true,
+    ...success(""),
     message: tempPassword
       ? `Добавлен ${fullName}. Временный пароль: ${tempPassword} — передайте его сотруднику, при первом входе он задаст свой.`
       : `Добавлен ${fullName}. Этот телефон уже зарегистрирован, сотрудник входит со своим паролем.`,

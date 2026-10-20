@@ -7,7 +7,13 @@ export type FormState = {
   fieldErrors?: Record<string, string[] | undefined>;
   // Значения, чтобы форма не очищалась после ошибки
   values?: Record<string, string>;
+  // Метка успешной отправки: по ней форма сбрасывается (key={state.at})
+  at?: number;
 };
+
+export function success(message: string): FormState {
+  return { ok: true, message, at: Date.now() };
+}
 
 export const initialFormState: FormState = {};
 
