@@ -100,7 +100,7 @@ export function BottomNavView({
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex flex-col items-center gap-0.5",
+              "flex min-w-0 flex-col items-center gap-0.5",
               app ? "py-2.5 text-xs" : "py-2 text-[11px]",
               active ? (app ? "font-semibold text-ink" : "font-semibold text-brand-700") : "text-gray-500",
             )}
@@ -113,7 +113,7 @@ export function BottomNavView({
                 </span>
               )}
             </span>
-            {t(item.label)}
+            <span className="max-w-full truncate px-0.5">{t(item.label)}</span>
           </Link>
         );
       })}
