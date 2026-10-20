@@ -30,6 +30,24 @@ export async function saveImage(file: File, folder: string): Promise<string> {
   return rel;
 }
 
+const VIDEO_TYPES: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+};
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
+export async function saveVideo(file: File, folder: string): Promise<string> {
+  const ext = VIDEO_TYPES[file.type];
+  if (!ext) throw new UploadError("Допустимы видео MP4, WEBM или MOV");
+  if (file.size > MAX_VIDEO_BYTES) throw new UploadError("Видео больше 50 МБ");
+  const name = `${randomBytes(16).toString("hex")}.${ext}`;
+  const rel = path.posix.join(folder, name);
+  await mkdir(path.join(ROOT, folder), { recursive: true });
+  await writeFile(path.join(ROOT, rel), Buffer.from(await file.arrayBuffer()));
+  return rel;
+}
+
 export async function readStoredFile(rel: string) {
   const full = path.resolve(ROOT, rel);
   if (!full.startsWith(ROOT + path.sep)) return null;

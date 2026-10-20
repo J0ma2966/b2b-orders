@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { schedulePush } from "@/lib/push";
 import type { Prisma } from "@/generated/prisma/client";
 
 type Tx = Prisma.TransactionClient | typeof db;
@@ -17,7 +18,8 @@ export type NotificationInput = {
 export async function notifyUsers(userIds: string[], n: NotificationInput, tx: Tx = db) {
   const unique = [...new Set(userIds)];
   if (unique.length === 0) return;
-  await tx.notification.createMany({ data: unique.map((userId) => ({ userId, ...n })) });
+  const created = await tx.notification.createManyAndReturn({ data: unique.map((userId) => ({ userId, ...n })), select: { id: true } });
+  schedulePush(created.map((c) => c.id));
 }
 
 export async function notifySupplierStaff(

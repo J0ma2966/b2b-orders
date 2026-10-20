@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // Фото магазина, логотип, позже фото/видео замен
-      bodySizeLimit: "12mb",
+      bodySizeLimit: "120mb",
     },
   },
   turbopack: {

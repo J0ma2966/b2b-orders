@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
-import { OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
-import { CancelOrderForm } from "@/components/orders/shop-forms";
+import QRCode from "qrcode";
+import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
+import { CancelOrderForm, ConfirmReceiptQr, RequestCancelForm } from "@/components/orders/shop-forms";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { PAYMENT_LABEL, shopCanCancel } from "@/lib/order-core";
+import { PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
 
 export default async function ShopOrderPage({ params, searchParams }: PageProps<"/shop/orders/[id]">) {
@@ -21,6 +22,8 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
   if (!order || order.shopId !== ctx.shop.id || order.status === "DRAFT") notFound();
   const events = await orderEvents(order.id);
   const placedEvent = events.find((e) => e.fromStatus === "DRAFT");
+  const qr = order.status === "IN_TRANSIT" && order.qrToken && !order.qrUsedAt ? await QRCode.toDataURL(`B2B-ORDER:${order.qrToken}`, { width: 512, margin: 1 }) : null;
+  const account = RECEIVED.includes(order.status) ? await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } }) : null;
   return (
     <>
       <PageHeader
@@ -40,9 +43,24 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
             {order.cancelledBy === "SHOP" ? "Вы отменили заказ" : "Поставщик отменил заказ"} {formatDateTime(order.cancelledAt)}. Причина: {order.cancelReason}
           </Alert>
         )}
+        {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">Вы попросили отменить заказ: {order.cancelRequestReason}. Ждём решения поставщика.</Alert>}
+        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">Заказ не доставлен: {order.problemNote}</Alert>}
+        {qr && (
+          <Card>
+            <ConfirmReceiptQr dataUrl={qr} code={order.qrToken!} />
+          </Card>
+        )}
+        {RECEIVED.includes(order.status) && (
+          <div className="flex flex-wrap gap-2">
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>🧾 Чек</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>📄 Накладная</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/shop/replacements/new?order=${order.id}`}>🔁 Заявка на замену</Link>
+          </div>
+        )}
         <div className="grid gap-4 lg:grid-cols-5">
           <div className="space-y-4 lg:col-span-3">
             <OrderItems items={order.items} total={order.total} />
+            <OrderFinance o={order} currentBalance={account ? Number(account.balance) : undefined} />
             <Card>
               <h2 className="mb-3 font-semibold">История</h2>
               <OrderHistory events={events} />
@@ -62,6 +80,12 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
                 ]}
               />
             </Card>
+            {shopCanRequestCancel(order.status) && (
+              <Card>
+                <h2 className="mb-3 font-semibold">Отмена заказа</h2>
+                <RequestCancelForm orderId={order.id} />
+              </Card>
+            )}
             {shopCanCancel(order.status) && (
               <Card>
                 <h2 className="mb-3 font-semibold">Отмена заказа</h2>

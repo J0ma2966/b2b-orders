@@ -2,14 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
-import { AssignCourierForm, ForcedItemForm, OrderStatusForm } from "@/components/orders/supplier-forms";
+import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
+import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedItemForm, OrderStatusForm, ResolveProblemForm } from "@/components/orders/supplier-forms";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
-import { availableSupplierOrderActions, canAssignCourier, canEditForced, CLOSED, PAYMENT_LABEL } from "@/lib/order-core";
+import { availableSupplierOrderActions, canAssignCourier, canEditForced, CLOSED, PAYMENT_LABEL, RECEIVED } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { Badge } from "@/components/ui";
@@ -39,6 +39,8 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
       : [],
   ]);
   const actions = availableSupplierOrderActions(order.status);
+  const received = RECEIVED.includes(order.status);
+  const account = await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } });
   return (
     <>
       <PageHeader
@@ -56,6 +58,20 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
           <Alert tone="error">
             {order.cancelledBy === "SHOP" ? "Магазин отменил заказ" : "Заказ отменён поставщиком"} {formatDateTime(order.cancelledAt)}. Причина: {order.cancelReason}
           </Alert>
+        )}
+        {order.status === "NEEDS_CONFIRMATION" && (
+          <Card><CancelRequestDecisionForm orderId={order.id} reason={order.cancelRequestReason ?? ""} /></Card>
+        )}
+        {order.status === "DELIVERY_PROBLEM" && (
+          <Card><ResolveProblemForm orderId={order.id} note={order.problemNote ?? ""} /></Card>
+        )}
+        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">Не доставлен: {order.problemNote}</Alert>}
+        {received && (
+          <div className="flex flex-wrap gap-2">
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>🧾 Чек</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>📄 Накладная</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>💰 Счёт магазина</Link>
+          </div>
         )}
         {!CLOSED.includes(order.status) && actions.length > 0 && (
           <Card>
@@ -77,6 +93,14 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                 ) : null
               }
             />
+            <OrderFinance o={order} currentBalance={account ? Number(account.balance) : undefined} />
+            {received && (
+              <Card>
+                <h2 className="mb-1 font-semibold">Корректирующая операция</h2>
+                <p className="mb-3 text-sm text-gray-500">Полученный заказ не редактируется. Исправление суммы записывается отдельной операцией и меняет задолженность магазина (ТЗ п. 65–66).</p>
+                <CorrectionForm orderId={order.id} shopId={order.shopId} />
+              </Card>
+            )}
             {editable && (
               <Card>
                 <h2 className="mb-1 font-semibold">Принудительная продажа</h2>
@@ -99,7 +123,7 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
           <div className="space-y-4 lg:col-span-2">
             <Card>
               <h2 className="mb-2 flex items-center gap-2 font-semibold">
-                {order.shop.name}
+                <Link href={`/supplier/shops/${order.shopId}`} className="hover:underline">{order.shop.name}</Link>
                 <Badge color={SHOP_STATUS_COLOR[order.shop.status]}>{SHOP_STATUS_LABEL[order.shop.status]}</Badge>
               </h2>
               <DefinitionList

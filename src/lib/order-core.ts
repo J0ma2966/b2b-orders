@@ -55,7 +55,17 @@ export const ITEM_KIND_LABEL: Record<OrderItemKind, string> = {
 export const PRE_DELIVERY: OrderStatus[] = ["PLACED", "ACCEPTED", "ASSEMBLING", "READY", "ASSIGNED"];
 
 // Закрытые состояния: резерва нет, действий нет.
-export const CLOSED: OrderStatus[] = ["COMPLETED", "CANCELLED_BY_SHOP", "CANCELLED_BY_SUPPLIER", "REJECTED"];
+export const CLOSED: OrderStatus[] = ["COMPLETED", "PARTIALLY_ACCEPTED", "NOT_DELIVERED", "CANCELLED_BY_SHOP", "CANCELLED_BY_SUPPLIER", "REJECTED"];
+
+// Заказ получен магазином: дальше только корректирующие операции (ТЗ п. 66).
+export const RECEIVED: OrderStatus[] = ["COMPLETED", "PARTIALLY_ACCEPTED"];
+
+// В пути: магазин может только попросить отмену (ТЗ п. 28).
+export function shopCanRequestCancel(status: OrderStatus) {
+  return status === "IN_TRANSIT" || status === "DELIVERY_PROBLEM";
+}
+
+export const DELIVERY_ACTIVE: OrderStatus[] = ["ASSIGNED", "IN_TRANSIT", "DELIVERY_PROBLEM", "NEEDS_CONFIRMATION"];
 
 // Действия поставщика по основному циклу (ТЗ п. 26).
 export type SupplierOrderAction = "accept" | "assemble" | "ready" | "reject" | "cancel";
@@ -180,6 +190,22 @@ export function orderEventText(e: { type: string; fromStatus: OrderStatus | null
       return `Добавлена принудительная продажа: ${line()}`;
     case "item.forced_removed":
       return `Убрана принудительная продажа: ${line()}`;
+    case "delivery.confirmed":
+      return `Получение подтверждено по QR, получено ${d.received}`;
+    case "delivery.problem":
+      return "Доставщик сообщил о проблеме";
+    case "delivery.not_delivered":
+      return "Заказ не доставлен";
+    case "cancel.requested":
+      return "Магазин просит отменить заказ";
+    case "cancel.approved":
+      return "Поставщик согласовал отмену";
+    case "cancel.declined":
+      return "Поставщик отказал в отмене, доставка продолжается";
+    case "problem.resolved":
+      return `Проблема решена: ${d.resolution}`;
+    case "correction":
+      return `Корректировка суммы: ${d.amount}`;
     default:
       return e.type;
   }

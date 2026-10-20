@@ -24,6 +24,8 @@ export function movementDeltas(type: StockMovementType, qty: number): Deltas {
     case "SALE":
     case "BONUS":
     case "FORCED_SALE":
+    // Новый товар по замене передан магазину: из резерва и с остатка, без продажи
+    case "REPLACEMENT_OUT":
       return { physical: -qty, reserved: -qty };
     // Забранный при замене товар идёт в «Возвращённые», основной остаток не меняется (ТЗ п. 48)
     case "TO_RETURNED":
@@ -50,6 +52,7 @@ export const MOVEMENT_LABEL: Record<StockMovementType, string> = {
   FORCED_SALE: "Принудительная продажа",
   RETURN_UNACCEPTED: "Возврат непринятого",
   TO_RETURNED: "В возвращённые товары",
+  REPLACEMENT_OUT: "Выдача по замене",
   BACK_TO_STOCK: "Возврат в оборот",
   WRITE_OFF: "Списание",
   ADJUSTMENT: "Ручная корректировка",

@@ -10,7 +10,13 @@ export default async function ShopProfilePage() {
   const territories = await getTerritoryOptions();
   return (
     <>
-      <PageHeader title="Профиль магазина" actions={<ButtonLink href="/shop/points" variant="secondary">📍 Мои точки</ButtonLink>} />
+      <PageHeader title="Профиль магазина" actions={<>
+        <ButtonLink href="/shop/points" variant="secondary">📍 Мои точки</ButtonLink>
+        <ButtonLink href="/shop/replacements" variant="secondary">🔁 Замены</ButtonLink>
+        <ButtonLink href="/shop/debts" variant="secondary">💰 Задолженность</ButtonLink>
+        <ButtonLink href="/shop/documents" variant="secondary">🧾 Документы</ButtonLink>
+        <ButtonLink href="/account" variant="secondary">⚙️ Настройки</ButtonLink>
+      </>} />
       <Card className="max-w-2xl">
         {s.photoPaths.length > 0 && (
           <div className="mb-4 flex gap-2 overflow-x-auto">

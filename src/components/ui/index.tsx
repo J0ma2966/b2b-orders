@@ -66,7 +66,7 @@ export function Field({
   // Подсказка и ошибка вне <label>, чтобы не попадать в доступное имя поля
   return (
     <div>
-      <label className="block" htmlFor={name}>
+      <label className="block">
         <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
         {children}
       </label>

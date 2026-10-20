@@ -1,4 +1,4 @@
-// Сквозной сценарий (этапы 1–3) на запущенном приложении: node tests/e2e/flow.mjs
+// Сквозной сценарий (этапы 1–6) на запущенном приложении: node tests/e2e/flow.mjs
 // Нужен супер-админ +998900000000 с паролем superadmin-1 (или ADMIN_PW).
 import { chromium } from "playwright";
 
@@ -379,6 +379,163 @@ log("заказы у админа:", await admin.locator("main li:visible").coun
 await admin.goto(`${BASE}/admin/orders/${orderId}`);
 await admin.waitForTimeout(800);
 await shot(admin, "21-admin-order");
+
+// ═════════ Этап 4–6: доставка, QR, финансы, замены ═════════
+const errText = async (page) => (await page.locator(".bg-red-50:visible").first().innerText().catch(() => "")).replace(/\n/g, " ");
+await cour.goto(`${BASE}/courier/orders/${orderId}`);
+await cour.waitForTimeout(1000);
+await cour.getByRole("button", { name: /Выехал к магазину/ }).click();
+await cour.waitForTimeout(1500);
+await cour.reload();
+await cour.waitForTimeout(1000);
+await shot(cour, "22-courier-in-transit-mobile");
+
+await shop.goto(orderUrlShop);
+await shop.waitForTimeout(1000);
+await shop.getByRole("button", { name: "Подтвердить получение" }).click();
+await shop.waitForTimeout(500);
+const code = (await shop.locator("p.font-mono:visible").innerText()).trim();
+await shot(shop, "23-shop-qr-mobile");
+log("код подтверждения у магазина:", code);
+
+// неверный QR
+const accFirst = cour.locator("input[name^=accepted_]").first();
+await accFirst.fill("10");
+await cour.locator("[name=received]").fill("50000");
+await cour.locator("[name=qr]").fill("AAAAA BBBBB");
+await cour.getByRole("button", { name: "Подтвердить получение" }).click();
+await cour.waitForTimeout(1500);
+log("чужой QR:", await errText(cour));
+// недоплата без разрешения на долг
+await cour.locator("input[name^=accepted_]").first().fill("10");
+await cour.locator("[name=received]").fill("50000");
+await cour.locator("[name=qr]").fill(code);
+await cour.getByRole("button", { name: "Подтвердить получение" }).click();
+await cour.waitForTimeout(1500);
+log("недоплата без кредита:", await errText(cour));
+
+// поставщик разрешает работу в долг
+await sup.goto(`${BASE}/supplier/shops`);
+await sup.waitForTimeout(800);
+const shopHref = await sup.locator("a", { hasText: "Минимаркет «Чиланзар»" }).first().getAttribute("href");
+await sup.goto(`${BASE}${shopHref}`);
+await sup.waitForTimeout(800);
+await sup.locator("[name=creditAllowed]").check();
+await sup.locator("[name=creditLimit]").fill("200000");
+await sup.getByRole("button", { name: "Сохранить" }).click();
+await sup.waitForTimeout(1500);
+
+await cour.locator("input[name^=accepted_]").first().fill("10");
+await cour.locator("[name=received]").fill("50000");
+await cour.locator("[name=qr]").fill(code);
+await shot(cour, "24-courier-acceptance-mobile");
+await cour.getByRole("button", { name: "Подтвердить получение" }).click();
+await cour.waitForTimeout(2000);
+log("приёмка:", JSON.stringify((await cour.locator("main").innerText()).slice(0, 200)));
+// повтор того же QR
+await cour.goto(`${BASE}/courier/history`);
+await cour.waitForTimeout(800);
+await shot(cour, "25-courier-history-mobile");
+
+await shop.goto(orderUrlShop);
+await shop.waitForTimeout(1000);
+log("статус у магазина:", await visible(shop, "Частично принят").count() > 0);
+await shot(shop, "26-shop-order-received-mobile");
+await shop.goto(`${BASE}/documents/orders/${orderId}/receipt`);
+await shop.waitForTimeout(800);
+await shot(shop, "27-receipt-mobile");
+await shop.goto(`${BASE}/documents/orders/${orderId}/invoice`);
+await shop.waitForTimeout(800);
+log("накладная:", JSON.stringify((await shop.locator("body").innerText()).slice(0, 160)));
+await shop.goto(`${BASE}/shop/debts`);
+await shop.waitForTimeout(800);
+await shot(shop, "28-shop-debts-mobile");
+log("долг у магазина:", JSON.stringify((await shop.locator("main").innerText()).slice(0, 200)));
+
+// погашение долга
+await sup.goto(`${BASE}${shopHref}`);
+await sup.waitForTimeout(800);
+const payForm = sup.locator("form", { has: sup.getByRole("button", { name: "Зарегистрировать погашение" }) });
+await payForm.locator("[name=amount]").fill("20000");
+await payForm.locator("[name=comment]").fill("Наличными в офисе");
+await sup.getByRole("button", { name: "Зарегистрировать погашение" }).click();
+await sup.waitForTimeout(1500);
+await sup.reload();
+await sup.waitForTimeout(800);
+await shot(sup, "29-supplier-shop-debt");
+log("долг после погашения:", JSON.stringify(await sup.locator("text=Задолженность").first().locator("xpath=..").innerText()));
+
+// замена: магазин → поставщик → доставщик → возвращённые
+await shop.goto(`${BASE}/shop/replacements/new?order=${orderId}`);
+await shop.waitForTimeout(1000);
+await shop.locator("[name=orderItemId]").selectOption({ index: 1 });
+await shop.locator("[name=qty]").fill("2");
+await shop.locator("[name=reason]").selectOption({ index: 1 });
+await shop.locator("[name=comment]").fill("Две бутылки протекают");
+await shop.locator("input[name=photos]").setInputFiles(`${OUT}/water.png`);
+await shot(shop, "30-shop-replacement-form-mobile");
+await shop.getByRole("button", { name: "Отправить заявку" }).click();
+await shop.waitForURL(/replacements\?created=1/, { timeout: 15000, waitUntil: "commit" });
+await shop.waitForTimeout(800);
+log("заявка на замену:", JSON.stringify((await shop.locator("main").innerText()).slice(0, 160)));
+
+await sup.goto(`${BASE}/supplier/replacements`);
+await sup.waitForTimeout(800);
+await sup.locator("main a", { hasText: "Вода питьевая" }).first().click();
+await sup.waitForURL(/supplier\/replacements\/.+/, { waitUntil: "commit" });
+await sup.waitForTimeout(800);
+await sup.getByRole("button", { name: "Согласовать и зарезервировать" }).click();
+await sup.waitForTimeout(1500);
+await sup.reload();
+await sup.waitForTimeout(800);
+await sup.locator("[name=courierId]").selectOption({ label: "Бобур Доставщик" });
+await sup.getByRole("button", { name: "Назначить" }).click();
+await sup.waitForTimeout(1500);
+await shot(sup, "31-supplier-replacement");
+
+await cour.goto(`${BASE}/courier/replacements`);
+await cour.waitForTimeout(800);
+cour.once("dialog", (d) => d.accept());
+await cour.getByRole("button", { name: "Передал новый, забрал старый" }).click();
+await cour.waitForTimeout(1500);
+log("замена выполнена:", JSON.stringify((await cour.locator("main").innerText()).slice(0, 160)));
+
+await sup.goto(`${BASE}/supplier/returned`);
+await sup.waitForTimeout(800);
+await sup.getByLabel("Статус").first().selectOption("BACK_TO_STOCK");
+await sup.getByRole("button", { name: "Сохранить" }).first().click();
+await sup.waitForTimeout(1500);
+await sup.reload();
+await sup.waitForTimeout(800);
+await shot(sup, "32-supplier-returned");
+await sup.goto(`${BASE}/supplier/stock`);
+await sup.waitForTimeout(800);
+log("остатки после замены:", JSON.stringify((await sup.locator("main").innerText()).slice(0, 400)));
+
+// отчёты, карта, финансы
+await sup.goto(`${BASE}/supplier/reports?period=month`);
+await sup.waitForTimeout(1200);
+await shot(sup, "33-supplier-reports");
+log("оборот в отчёте:", JSON.stringify((await sup.locator("main").innerText()).slice(0, 300)));
+await sup.goto(`${BASE}/supplier/map`);
+await sup.waitForTimeout(2500);
+await shot(sup, "34-supplier-map");
+await sup.goto(`${BASE}/supplier/audit`);
+await sup.waitForTimeout(800);
+log("журнал поставщика:", await sup.locator("tbody tr:visible").count(), "записей");
+await admin.goto(`${BASE}/admin/reports?period=month`);
+await admin.waitForTimeout(1200);
+await shot(admin, "35-admin-reports");
+await admin.goto(`${BASE}/admin/commissions`);
+await admin.waitForTimeout(1000);
+await shot(admin, "36-admin-commissions");
+log("комиссии:", JSON.stringify((await admin.locator("main").innerText()).slice(0, 300)));
+await admin.goto(`${BASE}/admin/finance`);
+await admin.waitForTimeout(1000);
+await shot(admin, "37-admin-finance");
+await admin.goto(`${BASE}/admin`);
+await admin.waitForTimeout(1000);
+await shot(admin, "38-admin-dashboard");
 
 // удаление из каталога — магазин больше не видит
 await sup.goto(productUrl);

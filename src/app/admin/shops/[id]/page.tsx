@@ -1,3 +1,4 @@
+import { EntityActivity } from "@/components/orders/entity-activity";
 import { notFound } from "next/navigation";
 import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -94,6 +95,7 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
           </Card>
         </div>
       </div>
+      <EntityActivity shopId={shop.id} />
     </>
   );
 }

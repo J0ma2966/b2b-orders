@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { SUPPLIER_ACTION_LABEL, SUPPLIER_ACTION_NEEDS_REASON, type SupplierOrderAction } from "@/lib/order-core";
-import { addForcedAction, assignCourierAction, orderStatusAction } from "@/app/supplier/orders/actions";
+import { addForcedAction, assignCourierAction, cancelRequestDecisionAction, orderCorrectionAction, orderStatusAction, resolveProblemAction } from "@/app/supplier/orders/actions";
 
 export function OrderStatusForm({ orderId, actions }: { orderId: string; actions: SupplierOrderAction[] }) {
   const [state, action, pending] = useActionState(orderStatusAction, initialFormState);
@@ -97,6 +97,68 @@ export function ForcedItemForm({ orderId, units }: { orderId: string; units: { i
         <Input name="qty" inputMode="decimal" defaultValue={state.values?.qty} className="w-32" />
       </Field>
       <SubmitButton variant="secondary" pendingText="Добавляю…">Добавить как принудительную продажу</SubmitButton>
+    </ActionForm>
+  );
+}
+
+export function CancelRequestDecisionForm({ orderId, reason }: { orderId: string; reason: string }) {
+  const [state, action, pending] = useActionState(cancelRequestDecisionAction, initialFormState);
+  if (state.ok) return <FormMessage state={state} />;
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <p className="text-sm">Магазин просит отменить заказ в пути. Причина: <b>{reason}</b></p>
+      <input type="hidden" name="orderId" value={orderId} />
+      <Field label="Комментарий магазину" name="comment">
+        <Input name="comment" />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <SubmitButton name="decision" value="approve" variant="danger" pendingText="…">Согласовать отмену</SubmitButton>
+        <SubmitButton name="decision" value="decline" variant="secondary" pendingText="…">Отказать, доставлять</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
+export function ResolveProblemForm({ orderId, note }: { orderId: string; note: string }) {
+  const [state, action, pending] = useActionState(resolveProblemAction, initialFormState);
+  if (state.ok) return <FormMessage state={state} />;
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <p className="text-sm">Доставщик сообщил о проблеме: <b>{note}</b></p>
+      <input type="hidden" name="orderId" value={orderId} />
+      <Field label="Комментарий (для отмены обязателен)" name="comment">
+        <Input name="comment" defaultValue={state.values?.comment} />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <SubmitButton name="resolution" value="continue" pendingText="…">Продолжить доставку</SubmitButton>
+        <SubmitButton name="resolution" value="back_to_ready" variant="secondary" pendingText="…">Вернуть на склад</SubmitButton>
+        <SubmitButton name="resolution" value="cancel" variant="danger" pendingText="…" confirm="Отменить заказ и освободить резерв?">Отменить заказ</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
+export function CorrectionForm({ orderId, shopId }: { orderId?: string; shopId: string }) {
+  const [state, action, pending] = useActionState(orderCorrectionAction, initialFormState);
+  const fe = state.fieldErrors ?? {};
+  return (
+    <ActionForm key={state.at ?? "c"} action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <input type="hidden" name="orderId" value={orderId ?? ""} />
+      <input type="hidden" name="shopId" value={shopId} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Сумма (+ увеличивает долг)" name="amount" error={fe.amount}>
+          <Input name="amount" inputMode="decimal" placeholder="+200" defaultValue={state.values?.amount} />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Основание" name="reason" error={fe.reason}>
+            <Input name="reason" defaultValue={state.values?.reason} />
+          </Field>
+        </div>
+      </div>
+      <SubmitButton variant="secondary" pendingText="…" confirm="Записать корректирующую операцию? Исходные записи останутся в истории.">Записать корректировку</SubmitButton>
     </ActionForm>
   );
 }

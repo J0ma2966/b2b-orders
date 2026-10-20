@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireShop } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { addToCart, cancelByShop, checkout, OrderError, setCartQty } from "@/lib/orders";
+import { requestCancel } from "@/lib/delivery";
 import { parseAmount } from "@/lib/catalog";
 import { normalizePhone } from "@/lib/phone";
 import { formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
@@ -109,4 +110,19 @@ export async function cancelOrderAction(_prev: FormState, formData: FormData): P
   await writeAudit({ entity: "Order", entityId: orderId, action: "cancel", actorRole: "SHOP", shopId: ctx.shop.id, comment: reason });
   revalidatePath("/shop", "layout");
   return success("Заказ отменён, резерв освобождён");
+}
+
+export async function requestCancelAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  const orderId = String(formData.get("orderId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { fieldErrors: { reason: ["Укажите причину"] } };
+  try {
+    await requestCancel(ctx.shop.id, orderId, reason);
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: "Order", entityId: orderId, action: "cancel.request", actorRole: "SHOP", shopId: ctx.shop.id, comment: reason });
+  revalidatePath("/shop", "layout");
+  return success("Запрос отправлен поставщику");
 }

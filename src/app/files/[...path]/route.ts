@@ -1,6 +1,6 @@
 import { readStoredFile } from "@/lib/storage";
 
-const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime" };
 
 export async function GET(_req: Request, ctx: RouteContext<"/files/[...path]">) {
   const { path } = await ctx.params;

@@ -14,6 +14,12 @@ const ENTITIES: [string, string][] = [
   ["SupplierMember", "Сотрудники"],
   ["Territory", "Территории"],
   ["PlatformSetting", "Настройки"],
+  ["Product", "Товары"],
+  ["ProductUnit", "Цены и единицы"],
+  ["Order", "Заказы"],
+  ["ShopAccount", "Долги и кредит"],
+  ["Replacement", "Замены"],
+  ["ReturnedItem", "Возвращённые"],
 ];
 
 export default async function AuditPage({ searchParams }: PageProps<"/admin/audit">) {

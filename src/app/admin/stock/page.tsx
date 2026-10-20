@@ -1,0 +1,49 @@
+import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
+import { db } from "@/lib/db";
+import { requireSuperAdmin } from "@/lib/auth/current";
+import { formatQty, unitName } from "@/lib/catalog";
+import type { Prisma } from "@/generated/prisma/client";
+
+export default async function AdminStockPage({ searchParams }: PageProps<"/admin/stock">) {
+  await requireSuperAdmin();
+  const sp = await searchParams;
+  const q = typeof sp.q === "string" ? sp.q.trim() : "";
+  const status = typeof sp.status === "string" ? sp.status : "";
+  const page = pageFrom(sp);
+  const where: Prisma.ProductUnitWhereInput = {
+    product: { archivedAt: null, ...(q && { OR: [{ name: { contains: q, mode: "insensitive" } }, { supplier: { displayName: { contains: q, mode: "insensitive" } } }] }) },
+    ...(status === "reserved" && { reservedQty: { gt: 0 } }),
+    ...(status === "empty" && { physicalQty: 0 }),
+  };
+  const [total, rows] = await Promise.all([
+    db.productUnit.count({ where }),
+    db.productUnit.findMany({ where, include: { product: { include: { supplier: true } } }, orderBy: { updatedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+  ]);
+  return (
+    <>
+      <PageHeader title="Остатки" subtitle="Доступно = физический − резерв" />
+      <FilterBar q={q} status={status} statuses={[["reserved", "Есть резерв"], ["empty", "Закончились"]]} allLabel="Все" placeholder="Товар или поставщик" />
+      {rows.length === 0 ? <EmptyState>Нет данных</EmptyState> : (
+        <Card className="overflow-x-auto p-0 sm:p-0">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="px-4 py-2 text-left">Товар</th><th className="px-2 text-left">Поставщик</th><th className="px-2 text-right">Физический</th><th className="px-2 text-right">Резерв</th><th className="px-4 text-right">Доступно</th></tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((u) => (
+                <tr key={u.id}>
+                  <td className="px-4 py-2">{u.product.name} · {unitName(u)}</td>
+                  <td className="px-2">{u.product.supplier.displayName}</td>
+                  <td className="px-2 text-right">{formatQty(u.physicalQty)}</td>
+                  <td className="px-2 text-right">{formatQty(u.reservedQty)}</td>
+                  <td className="px-4 text-right font-medium">{formatQty(Number(u.physicalQty) - Number(u.reservedQty))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+      <Pagination page={page} total={total} basePath="/admin/stock" params={{ q, status }} />
+    </>
+  );
+}

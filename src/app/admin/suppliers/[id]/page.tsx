@@ -1,3 +1,4 @@
+import { EntityActivity } from "@/components/orders/entity-activity";
 import { notFound } from "next/navigation";
 import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
@@ -127,6 +128,7 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
           </Card>
         </div>
       </div>
+      <EntityActivity supplierId={supplier.id} />
     </>
   );
 }

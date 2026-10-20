@@ -3,9 +3,13 @@ import { requireAuth } from "@/lib/auth/current";
 import { formatDateTime } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { PasswordForm } from "./password-form";
+import { PushSettings } from "./push-settings";
+import { db } from "@/lib/db";
+import { vapidPublicKey } from "@/lib/push";
 
 export default async function AccountPage() {
   const auth = await requireAuth();
+  const devices = await db.pushSubscription.count({ where: { userId: auth.realUser.id } });
   return (
     <>
       <PageHeader title="Мой профиль" />
@@ -19,6 +23,12 @@ export default async function AccountPage() {
             ]}
           />
         </Card>
+        {!auth.isImpersonating && (
+          <Card>
+            <h2 className="mb-3 font-semibold">Уведомления</h2>
+            <PushSettings enabled={auth.realUser.pushEnabled} devices={devices} publicKey={vapidPublicKey()} />
+          </Card>
+        )}
         {!auth.isImpersonating && (
           <Card>
             <h2 className="mb-3 font-semibold">Сменить пароль</h2>

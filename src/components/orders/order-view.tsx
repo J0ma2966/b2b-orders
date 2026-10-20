@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, DefinitionList } from "@/components/ui";
 import { formatQty } from "@/lib/catalog";
 import { formatDateTime, formatMoney } from "@/lib/format";
-import { actorRoleText, ITEM_KIND_LABEL, lineTotal, ORDER_STATUS_COLOR, ORDER_STATUS_LABEL, orderEventText } from "@/lib/order-core";
+import { actorRoleText, ITEM_KIND_LABEL, PAYMENT_LABEL, lineTotal, ORDER_STATUS_COLOR, ORDER_STATUS_LABEL, orderEventText } from "@/lib/order-core";
 import type { OrderItemKind, OrderStatus } from "@/generated/prisma/enums";
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
@@ -17,6 +17,8 @@ type ItemView = {
   unitLabel: string;
   price: { toString(): string };
   qty: { toString(): string };
+  deliveredQty?: { toString(): string } | null;
+  acceptedQty?: { toString(): string } | null;
   bonusPromotion?: { name: string } | null;
 };
 
@@ -45,9 +47,15 @@ export function OrderItems({ items, total, action }: { items: ItemView[]; total:
                       {formatQty(i.qty)} {i.unitLabel}
                       {kind === "BONUS" ? ` · бесплатно${i.bonusPromotion ? ` · ${i.bonusPromotion.name}` : ""}` : ` × ${formatMoney(i.price)}`}
                     </div>
+                    {i.acceptedQty != null && (
+                      <div className={Number(i.acceptedQty) < Number(i.qty) ? "text-xs text-yellow-700" : "text-xs text-gray-500"}>
+                        доставлено {formatQty(i.deliveredQty ?? i.qty)} · принято {formatQty(i.acceptedQty)}
+                        {Number(i.acceptedQty) < Number(i.qty) && ` · не принято ${formatQty(Number(i.qty) - Number(i.acceptedQty))}`}
+                      </div>
+                    )}
                     {action?.(i)}
                   </div>
-                  <div className="shrink-0 text-sm font-medium">{formatMoney(kind === "BONUS" ? 0 : lineTotal(Number(i.price), Number(i.qty)))}</div>
+                  <div className="shrink-0 text-sm font-medium">{formatMoney(kind === "BONUS" ? 0 : lineTotal(Number(i.price), Number(i.acceptedQty ?? i.qty)))}</div>
                 </li>
               ))}
             </ul>
@@ -122,4 +130,52 @@ export function OrdersList<T extends OrderRow>({ rows, href, party }: { rows: T[
       </ul>
     </Card>
   );
+}
+
+type FinanceView = {
+  status: OrderStatus;
+  total: { toString(): string };
+  orderedTotal: { toString(): string } | null;
+  correctionTotal: { toString(): string };
+  receivedAmount: { toString(): string } | null;
+  receivedMethod: keyof typeof PAYMENT_LABEL | null;
+  paidToOrder: { toString(): string } | null;
+  paidToDebt: { toString(): string } | null;
+  overpaid: { toString(): string } | null;
+  orderDebt: { toString(): string } | null;
+  balanceBefore: { toString(): string } | null;
+  balanceAfter: { toString(): string } | null;
+  qrUsedAt: Date | null;
+};
+
+// Финансы заказа (ТЗ п. 76): первоначальная и итоговая сумма, оплата, долги.
+export function OrderFinance({ o, currentBalance }: { o: FinanceView; currentBalance?: number }) {
+  if (o.receivedAmount === null) return null;
+  const correction = Number(o.correctionTotal);
+  const rows: [string, ReactNode][] = [
+    ["Первоначальная сумма", formatMoney(o.orderedTotal)],
+    ["Итоговая сумма (по принятому)", formatMoney(o.total)],
+    ...(correction !== 0 ? [["Корректировки", `${correction > 0 ? "+" : ""}${formatMoney(correction)}`] as [string, ReactNode]] : []),
+    ["Получено", `${formatMoney(o.receivedAmount)}${o.receivedMethod ? ` · ${PAYMENT_LABEL[o.receivedMethod]}` : ""}`],
+    ["Оплачено по заказу", formatMoney(o.paidToOrder)],
+    ...(Number(o.paidToDebt) > 0 ? [["Погашено прежнего долга", formatMoney(o.paidToDebt)] as [string, ReactNode]] : []),
+    ...(Number(o.overpaid) > 0 ? [["Переплата", formatMoney(o.overpaid)] as [string, ReactNode]] : []),
+    ["Долг по заказу", formatMoney(o.orderDebt)],
+    ["Предыдущий долг", balanceLabel(Number(o.balanceBefore))],
+    ["Задолженность после заказа", balanceLabel(Number(o.balanceAfter))],
+    ...(currentBalance !== undefined ? [["Задолженность сейчас", balanceLabel(currentBalance)] as [string, ReactNode]] : []),
+    ["Получение подтверждено", o.qrUsedAt ? `по QR, ${formatDateTime(o.qrUsedAt)}` : "—"],
+  ];
+  return (
+    <Card>
+      <h2 className="mb-2 font-semibold">Финансы</h2>
+      <DefinitionList items={rows} />
+    </Card>
+  );
+}
+
+export function balanceLabel(b: number) {
+  if (b > 0) return `долг ${formatMoney(b)}`;
+  if (b < 0) return `переплата ${formatMoney(-b)}`;
+  return "нет";
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { ActionForm } from "@/components/ui/action-form";
-import { Field, Input, Select, Textarea } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addToCartAction, cancelOrderAction, checkoutAction, setCartQtyAction } from "@/app/shop/orders/actions";
+import { addToCartAction, cancelOrderAction, checkoutAction, requestCancelAction, setCartQtyAction } from "@/app/shop/orders/actions";
 
 export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: string; unitId: string; step: string; max: number }) {
   const [state, action, pending] = useActionState(addToCartAction, initialFormState);
@@ -89,5 +89,35 @@ export function CancelOrderForm({ orderId }: { orderId: string }) {
       </Field>
       <SubmitButton variant="danger" pendingText="Отменяю…" confirm="Отменить заказ?">Отменить заказ</SubmitButton>
     </ActionForm>
+  );
+}
+
+export function RequestCancelForm({ orderId }: { orderId: string }) {
+  const [state, action, pending] = useActionState(requestCancelAction, initialFormState);
+  if (state.ok) return <FormMessage state={state} />;
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <p className="text-sm text-gray-600">Заказ уже в пути: отмена возможна только с согласия поставщика.</p>
+      <input type="hidden" name="orderId" value={orderId} />
+      <Field label="Причина" name="reason" error={state.fieldErrors?.reason}>
+        <Input name="reason" defaultValue={state.values?.reason} />
+      </Field>
+      <SubmitButton variant="secondary" pendingText="Отправляю…">Попросить отмену</SubmitButton>
+    </ActionForm>
+  );
+}
+
+// QR показывается только по нажатию — в момент передачи товара (ТЗ п. 34)
+export function ConfirmReceiptQr({ dataUrl, code }: { dataUrl: string; code: string }) {
+  const [open, setOpen] = useState(false);
+  if (!open) return <Button className="w-full" onClick={() => setOpen(true)}>Подтвердить получение</Button>;
+  return (
+    <div className="space-y-2 text-center">
+      <p className="text-sm text-gray-600">Проверьте товар и сумму, затем покажите QR доставщику.</p>
+      <img src={dataUrl} alt="QR-код подтверждения получения" className="mx-auto w-64 max-w-full" />
+      <p className="font-mono text-lg tracking-widest">{code.replace(/(.{5})/, "$1 ")}</p>
+      <button type="button" className="text-sm text-gray-600 underline" onClick={() => setOpen(false)}>Скрыть</button>
+    </div>
   );
 }

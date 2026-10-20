@@ -84,3 +84,28 @@ describe("бонусы (ТЗ п. 50–51)", () => {
     expect(plan.map((p) => p.qty)).toEqual([1, 0]);
   });
 });
+
+import { creditCheck, distributePayment, minimalPayment } from "@/lib/finance-core";
+
+describe("распределение оплаты (ТЗ п. 40–42)", () => {
+  it("частичная оплата формирует долг", () => {
+    expect(distributePayment(1000, 500, 0)).toMatchObject({ toOrder: 500, orderDebt: 500, balanceAfter: 500 });
+  });
+  it("оплата заказа и прежнего долга", () => {
+    expect(distributePayment(1000, 1500, 500)).toMatchObject({ toOrder: 1000, toDebt: 500, overpaid: 0, balanceAfter: 0 });
+  });
+  it("переплата не даёт отрицательного долга, а копится как переплата", () => {
+    expect(distributePayment(1000, 1800, 500)).toMatchObject({ toDebt: 500, overpaid: 300, balanceAfter: -300 });
+  });
+  it("прежняя переплата зачитывается в новый заказ", () => {
+    expect(distributePayment(1000, 700, -300)).toMatchObject({ fromPrepay: 300, toOrder: 700, orderDebt: 0, balanceAfter: 0 });
+  });
+  it("без разрешения долг расти не может", () => {
+    expect(creditCheck({ creditAllowed: false, creditLimit: null }, 0, 500)).toContain("не разрешена");
+    expect(creditCheck({ creditAllowed: false, creditLimit: null }, 800, 300)).toBeNull();
+    expect(creditCheck({ creditAllowed: true, creditLimit: 400 }, 0, 500)).toContain("лимит");
+    expect(creditCheck({ creditAllowed: true, creditLimit: null }, 0, 5000)).toBeNull();
+    expect(minimalPayment(1000, -300)).toBe(700);
+    expect(minimalPayment(1000, 500)).toBe(1000);
+  });
+});

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
-import { parseAmount } from "@/lib/catalog";
+import { parseAmount, parseSignedAmount } from "@/lib/catalog";
+import { correctBalance, decideCancelRequest, resolveProblem } from "@/lib/delivery";
 import { addForcedItem, assignCourier, OrderError, removeForcedItem, supplierOrderAction } from "@/lib/orders";
 import { ORDER_STATUS_LABEL, SUPPLIER_ACTION_NEEDS_REASON, type SupplierOrderAction } from "@/lib/order-core";
 import { formValues, success, type FormState } from "@/lib/forms";
@@ -82,4 +83,53 @@ export async function removeForcedAction(formData: FormData) {
   }
   await writeAudit({ entity: "Order", entityId: orderId, action: "item.forced_remove", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, changes: [{ field: "item", old: itemId, new: null }] });
   revalidatePath("/supplier", "layout");
+}
+
+export async function cancelRequestDecisionAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const orderId = String(formData.get("orderId") ?? "");
+  const approve = formData.get("decision") === "approve";
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  try {
+    await decideCancelRequest(ctx.supplier.id, orderId, approve, comment, roleTag(ctx.membership.role));
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: "Order", entityId: orderId, action: approve ? "cancel.approve" : "cancel.decline", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, comment });
+  revalidatePath("/supplier", "layout");
+  return success(approve ? "Отмена согласована, резерв освобождён" : "В отмене отказано, доставка продолжается");
+}
+
+export async function resolveProblemAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const orderId = String(formData.get("orderId") ?? "");
+  const resolution = String(formData.get("resolution") ?? "") as "continue" | "back_to_ready" | "cancel";
+  if (!["continue", "back_to_ready", "cancel"].includes(resolution)) return { error: "Неизвестное действие" };
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  try {
+    await resolveProblem(ctx.supplier.id, orderId, resolution, comment, roleTag(ctx.membership.role));
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: "Order", entityId: orderId, action: `problem.${resolution}`, actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, comment });
+  revalidatePath("/supplier", "layout");
+  return success("Решение сохранено");
+}
+
+export async function orderCorrectionAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier(["OWNER", "ADMIN"]);
+  const orderId = String(formData.get("orderId") ?? "");
+  const shopId = String(formData.get("shopId") ?? "");
+  const amount = parseSignedAmount(String(formData.get("amount") ?? ""));
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (amount === null || amount === 0) return { fieldErrors: { amount: ["Укажите сумму со знаком, например +200 или -500"] }, values: formValues(formData) };
+  if (!reason) return { fieldErrors: { reason: ["Укажите основание"] }, values: formValues(formData) };
+  try {
+    await correctBalance(ctx.supplier.id, shopId, amount, reason, orderId || null, roleTag(ctx.membership.role));
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: orderId ? "Order" : "ShopAccount", entityId: orderId || shopId, action: "correction", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, shopId, comment: reason, changes: [{ field: "amount", old: null, new: amount }] });
+  revalidatePath("/supplier", "layout");
+  return success("Корректирующая операция записана");
 }

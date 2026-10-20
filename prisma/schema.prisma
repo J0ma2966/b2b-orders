@@ -28,6 +28,8 @@ model User {
   status       UserStatus @default(ACTIVE)
   // Пароль выдан администратором, пользователь должен сменить его при входе
   mustChangePassword Boolean @default(false)
+  // Push-уведомления; внутренние уведомления сохраняются независимо (ТЗ п. 57)
+  pushEnabled  Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -37,6 +39,8 @@ model User {
   shopMembers       ShopMember[]
   notifications     Notification[]
   courierOrders     Order[]          @relation("OrderCourier")
+  courierReplacements Replacement[]  @relation("ReplacementCourier")
+  pushSubscriptions PushSubscription[]
 }
 
 model Session {
@@ -147,6 +151,9 @@ model Supplier {
   antifraudEvents AntifraudEvent[]
   orders      Order[]
   bonusPromotions BonusPromotion[]
+  shopAccounts ShopAccount[]
+  replacements Replacement[]
+  returnedItems ReturnedItem[]
 }
 
 enum SupplierRole {
@@ -222,6 +229,9 @@ model Shop {
   members       ShopMember[]
   statusHistory ShopStatusHistory[]
   orders        Order[]
+  accounts      ShopAccount[]
+  replacements  Replacement[]
+  returnedItems ReturnedItem[]
 
   @@index([territoryId])
 }
@@ -388,6 +398,8 @@ model ProductUnit {
   priceHistory PriceHistory[]
   antifraudEvents AntifraudEvent[]
   orderItems   OrderItem[]
+  replacements Replacement[]
+  returnedItems ReturnedItem[]
   bonusTriggers BonusPromotion[] @relation("BonusTrigger")
   bonusGifts    BonusPromotion[] @relation("BonusGift")
 
@@ -418,6 +430,7 @@ enum StockMovementType {
   FORCED_SALE       // принудительная продажа
   RETURN_UNACCEPTED // возврат непринятого товара
   TO_RETURNED       // перевод в возвращённые товары
+  REPLACEMENT_OUT   // выдача товара по замене
   BACK_TO_STOCK     // возврат в оборот
   WRITE_OFF         // списание
   ADJUSTMENT        // ручная корректировка
@@ -549,11 +562,43 @@ model Order {
   cancelledBy CancelSide?
   cancelReason String?
 
+  // QR-подтверждение получения (ТЗ п. 34–35): одноразовый код конкретного заказа
+  qrToken     String?   @unique
+  qrUsedAt    DateTime?
+  inTransitAt DateTime?
+  deliveredAt DateTime?
+  completedAt DateTime?
+  // Сумма до приёмки (заказанное); total после приёмки — по фактически принятому
+  orderedTotal Decimal? @db.Decimal(14, 2)
+  // Корректирующие операции после завершения (ТЗ п. 65–66)
+  correctionTotal Decimal @default(0) @db.Decimal(14, 2)
+
+  // Оплата при получении (ТЗ п. 38–42)
+  receivedAmount Decimal?       @db.Decimal(14, 2)
+  receivedMethod PaymentMethod?
+  paidToOrder    Decimal?       @db.Decimal(14, 2)
+  paidToDebt     Decimal?       @db.Decimal(14, 2)
+  overpaid       Decimal?       @db.Decimal(14, 2)
+  orderDebt      Decimal?       @db.Decimal(14, 2)
+  balanceBefore  Decimal?       @db.Decimal(14, 2)
+  balanceAfter   Decimal?       @db.Decimal(14, 2)
+
+  // Запрос магазина на отмену во время доставки (ТЗ п. 28)
+  cancelRequestedAt     DateTime?
+  cancelRequestReason   String?
+  statusBeforeRequest   OrderStatus?
+  // Проблема при доставке / причина недоставки
+  problemNote String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   items  OrderItem[]
   events OrderEvent[]
+  debtEntries  DebtEntry[]
+  replacements Replacement[] @relation("ReplacementOrder")
+  replacementsNew Replacement[] @relation("ReplacementNewOrder")
+  returnedItems ReturnedItem[]
 
   @@index([shopId, status])
   @@index([supplierId, status, placedAt])
@@ -572,9 +617,11 @@ model OrderItem {
   unitLabel     String
   price         Decimal       @db.Decimal(14, 2) // для бонуса 0
   qty           Decimal       @db.Decimal(14, 3)
+  deliveredQty  Decimal?      @db.Decimal(14, 3)
   acceptedQty   Decimal?      @db.Decimal(14, 3)
   bonusPromotionId String?
   bonusPromotion   BonusPromotion? @relation(fields: [bonusPromotionId], references: [id])
+  replacements  Replacement[]
   addedByUserId String?
   createdAt     DateTime      @default(now())
 
@@ -625,4 +672,158 @@ model BonusPromotion {
   items OrderItem[]
 
   @@index([supplierId, isActive])
+}
+
+// ───────────── Финансы: счёт магазина у поставщика (ТЗ п. 38–44) ─────────────
+
+model ShopAccount {
+  id            String   @id @default(cuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id])
+  // Работа в долг разрешается поставщиком (ТЗ п. 39); лимит необязателен (п. 90.15)
+  creditAllowed Boolean  @default(false)
+  creditLimit   Decimal? @db.Decimal(14, 2)
+  // > 0 — долг магазина, < 0 — переплата (п. 42)
+  balance       Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  entries DebtEntry[]
+
+  @@unique([shopId, supplierId])
+  @@index([supplierId])
+}
+
+enum DebtEntryType {
+  ORDER_CHARGE  // обязательство по заказу (принятые товары)
+  ORDER_PAYMENT // оплата при получении
+  DEBT_PAYMENT  // погашение задолженности
+  CORRECTION    // корректирующая операция
+}
+
+model DebtEntry {
+  id            String        @id @default(cuid())
+  accountId     String
+  account       ShopAccount   @relation(fields: [accountId], references: [id])
+  orderId       String?
+  order         Order?        @relation(fields: [orderId], references: [id])
+  type          DebtEntryType
+  // Со знаком: + увеличивает долг, − уменьшает
+  amount        Decimal       @db.Decimal(14, 2)
+  balanceAfter  Decimal       @db.Decimal(14, 2)
+  paymentMethod PaymentMethod?
+  comment       String?
+  occurredAt    DateTime      @default(now())
+  userId        String?
+  onBehalfOfUserId String?
+  correctsId    String?
+  createdAt     DateTime      @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([orderId])
+}
+
+// ───────────── Замены и возвращённые товары (ТЗ п. 45–49) ─────────────
+
+enum ReplacementStatus {
+  NEW       // на рассмотрении
+  APPROVED  // согласована
+  REJECTED  // отклонена
+  ASSIGNED  // передана доставщику
+  DONE      // выполнена
+  CANCELLED // отменена магазином
+}
+
+model Replacement {
+  id            String            @id @default(cuid())
+  number        Int               @unique @default(autoincrement())
+  shopId        String
+  shop          Shop              @relation(fields: [shopId], references: [id])
+  supplierId    String
+  supplier      Supplier          @relation(fields: [supplierId], references: [id])
+  orderId       String
+  order         Order             @relation("ReplacementOrder", fields: [orderId], references: [id])
+  orderItemId   String
+  orderItem     OrderItem         @relation(fields: [orderItemId], references: [id])
+  productUnitId String
+  productUnit   ProductUnit       @relation(fields: [productUnitId], references: [id])
+  productName   String
+  unitLabel     String
+  qty           Decimal           @db.Decimal(14, 3)
+  reason        String
+  comment       String?
+  photoPaths    String[]
+  videoPaths    String[]
+  status        ReplacementStatus @default(NEW)
+  decisionComment String?
+  courierId     String?
+  courier       User?             @relation("ReplacementCourier", fields: [courierId], references: [id])
+  // Вариант «привязать к новому заказу» (ТЗ п. 46)
+  newOrderId    String?
+  newOrder      Order?            @relation("ReplacementNewOrder", fields: [newOrderId], references: [id])
+  createdByUserId String?
+  decidedAt     DateTime?
+  assignedAt    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  returnedItems ReturnedItem[]
+
+  @@index([supplierId, status])
+  @@index([shopId])
+  @@index([courierId, status])
+}
+
+enum ReturnedStatus {
+  PENDING_CHECK // ожидает проверки
+  CHECKED       // проверен
+  USABLE        // пригоден
+  DEFECTIVE     // брак
+  WRITTEN_OFF   // списан
+  DISPOSED      // утилизирован
+  BACK_TO_STOCK // возвращён в оборот
+}
+
+model ReturnedItem {
+  id            String         @id @default(cuid())
+  supplierId    String
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  shopId        String
+  shop          Shop           @relation(fields: [shopId], references: [id])
+  orderId       String
+  order         Order          @relation(fields: [orderId], references: [id])
+  replacementId String?
+  replacement   Replacement?   @relation(fields: [replacementId], references: [id])
+  productUnitId String
+  productUnit   ProductUnit    @relation(fields: [productUnitId], references: [id])
+  productName   String
+  unitLabel     String
+  qty           Decimal        @db.Decimal(14, 3)
+  reason        String
+  courierId     String?
+  status        ReturnedStatus @default(PENDING_CHECK)
+  comment       String?
+  photoPaths    String[]
+  videoPaths    String[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([supplierId, status])
+}
+
+// ───────────── Push-уведомления (ТЗ п. 57) ─────────────
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

@@ -7,6 +7,7 @@ import { notifySupplierStaff, notifyUsers, type NotificationInput } from "@/lib/
 import { supplierForShop } from "@/lib/shop-catalog";
 import { formatQty, unitName } from "@/lib/catalog";
 import { formatMoney } from "@/lib/format";
+import { generateQrToken } from "@/lib/qr-token";
 import {
   canAssignCourier,
   canEditForced,
@@ -32,7 +33,7 @@ export function orderTitle(o: Pick<Order, "number">) {
 
 // ───────────── Общее ─────────────
 
-async function lockOrder(tx: Tx, orderId: string) {
+export async function lockOrder(tx: Tx, orderId: string) {
   await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
   const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
   if (!order) throw new OrderError("Заказ не найден");
@@ -66,7 +67,7 @@ export async function notifyShop(shopId: string, n: NotificationInput, tx: Tx | 
 }
 
 // Освобождает резерв по всем позициям заказа (отмена, отклонение).
-async function releaseAll(tx: Tx, order: { id: string; items: { productUnitId: string; qty: Prisma.Decimal }[] }, actor: Actor, reason: string) {
+export async function releaseAll(tx: Tx, order: { id: string; items: { productUnitId: string; qty: Prisma.Decimal }[] }, actor: Actor, reason: string) {
   for (const item of order.items) {
     await applyStock(tx, { unitId: item.productUnitId, type: "RELEASE", qty: num(item.qty), reason, relatedEntity: "Order", relatedId: order.id }, actor);
   }
@@ -318,6 +319,7 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
             deliveryDate: input.deliveryDate ?? null,
             commissionRate: rate,
             createdByUserId: actor.userId,
+            qrToken: generateQrToken(),
           },
         });
         await addEvent(tx, order.id, { type: "status", from: "DRAFT", to: "PLACED", actorRole: "SHOP", comment: bonusNotes.join("\n") || null }, actor);
@@ -342,7 +344,7 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
 
 // ───────────── Действия поставщика (ТЗ п. 26, 28, 29) ─────────────
 
-function shopNote(order: { id: string; number: number | null }, title: string, body?: string): NotificationInput {
+export function shopNote(order: { id: string; number: number | null }, title: string, body?: string): NotificationInput {
   return { type: "order.status", title: `Заказ №${order.number}: ${title}`, body, link: `/shop/orders/${order.id}`, entity: "Order", entityId: order.id };
 }
 
