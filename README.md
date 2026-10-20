@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Оптовые заказы — B2B-платформа поставщиков и магазинов
 
-## Getting Started
+Реализация ТЗ v2.1. Поставщики ведут каталог, остатки и доставку, магазины заказывают у поставщиков своей территории, платформа учитывает приёмку, оплаты, долги и комиссию (деньги не проводит).
 
-First, run the development server:
+## Стек
+
+- Next.js 16 (App Router, Server Actions, Cache Components), React 19, TypeScript
+- PostgreSQL + Prisma 7
+- Tailwind CSS 4, Leaflet + OpenStreetMap
+- PWA: магазин и доставщик ставят приложение на телефон
+- Vitest (логика), Playwright (сквозной сценарий)
+
+## Запуск
 
 ```bash
+cp .env.example .env          # указать DATABASE_URL
+npm install
+npm run db:deploy             # миграции
+npm run db:seed               # территории Узбекистана, комиссия 3%, супер-админ
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Супер-админ по умолчанию: `+998900000000` / `admin12345`, при первом входе система попросит сменить пароль. В продакшене задайте `SUPERADMIN_PASSWORD`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Проверки: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
+Сквозной сценарий на запущенном приложении: `node tests/e2e/stage1-flow.mjs`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Структура
 
-## Learn More
+| Путь | Что там |
+|---|---|
+| `prisma/schema.prisma` | Модель данных |
+| `src/lib/auth` | Сессии (cookie + таблица Session), пароли, проверка ролей, «от имени» |
+| `src/lib/audit.ts` | Аудит: кто, от чьего имени, поле, старое → новое значение |
+| `src/lib/territory*.ts` | Территории доставки и доступность поставщика для магазина |
+| `src/lib/statuses.ts` | Статусы и допустимые переходы |
+| `src/app/(auth)` | Вход, регистрация магазина и поставщика |
+| `src/app/admin` | Кабинет супер-админа |
+| `src/app/supplier` | Кабинет поставщика (владелец и администраторы) |
+| `src/app/courier` | Кабинет доставщика |
+| `src/app/shop` | Кабинет магазина (мобильный) |
+| `docs/decisions.md` | Решения по пробелам ТЗ |
 
-To learn more about Next.js, take a look at the following resources:
+## Этапы (ТЗ п. 88)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [x] Этап 1 — пользователи, роли, регистрация, вход, поставщики и модерация, магазины и точки, сотрудники, доставщики, профили, территории, карта, права, аудит, уведомления
+- [ ] Этап 2 — каталог и склад
+- [ ] Этап 3 — заказы
+- [ ] Этап 4 — доставка, QR, приёмка, чек, накладная
+- [ ] Этап 5 — финансы
+- [ ] Этап 6 — замены
+- [ ] Этап 7 — бонусы
+- [ ] Этап 8 — аналитика
+- [ ] Этап 9 — контроль (антифрод, корректирующие операции)

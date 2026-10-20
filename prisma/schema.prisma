@@ -1,0 +1,305 @@
+// Схема данных B2B-платформы заказов (ТЗ v2.1).
+// Этап 1: пользователи, роли, сессии, поставщики, магазины, территории, аудит, уведомления.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────── Пользователи и сессии ─────────────
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  phone        String     @unique // нормализованный, +998XXXXXXXXX
+  passwordHash String
+  fullName     String
+  email        String?
+  isSuperAdmin Boolean    @default(false)
+  status       UserStatus @default(ACTIVE)
+  // Пароль выдан администратором, пользователь должен сменить его при входе
+  mustChangePassword Boolean @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  sessions          Session[]        @relation("SessionUser")
+  actingSessions    Session[]        @relation("SessionActingAs")
+  supplierMembers   SupplierMember[]
+  shopMembers       ShopMember[]
+  notifications     Notification[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // sha256 от токена из cookie
+  userId    String
+  user      User     @relation("SessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  // «Действие от имени» (ТЗ п. 63): супер-админ работает как пользователь поставщика
+  actingAsUserId String?
+  actingAsUser   User?   @relation("SessionActingAs", fields: [actingAsUserId], references: [id], onDelete: SetNull)
+  // Активный контекст, если пользователь состоит в нескольких организациях
+  activeSupplierId String?
+  activeShopId     String?
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  phone     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+}
+
+// ───────────── Территории ─────────────
+
+enum TerritoryType {
+  COUNTRY
+  REGION
+  CITY
+  DISTRICT
+}
+
+model Territory {
+  id       String        @id @default(cuid())
+  name     String
+  type     TerritoryType
+  parentId String?
+  parent   Territory?    @relation("TerritoryTree", fields: [parentId], references: [id])
+  children Territory[]   @relation("TerritoryTree")
+  isActive Boolean       @default(true)
+  sortOrder Int          @default(0)
+
+  supplierTerritories SupplierTerritory[]
+  shops               Shop[]
+  suppliersOffice     Supplier[]
+
+  @@unique([parentId, name])
+  @@index([parentId])
+}
+
+// ───────────── Поставщики ─────────────
+
+enum SupplierStatus {
+  PENDING      // На проверке
+  NEEDS_INFO   // Запрошены дополнительные сведения
+  ACTIVE       // Подтверждён
+  REJECTED     // Отклонён
+  BLOCKED      // Заблокирован
+}
+
+model Supplier {
+  id             String         @id @default(cuid())
+  legalName      String         // название юридического лица
+  displayName    String         // название для магазинов
+  inn            String         @unique
+  legalAddress   String
+  phone          String
+  extraPhones    String[]
+  email          String
+  website        String?
+  contactPerson  String
+  description    String?
+  logoPath       String?
+  // Главный офис
+  officeTerritoryId String?     // город/район офиса
+  officeTerritory   Territory?  @relation(fields: [officeTerritoryId], references: [id])
+  officeAddress  String
+  officeLat      Float?
+  officeLng      Float?
+
+  status            SupplierStatus @default(PENDING)
+  moderationComment String?        // причина отказа или что нужно дополнить
+  // Индивидуальная комиссия, %; null — действует стандартная ставка платформы
+  commissionRate    Decimal?       @db.Decimal(5, 2)
+  // Антифрод-меры (ТЗ п. 56)
+  hiddenFromShops   Boolean        @default(false)
+  ordersDisabled    Boolean        @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  approvedAt DateTime?
+
+  members     SupplierMember[]
+  territories SupplierTerritory[]
+  statusHistory SupplierStatusHistory[]
+}
+
+enum SupplierRole {
+  OWNER   // представитель юрлица, подавший заявку
+  ADMIN   // администратор поставщика
+  COURIER // доставщик
+}
+
+model SupplierMember {
+  id         String       @id @default(cuid())
+  supplierId String
+  supplier   Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       SupplierRole
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+
+  @@unique([supplierId, userId])
+  @@index([userId])
+}
+
+model SupplierTerritory {
+  supplierId  String
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  territoryId String
+  territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+
+  @@id([supplierId, territoryId])
+  @@index([territoryId])
+}
+
+model SupplierStatusHistory {
+  id         String          @id @default(cuid())
+  supplierId String
+  supplier   Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  fromStatus SupplierStatus?
+  toStatus   SupplierStatus
+  comment    String?
+  userId     String?
+  createdAt  DateTime        @default(now())
+
+  @@index([supplierId])
+}
+
+// ───────────── Магазины ─────────────
+
+enum ShopStatus {
+  NEW          // Новый
+  VERIFIED     // Проверенный (после первой успешной доставки)
+  FAILED_CHECK // Не прошёл проверку
+}
+
+model Shop {
+  id           String     @id @default(cuid())
+  name         String
+  inn          String?
+  phone        String
+  phone2       String?
+  photoPaths   String[]
+  address      String
+  lat          Float
+  lng          Float
+  contactName  String
+  // Самая точная территория магазина (район или город); регион определяется по дереву
+  territoryId  String
+  territory    Territory  @relation(fields: [territoryId], references: [id])
+  status       ShopStatus @default(NEW)
+  isBlocked    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  members       ShopMember[]
+  statusHistory ShopStatusHistory[]
+
+  @@index([territoryId])
+}
+
+enum ShopRole {
+  OWNER
+  STAFF
+}
+
+model ShopMember {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ShopRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, userId])
+  @@index([userId])
+}
+
+model ShopStatusHistory {
+  id         String      @id @default(cuid())
+  shopId     String
+  shop       Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  fromStatus ShopStatus?
+  toStatus   ShopStatus
+  reason     String?
+  userId     String?
+  createdAt  DateTime    @default(now())
+
+  @@index([shopId])
+}
+
+// ───────────── Настройки платформы ─────────────
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// ───────────── Аудит (ТЗ п. 63–64) ─────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  // Фактический пользователь (кто нажал кнопку)
+  actorUserId String?
+  // От чьего имени выполнено действие (если супер-админ действует от имени)
+  onBehalfOfUserId String?
+  actorRole  String   // SUPER_ADMIN, SUPPLIER_OWNER, SUPPLIER_ADMIN, COURIER, SHOP, SYSTEM
+  entity     String   // Supplier, Shop, User, Territory, ...
+  entityId   String?
+  action     String   // create, update, approve, block, ...
+  // [{ field, old, new }]
+  changes    Json?
+  comment    String?
+  supplierId String?
+  shopId     String?
+  source     String   @default("web")
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([supplierId, createdAt])
+  @@index([shopId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([createdAt])
+}
+
+// ───────────── Уведомления (ТЗ п. 57, 85) ─────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  link      String?
+  entity    String?
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+}

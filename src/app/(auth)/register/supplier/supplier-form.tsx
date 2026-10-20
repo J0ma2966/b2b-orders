@@ -1,0 +1,23 @@
+"use client";
+
+import { ActionForm } from "@/components/ui/action-form";
+import { useActionState } from "react";
+import { Alert } from "@/components/ui";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { AccountFields } from "@/components/forms/account-fields";
+import { SupplierFields } from "@/components/forms/supplier-fields";
+import type { TerritoryOption } from "@/components/territory/types";
+import { initialFormState } from "@/lib/forms";
+import { registerSupplierAction } from "../actions";
+
+export function SupplierRegisterForm({ territories, loggedIn }: { territories: TerritoryOption[]; loggedIn: boolean }) {
+  const [state, action, pending] = useActionState(registerSupplierAction, initialFormState);
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-6">
+      {state.error && <Alert tone="error">{state.error}</Alert>}
+      {!loggedIn && <AccountFields state={state} />}
+      <SupplierFields state={state} territories={territories} />
+      <SubmitButton className="w-full sm:w-auto" pendingText="Отправляем…">Отправить заявку</SubmitButton>
+    </ActionForm>
+  );
+}

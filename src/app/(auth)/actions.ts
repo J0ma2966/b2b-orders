@@ -1,0 +1,79 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { normalizePhone } from "@/lib/phone";
+import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "@/lib/auth/password";
+import { createSession, destroySession, requestMeta } from "@/lib/auth/session";
+import { homePathFor, requireAuth } from "@/lib/auth/current";
+import { formValues, invalid, parseForm, type FormState } from "@/lib/forms";
+
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_FAILS_PER_PHONE = 5;
+const MAX_FAILS_PER_IP = 30;
+
+const loginSchema = z.object({
+  phone: z.string().trim().min(1, "Введите телефон"),
+  password: z.string().min(1, "Введите пароль"),
+});
+
+export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = parseForm(loginSchema, formData);
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const phone = normalizePhone(parsed.data.phone);
+  const values = formValues(formData);
+  if (!phone) return { fieldErrors: { phone: ["Телефон в формате +998 90 123-45-67"] }, values };
+
+  const { ip } = await requestMeta();
+  const since = new Date(Date.now() - WINDOW_MS);
+  const [phoneFails, ipFails] = await Promise.all([
+    db.loginAttempt.count({ where: { phone, success: false, createdAt: { gte: since } } }),
+    ip ? db.loginAttempt.count({ where: { ip, success: false, createdAt: { gte: since } } }) : 0,
+  ]);
+  if (phoneFails >= MAX_FAILS_PER_PHONE || ipFails >= MAX_FAILS_PER_IP) {
+    return { error: "Слишком много неудачных попыток. Попробуйте через 15 минут.", values };
+  }
+
+  const user = await db.user.findUnique({ where: { phone } });
+  const ok = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
+  await db.loginAttempt.create({ data: { phone, ip, success: ok && user?.status === "ACTIVE" } });
+  if (!user || !ok) return { error: "Неверный телефон или пароль", values };
+  if (user.status !== "ACTIVE") return { error: "Учётная запись заблокирована. Обратитесь к администратору.", values };
+
+  await createSession(user.id);
+  if (user.mustChangePassword) redirect("/account/password");
+  redirect(await homePathFor({ isSuperAdmin: user.isSuperAdmin, user }));
+}
+
+export async function logoutAction() {
+  await destroySession();
+  redirect("/login");
+}
+
+const passwordSchema = z
+  .object({
+    current: z.string().min(1, "Введите текущий пароль"),
+    password: z.string().min(MIN_PASSWORD_LENGTH, `Минимум ${MIN_PASSWORD_LENGTH} символов`),
+    password2: z.string(),
+  })
+  .refine((d) => d.password === d.password2, { path: ["password2"], message: "Пароли не совпадают" });
+
+export async function changePasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const auth = await requireAuth({ allowTempPassword: true });
+  if (auth.isImpersonating) return { error: "Нельзя менять пароль в режиме «от имени»" };
+  const parsed = parseForm(passwordSchema, formData);
+  if (!parsed.success) return invalid(parsed.error, formData);
+  if (!(await verifyPassword(parsed.data.current, auth.realUser.passwordHash))) {
+    return { fieldErrors: { current: ["Неверный текущий пароль"] } };
+  }
+  await db.$transaction([
+    db.user.update({
+      where: { id: auth.realUser.id },
+      data: { passwordHash: await hashPassword(parsed.data.password), mustChangePassword: false },
+    }),
+    // Выходим на остальных устройствах
+    db.session.deleteMany({ where: { userId: auth.realUser.id, NOT: { id: auth.session.id } } }),
+  ]);
+  redirect(await homePathFor(auth));
+}
