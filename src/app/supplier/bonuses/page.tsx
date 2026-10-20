@@ -3,11 +3,12 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatDate } from "@/lib/format";
 import { BonusForm } from "./form";
 import { toggleBonusAction } from "./actions";
+import { getT } from "@/lib/i18n/server";
 
 export default async function BonusesPage() {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const [promos, units, given] = await Promise.all([
     db.bonusPromotion.findMany({
@@ -34,7 +35,7 @@ export default async function BonusesPage() {
       <PageHeader title="Бонусы" subtitle="Подарок добавляется в заказ автоматически, бесплатно для магазина и только из доступного остатка" />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
-          {promos.length === 0 && <EmptyState>Акций пока нет</EmptyState>}
+          {promos.length === 0 && <EmptyState>{t("Акций пока нет")}</EmptyState>}
           {promos.map((p) => {
             const running = p.isActive && p.startsAt <= now && p.endsAt >= now;
             return (
@@ -43,13 +44,16 @@ export default async function BonusesPage() {
                   <div>
                     <div className="font-medium">{p.name}</div>
                     <div className="mt-1 text-sm text-gray-700">
-                      {p.repeatable ? "За каждые" : "При покупке от"} {formatQty(p.triggerQty)} {unitName(p.triggerUnit)} «{p.triggerUnit.product.name}» — {formatQty(p.giftQty)} {unitName(p.giftUnit)} «{p.giftUnit.product.name}» в подарок
+                      {t(p.repeatable ? "За каждые {tq} {tu} «{tp}» — {gq} {gu} «{gp}» в подарок" : "При покупке от {tq} {tu} «{tp}» — {gq} {gu} «{gp}» в подарок", {
+                        tq: formatQty(p.triggerQty), tu: t(unitName(p.triggerUnit)), tp: p.triggerUnit.product.name,
+                        gq: formatQty(p.giftQty), gu: t(unitName(p.giftUnit)), gp: p.giftUnit.product.name,
+                      })}
                     </div>
                     <div className="mt-1 text-xs text-gray-500">
-                      {formatDate(p.startsAt)} — {formatDate(p.endsAt)} · выдано {formatQty(givenBy.get(p.id) ?? 0)}
+                      {t.date(p.startsAt)} — {t.date(p.endsAt)} · {t("выдано {n}", { n: formatQty(givenBy.get(p.id) ?? 0) })}
                     </div>
                   </div>
-                  <Badge color={running ? "green" : "gray"}>{running ? "Действует" : p.isActive ? "Не в сроке" : "Выключена"}</Badge>
+                  <Badge color={running ? "green" : "gray"}>{running ? t("Действует") : p.isActive ? t("Не в сроке") : t("Выключена")}</Badge>
                 </div>
                 <form action={toggleBonusAction} className="mt-2">
                   <input type="hidden" name="id" value={p.id} />
@@ -60,8 +64,8 @@ export default async function BonusesPage() {
           })}
         </div>
         <Card>
-          <h2 className="mb-3 font-semibold">Новая акция</h2>
-          <BonusForm today={today} units={units.map((u) => ({ id: u.id, label: `${u.product.name} — ${unitName(u)}` }))} />
+          <h2 className="mb-3 font-semibold">{t("Новая акция")}</h2>
+          <BonusForm today={today} units={units.map((u) => ({ id: u.id, label: `${u.product.name} — ${t(unitName(u))}` }))} />
         </Card>
       </div>
     </>

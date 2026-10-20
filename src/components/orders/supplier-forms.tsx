@@ -8,8 +8,10 @@ import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { SUPPLIER_ACTION_LABEL, SUPPLIER_ACTION_NEEDS_REASON, type SupplierOrderAction } from "@/lib/order-core";
 import { addForcedAction, assignCourierAction, cancelRequestDecisionAction, orderCorrectionAction, orderStatusAction, resolveProblemAction } from "@/app/supplier/orders/actions";
+import { useT } from "@/lib/i18n/client";
 
 export function OrderStatusForm({ orderId, actions }: { orderId: string; actions: SupplierOrderAction[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(orderStatusAction, initialFormState);
   const [withReason, setWithReason] = useState<SupplierOrderAction | null>(null);
   const forward = actions.filter((a) => !SUPPLIER_ACTION_NEEDS_REASON.includes(a));
@@ -31,7 +33,7 @@ export function OrderStatusForm({ orderId, actions }: { orderId: string; actions
         <div className="flex flex-wrap gap-2">
           {negative.map((a) => (
             <button key={a} type="button" className="text-sm text-red-600 underline" onClick={() => setWithReason(a)}>
-              {SUPPLIER_ACTION_LABEL[a]}
+              {t(SUPPLIER_ACTION_LABEL[a])}
             </button>
           ))}
         </div>
@@ -45,7 +47,7 @@ export function OrderStatusForm({ orderId, actions }: { orderId: string; actions
           </Field>
           <div className="flex gap-2">
             <SubmitButton variant="danger" pendingText="…">{SUPPLIER_ACTION_LABEL[current]}</SubmitButton>
-            <button type="button" className="text-sm text-gray-600" onClick={() => setWithReason(null)}>Не нужно</button>
+            <button type="button" className="text-sm text-gray-600" onClick={() => setWithReason(null)}>{t("Не нужно")}</button>
           </div>
         </ActionForm>
       )}
@@ -54,20 +56,21 @@ export function OrderStatusForm({ orderId, actions }: { orderId: string; actions
 }
 
 export function AssignCourierForm({ orderId, couriers, current }: { orderId: string; couriers: { id: string; name: string; active: number }[]; current: string | null }) {
+  const t = useT();
   const [state, action, pending] = useActionState(assignCourierAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
       <input type="hidden" name="orderId" value={orderId} />
       {couriers.length === 0 ? (
-        <p className="text-sm text-gray-500">Нет доставщиков. Добавьте их в разделе «Сотрудники и доставщики».</p>
+        <p className="text-sm text-gray-500">{t("Нет доставщиков. Добавьте их в разделе «Сотрудники и доставщики».")}</p>
       ) : (
         <>
           <Field label="Доставщик" name="courierId">
             <Select name="courierId" defaultValue={current ?? ""}>
-              <option value="">— не назначен —</option>
+              <option value="">{t("— не назначен —")}</option>
               {couriers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} · в работе {c.active}</option>
+                <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}</option>
               ))}
             </Select>
           </Field>
@@ -79,6 +82,7 @@ export function AssignCourierForm({ orderId, couriers, current }: { orderId: str
 }
 
 export function ForcedItemForm({ orderId, units }: { orderId: string; units: { id: string; label: string; available: string }[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(addForcedAction, initialFormState);
   const fe = state.fieldErrors ?? {};
   return (
@@ -87,60 +91,63 @@ export function ForcedItemForm({ orderId, units }: { orderId: string; units: { i
       <input type="hidden" name="orderId" value={orderId} />
       <Field label="Товар" name="unitId" error={fe.unitId}>
         <Select name="unitId" defaultValue={state.values?.unitId ?? ""}>
-          <option value="">— выберите —</option>
+          <option value="">{t("— выберите —")}</option>
           {units.map((u) => (
-            <option key={u.id} value={u.id}>{u.label} · доступно {u.available}</option>
+            <option key={u.id} value={u.id}>{u.label} · {t("доступно {n}", { n: u.available })}</option>
           ))}
         </Select>
       </Field>
       <Field label="Количество" name="qty" error={fe.qty}>
         <Input name="qty" inputMode="decimal" defaultValue={state.values?.qty} className="w-32" />
       </Field>
-      <SubmitButton variant="secondary" pendingText="Добавляю…">Добавить как принудительную продажу</SubmitButton>
+      <SubmitButton variant="secondary" pendingText="Добавляю…">{t("Добавить как принудительную продажу")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function CancelRequestDecisionForm({ orderId, reason }: { orderId: string; reason: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(cancelRequestDecisionAction, initialFormState);
   if (state.ok) return <FormMessage state={state} />;
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
-      <p className="text-sm">Магазин просит отменить заказ в пути. Причина: <b>{reason}</b></p>
+      <p className="text-sm">{t("Магазин просит отменить заказ в пути. Причина:")} <b>{reason}</b></p>
       <input type="hidden" name="orderId" value={orderId} />
       <Field label="Комментарий магазину" name="comment">
         <Input name="comment" />
       </Field>
       <div className="flex flex-wrap gap-2">
-        <SubmitButton name="decision" value="approve" variant="danger" pendingText="…">Согласовать отмену</SubmitButton>
-        <SubmitButton name="decision" value="decline" variant="secondary" pendingText="…">Отказать, доставлять</SubmitButton>
+        <SubmitButton name="decision" value="approve" variant="danger" pendingText="…">{t("Согласовать отмену")}</SubmitButton>
+        <SubmitButton name="decision" value="decline" variant="secondary" pendingText="…">{t("Отказать, доставлять")}</SubmitButton>
       </div>
     </ActionForm>
   );
 }
 
 export function ResolveProblemForm({ orderId, note }: { orderId: string; note: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(resolveProblemAction, initialFormState);
   if (state.ok) return <FormMessage state={state} />;
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
-      <p className="text-sm">Доставщик сообщил о проблеме: <b>{note}</b></p>
+      <p className="text-sm">{t("Доставщик сообщил о проблеме:")} <b>{note}</b></p>
       <input type="hidden" name="orderId" value={orderId} />
       <Field label="Комментарий (для отмены обязателен)" name="comment">
         <Input name="comment" defaultValue={state.values?.comment} />
       </Field>
       <div className="flex flex-wrap gap-2">
-        <SubmitButton name="resolution" value="continue" pendingText="…">Продолжить доставку</SubmitButton>
-        <SubmitButton name="resolution" value="back_to_ready" variant="secondary" pendingText="…">Вернуть на склад</SubmitButton>
-        <SubmitButton name="resolution" value="cancel" variant="danger" pendingText="…" confirm="Отменить заказ и освободить резерв?">Отменить заказ</SubmitButton>
+        <SubmitButton name="resolution" value="continue" pendingText="…">{t("Продолжить доставку")}</SubmitButton>
+        <SubmitButton name="resolution" value="back_to_ready" variant="secondary" pendingText="…">{t("Вернуть на склад")}</SubmitButton>
+        <SubmitButton name="resolution" value="cancel" variant="danger" pendingText="…" confirm="Отменить заказ и освободить резерв?">{t("Отменить заказ")}</SubmitButton>
       </div>
     </ActionForm>
   );
 }
 
 export function CorrectionForm({ orderId, shopId }: { orderId?: string; shopId: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(orderCorrectionAction, initialFormState);
   const fe = state.fieldErrors ?? {};
   return (
@@ -158,7 +165,7 @@ export function CorrectionForm({ orderId, shopId }: { orderId?: string; shopId: 
           </Field>
         </div>
       </div>
-      <SubmitButton variant="secondary" pendingText="…" confirm="Записать корректирующую операцию? Исходные записи останутся в истории.">Записать корректировку</SubmitButton>
+      <SubmitButton variant="secondary" pendingText="…" confirm="Записать корректирующую операцию? Исходные записи останутся в истории.">{t("Записать корректировку")}</SubmitButton>
     </ActionForm>
   );
 }

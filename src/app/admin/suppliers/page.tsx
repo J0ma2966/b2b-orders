@@ -4,12 +4,13 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { formatDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { SUPPLIER_STATUS_COLOR, SUPPLIER_STATUS_LABEL } from "@/lib/statuses";
 import type { Prisma, SupplierStatus } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function SuppliersPage({ searchParams }: PageProps<"/admin/suppliers">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
@@ -35,7 +36,7 @@ export default async function SuppliersPage({ searchParams }: PageProps<"/admin/
       <PageHeader title="Поставщики" />
       <FilterBar q={q} status={status} statuses={Object.entries(SUPPLIER_STATUS_LABEL)} placeholder="Название, ИНН, телефон" />
       {rows.length === 0 ? (
-        <EmptyState>Поставщиков не найдено</EmptyState>
+        <EmptyState>{t("Поставщиков не найдено")}</EmptyState>
       ) : (
         <Card className="p-0 sm:p-0">
           <ul className="divide-y divide-gray-100">
@@ -45,7 +46,7 @@ export default async function SuppliersPage({ searchParams }: PageProps<"/admin/
                   <div className="min-w-0">
                     <div className="truncate font-medium">{s.legalName}</div>
                     <div className="text-xs text-gray-500">
-                      ИНН {s.inn} · {formatPhone(s.phone)} · заявка {formatDate(s.createdAt)}
+                      {t("ИНН")}{" "}{s.inn} · {formatPhone(s.phone)} · {t("заявка {date}", { date: t.date(s.createdAt) })}
                     </div>
                   </div>
                   <Badge color={SUPPLIER_STATUS_COLOR[s.status]}>{SUPPLIER_STATUS_LABEL[s.status]}</Badge>

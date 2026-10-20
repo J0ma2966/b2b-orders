@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
+import { Tr } from "@/components/ui/tr";
 import { BottomNav, BottomNavView, SideNav, SideNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner, UserMenu } from "./user-menu";
 
@@ -28,7 +29,7 @@ export function AppShell({
       <header className="sticky top-0 z-[1001] border-b border-gray-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href={root} className="shrink-0 font-semibold text-brand-700">{title}</Link>
+            <Link href={root} className="shrink-0 font-semibold text-brand-700"><Tr>{title}</Tr></Link>
             {context && <Suspense>{context}</Suspense>}
           </div>
           <Suspense fallback={<div className="h-8" />}>

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { Tr } from "./tr";
+import { tr } from "./tr-node";
 
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
@@ -20,17 +22,19 @@ const buttonBase =
 export function Button({
   variant = "primary",
   className,
+  children,
   ...props
 }: ComponentProps<"button"> & { variant?: ButtonVariant }) {
-  return <button className={cn(buttonBase, buttonVariants[variant], className)} {...props} />;
+  return <button className={cn(buttonBase, buttonVariants[variant], className)} {...props}>{tr(children)}</button>;
 }
 
 export function ButtonLink({
   variant = "primary",
   className,
+  children,
   ...props
 }: ComponentProps<typeof Link> & { variant?: ButtonVariant }) {
-  return <Link className={cn(buttonBase, buttonVariants[variant], className)} {...props} />;
+  return <Link className={cn(buttonBase, buttonVariants[variant], className)} {...props}>{tr(children as ReactNode)}</Link>;
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
@@ -41,8 +45,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:mb-6">
       <div>
-        <h1 className="text-xl font-semibold sm:text-2xl">{title}</h1>
-        {subtitle && <div className="mt-1 text-sm text-gray-500">{subtitle}</div>}
+        <h1 className="text-xl font-semibold sm:text-2xl">{tr(title)}</h1>
+        {subtitle && <div className="mt-1 text-sm text-gray-500">{tr(subtitle)}</div>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -51,7 +55,6 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
 
 export function Field({
   label,
-  name,
   error,
   hint,
   children,
@@ -67,11 +70,11 @@ export function Field({
   return (
     <div>
       <label className="block">
-        <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+        <span className="mb-1 block text-sm font-medium text-gray-700">{tr(label)}</span>
         {children}
       </label>
-      {hint && !message && <span className="mt-1 block text-xs text-gray-500">{hint}</span>}
-      {message && <span className="mt-1 block text-xs text-red-600" role="alert">{message}</span>}
+      {hint && !message && <span className="mt-1 block text-xs text-gray-500">{tr(hint)}</span>}
+      {message && <span className="mt-1 block text-xs text-red-600" role="alert">{tr(message)}</span>}
     </div>
   );
 }
@@ -102,7 +105,7 @@ const badgeColors = {
 export function Badge({ color = "gray", children }: { color?: keyof typeof badgeColors; children: ReactNode }) {
   return (
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", badgeColors[color])}>
-      {children}
+      {tr(children)}
     </span>
   );
 }
@@ -114,15 +117,15 @@ export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "
     success: "bg-green-50 text-green-800 ring-green-200",
     warning: "bg-yellow-50 text-yellow-800 ring-yellow-200",
   };
-  return <div className={cn("rounded-lg px-4 py-3 text-sm ring-1", tones[tone])}>{children}</div>;
+  return <div className={cn("rounded-lg px-4 py-3 text-sm ring-1", tones[tone])}>{tr(children)}</div>;
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">{children}</div>;
+  return <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">{tr(children)}</div>;
 }
 
 export function Spinner() {
-  return <div className="p-8 text-center text-sm text-gray-500">Загрузка…</div>;
+  return <div className="p-8 text-center text-sm text-gray-500"><Tr>Загрузка…</Tr></div>;
 }
 
 export function DefinitionList({ items }: { items: [string, ReactNode][] }) {
@@ -130,7 +133,7 @@ export function DefinitionList({ items }: { items: [string, ReactNode][] }) {
     <dl className="divide-y divide-gray-100">
       {items.map(([k, v]) => (
         <div key={k} className="grid grid-cols-1 gap-1 py-2 sm:grid-cols-3 sm:gap-4">
-          <dt className="text-sm text-gray-500">{k}</dt>
+          <dt className="text-sm text-gray-500"><Tr>{k}</Tr></dt>
           <dd className="text-sm text-gray-900 sm:col-span-2">{v ?? "—"}</dd>
         </div>
       ))}

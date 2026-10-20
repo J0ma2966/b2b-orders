@@ -8,9 +8,10 @@ import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { db } from "@/lib/db";
 import { OrdersList } from "@/components/orders/order-view";
 import { orderStatusFilter } from "@/lib/order-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function ShopHome() {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const shop = ctx.shop;
   const [suppliers, byId, active] = await Promise.all([
     availableSuppliersForShop(shop.territoryId),
@@ -24,24 +25,24 @@ export default async function ShopHome() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <Badge color={SHOP_STATUS_COLOR[shop.status]}>{SHOP_STATUS_LABEL[shop.status]}</Badge>
-            <span>{territoryLabel(shop.territoryId, byId)}</span>
+            <span>{territoryLabel(shop.territoryId, byId, t)}</span>
           </span>
         }
       />
       {shop.isBlocked ? (
-        <Alert tone="error">Магазин заблокирован администратором платформы. Заказы недоступны.</Alert>
+        <Alert tone="error">{t("Магазин заблокирован администратором платформы. Заказы недоступны.")}</Alert>
       ) : (
         <>
           {active.length > 0 && (
             <div className="mb-6">
-              <h2 className="mb-2 font-semibold">Заказы в работе</h2>
+              <h2 className="mb-2 font-semibold">{t("Заказы в работе")}</h2>
               <OrdersList rows={active} href={(id) => `/shop/orders/${id}`} party={(o) => o.supplier.displayName} />
-              <Link href="/shop/orders" className="mt-2 inline-block text-sm text-brand-600">Все заказы →</Link>
+              <Link href="/shop/orders" className="mt-2 inline-block text-sm text-brand-600">{t("Все заказы →")}</Link>
             </div>
           )}
-          <h2 className="mb-2 font-semibold">Поставщики в вашем районе</h2>
+          <h2 className="mb-2 font-semibold">{t("Поставщики в вашем районе")}</h2>
           {suppliers.length === 0 ? (
-            <EmptyState>Пока ни один поставщик не доставляет в ваш район. Мы сообщим, когда появятся.</EmptyState>
+            <EmptyState>{t("Пока ни один поставщик не доставляет в ваш район. Мы сообщим, когда появятся.")}</EmptyState>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {suppliers.slice(0, 6).map((s) => (
@@ -50,7 +51,8 @@ export default async function ShopHome() {
             </div>
           )}
           {suppliers.length > 6 && (
-            <Link href="/shop/suppliers" className="mt-3 inline-block text-sm text-brand-600">Все поставщики ({suppliers.length}) →</Link>
+            <Link href="/shop/suppliers" className="mt-3 inline-block text-sm text-brand-600">{t("Все поставщики ({n}) →", { n: suppliers.length })}</Link>
+
           )}
         </>
       )}

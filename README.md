@@ -63,4 +63,6 @@ npm run build && npm start                                  # затем на с
 ADMIN_PW=admin12345 CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/flow.mjs
 ```
 
+Перевод: `node scripts/i18n-check.mjs --missing` — строки без узбекского перевода; `DATABASE_URL=… node tests/e2e/uz-scan.mjs` после сквозного сценария обходит все страницы на узбекском и печатает оставшуюся кириллицу.
+
 Сквозной сценарий проходит этапы 1–6 в браузере: регистрация и модерация, каталог, заказ, доставка с QR, частичная приёмка в долг, погашение, замена и возврат в оборот, отчёты.

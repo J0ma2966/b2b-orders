@@ -2,9 +2,10 @@ import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 export default async function AdminBonusesPage() {
+  const t = await getT();
   await requireSuperAdmin();
   const now = new Date();
   const rows = await db.bonusPromotion.findMany({
@@ -15,7 +16,7 @@ export default async function AdminBonusesPage() {
   return (
     <>
       <PageHeader title="Бонусные акции" />
-      {rows.length === 0 ? <EmptyState>Акций нет</EmptyState> : (
+      {rows.length === 0 ? <EmptyState>{t("Акций нет")}</EmptyState> : (
         <Card className="p-0 sm:p-0">
           <ul className="divide-y divide-gray-100">
             {rows.map((p) => {
@@ -25,10 +26,10 @@ export default async function AdminBonusesPage() {
                   <div>
                     <div className="font-medium">{p.name} · {p.supplier.displayName}</div>
                     <div className="text-xs text-gray-500">
-                      {formatQty(p.triggerQty)} {unitName(p.triggerUnit)} «{p.triggerUnit.product.name}» → {formatQty(p.giftQty)} {unitName(p.giftUnit)} «{p.giftUnit.product.name}» · {formatDate(p.startsAt)} — {formatDate(p.endsAt)}
+                      {formatQty(p.triggerQty)} {t(unitName(p.triggerUnit))} «{p.triggerUnit.product.name}» → {formatQty(p.giftQty)} {t(unitName(p.giftUnit))} «{p.giftUnit.product.name}» · {t.date(p.startsAt)} — {t.date(p.endsAt)}
                     </div>
                   </div>
-                  <Badge color={running ? "green" : "gray"}>{running ? "Действует" : "Не действует"}</Badge>
+                  <Badge color={running ? "green" : "gray"}>{running ? t("Действует") : t("Не действует")}</Badge>
                 </li>
               );
             })}

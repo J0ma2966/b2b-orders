@@ -6,6 +6,7 @@ import { TerritorySelect } from "@/components/territory/territory-select";
 import { TerritoryMultiSelect } from "@/components/territory/territory-multi-select";
 import type { TerritoryOption } from "@/components/territory/types";
 import type { FormState } from "@/lib/forms";
+import { useT } from "@/lib/i18n/client";
 
 export type SupplierDefaults = Partial<Record<string, string>> & { territoryIds?: string[] };
 
@@ -23,15 +24,16 @@ export function SupplierFields({
   showDeliveryTerritory?: boolean;
   innReadOnly?: boolean;
 }) {
+  const t = useT();
   const e = state.fieldErrors ?? {};
   const v = { ...defaults, ...state.values } as Record<string, string | undefined>;
   const office = v.officeLat && v.officeLng ? { lat: Number(v.officeLat), lng: Number(v.officeLng) } : null;
   return (
     <>
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-base font-semibold">Компания</legend>
+        <legend className="mb-2 text-base font-semibold">{t("Компания")}</legend>
         <Field label="Название юридического лица" name="legalName" error={e.legalName}>
-          <Input name="legalName" defaultValue={v.legalName} placeholder="ООО «Пример»" required />
+          <Input name="legalName" defaultValue={v.legalName} placeholder={t("ООО «Пример»")} required />
         </Field>
         <Field label="Название для магазинов" name="displayName" error={e.displayName} hint="Если пусто — как у юрлица">
           <Input name="displayName" defaultValue={v.displayName} />
@@ -64,7 +66,7 @@ export function SupplierFields({
         </Field>
       </fieldset>
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-base font-semibold">Главный офис</legend>
+        <legend className="mb-2 text-base font-semibold">{t("Главный офис")}</legend>
         <TerritorySelect territories={territories} name="officeTerritoryId" defaultValue={v.officeTerritoryId} error={e.officeTerritoryId} />
         <Field label="Адрес офиса" name="officeAddress" error={e.officeAddress}>
           <Input name="officeAddress" defaultValue={v.officeAddress} required />
@@ -73,14 +75,15 @@ export function SupplierFields({
       </fieldset>
       {showDeliveryTerritory && (
         <fieldset className="space-y-2">
-          <legend className="mb-2 text-base font-semibold">Территория доставки</legend>
-          <p className="text-sm text-gray-500">Отметьте регионы целиком или отдельные города и районы. Магазины из этих мест увидят ваш каталог.</p>
+          <legend className="mb-2 text-base font-semibold">{t("Территория доставки")}</legend>
+          <p className="text-sm text-gray-500">{t("Отметьте регионы целиком или отдельные города и районы. Магазины из этих мест увидят ваш каталог.")}</p>
           <TerritoryMultiSelect
             territories={territories}
             defaultValue={state.values?.["territoryIds[]"]?.split(",").filter(Boolean) ?? defaults.territoryIds}
           />
           {(e.territoryIds || e["territoryIds[]"]) && (
-            <p className="text-xs text-red-600">{(e.territoryIds ?? e["territoryIds[]"])?.[0]}</p>
+            <p className="text-xs text-red-600">{t((e.territoryIds ?? e["territoryIds[]"])?.[0])}</p>
+
           )}
         </fieldset>
       )}

@@ -11,6 +11,7 @@ import { formatQty } from "@/lib/catalog";
 import { initialFormState } from "@/lib/forms";
 import { fileUrl } from "@/lib/storage-url";
 import { saveUnitsAction, stockOperationAction, updateProductAction } from "../actions";
+import { useT } from "@/lib/i18n/client";
 
 export function EditProductForm({
   productId,
@@ -23,6 +24,7 @@ export function EditProductForm({
   photos: string[];
   defaults: ProductDefaults;
 }) {
+  const t = useT();
   const [state, action, pending] = useActionState(updateProductAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-4">
@@ -34,14 +36,14 @@ export function EditProductForm({
             <label key={p} className="relative block">
               <img src={fileUrl(p)!} alt="" className="size-20 rounded-lg object-cover ring-1 ring-gray-200" />
               <span className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                <input type="checkbox" name="removePhoto" value={p} /> убрать
+                <input type="checkbox" name="removePhoto" value={p} /> {t("убрать")}
               </span>
             </label>
           ))}
         </div>
       )}
       <ProductFields state={state} categories={categories} defaults={defaults} />
-      <SubmitButton>Сохранить карточку</SubmitButton>
+      <SubmitButton>{t("Сохранить карточку")}</SubmitButton>
     </ActionForm>
   );
 }
@@ -49,6 +51,7 @@ export function EditProductForm({
 type UnitView = { id: string; label: string; price: string; isActive: boolean; physical: number; reserved: number };
 
 export function UnitsForm({ productId, units }: { productId: string; units: UnitView[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(saveUnitsAction, initialFormState);
   return (
     <ActionForm key={state.at ?? "u"} action={action} pending={pending} className="space-y-3">
@@ -58,29 +61,29 @@ export function UnitsForm({ productId, units }: { productId: string; units: Unit
         <div key={u.id} className="rounded-lg ring-1 ring-gray-200 p-3">
           <input type="hidden" name="existingId" value={u.id} />
           <div className="flex items-center justify-between gap-2">
-            <b className="text-sm">{u.label}</b>
+            <b className="text-sm">{t(u.label)}</b>
             <label className="flex items-center gap-1 text-xs text-gray-600">
-              <input type="checkbox" name={`active_${u.id}`} defaultChecked={u.isActive} /> продаётся
+              <input type="checkbox" name={`active_${u.id}`} defaultChecked={u.isActive} /> {t("продаётся")}
             </label>
           </div>
           <div className="mt-2 grid grid-cols-2 items-end gap-2">
             <Field label="Цена, сум">
-              <Input name="existingPrice" inputMode="decimal" defaultValue={u.price} placeholder="без цены" />
+              <Input name="existingPrice" inputMode="decimal" defaultValue={u.price} placeholder={t("без цены")} />
             </Field>
             <div className="text-xs text-gray-600">
-              <div>Доступно: <b>{formatQty(u.physical - u.reserved)}</b></div>
-              <div>Физический {formatQty(u.physical)} · резерв {formatQty(u.reserved)}</div>
+              <div>{t("Доступно:")} <b>{formatQty(u.physical - u.reserved)}</b></div>
+              <div>{t("Физический {p} · резерв {r}", { p: formatQty(u.physical), r: formatQty(u.reserved) })}</div>
             </div>
           </div>
         </div>
       ))}
       <details>
-        <summary className="cursor-pointer text-sm text-brand-600">Добавить единицу продажи</summary>
+        <summary className="cursor-pointer text-sm text-brand-600">{t("Добавить единицу продажи")}</summary>
         <div className="mt-2">
           <UnitRows initial={0} />
         </div>
       </details>
-      <SubmitButton>Сохранить цены</SubmitButton>
+      <SubmitButton>{t("Сохранить цены")}</SubmitButton>
     </ActionForm>
   );
 }
@@ -92,6 +95,7 @@ const OPS = [
 ] as const;
 
 export function StockForm({ units }: { units: { id: string; label: string }[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(stockOperationAction, initialFormState);
   const [type, setType] = useState<string>("INCOME");
   return (
@@ -101,14 +105,14 @@ export function StockForm({ units }: { units: { id: string; label: string }[] })
         <Field label="Единица" name="unitId">
           <Select name="unitId">
             {units.map((u) => (
-              <option key={u.id} value={u.id}>{u.label}</option>
+              <option key={u.id} value={u.id}>{t(u.label)}</option>
             ))}
           </Select>
         </Field>
         <Field label="Операция" name="type">
           <Select name="type" value={type} onChange={(e) => setType(e.target.value)}>
             {OPS.map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
+              <option key={v} value={v}>{t(l)}</option>
             ))}
           </Select>
         </Field>
@@ -117,9 +121,9 @@ export function StockForm({ units }: { units: { id: string; label: string }[] })
         <Input name="qty" inputMode="decimal" required />
       </Field>
       <Field label={type === "INCOME" ? "Основание (необязательно)" : "Основание"} name="reason" error={state.fieldErrors?.reason}>
-        <Input name="reason" placeholder={type === "INCOME" ? "Накладная №…" : "Причина"} required={type !== "INCOME"} />
+        <Input name="reason" placeholder={t(type === "INCOME" ? "Накладная №…" : "Причина")} required={type !== "INCOME"} />
       </Field>
-      <SubmitButton variant="secondary">Провести</SubmitButton>
+      <SubmitButton variant="secondary">{t("Провести")}</SubmitButton>
     </ActionForm>
   );
 }

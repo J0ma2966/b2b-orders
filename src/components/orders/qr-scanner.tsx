@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
+import { useT } from "@/lib/i18n/client";
 
 // Сканер QR камерой телефона. Если камера недоступна — код вводится вручную.
 export function QrScanner({ onScan, onClose }: { onScan: (text: string) => void; onClose: () => void }) {
+  const t = useT();
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,12 +54,12 @@ export function QrScanner({ onScan, onClose }: { onScan: (text: string) => void;
   return (
     <div className="space-y-2">
       {error ? (
-        <p className="text-sm text-red-600">{error}</p>
+        <p className="text-sm text-red-600">{t(error)}</p>
       ) : (
         <video ref={video} className="aspect-square w-full rounded-lg bg-black object-cover" muted playsInline />
       )}
       <canvas ref={canvas} className="hidden" />
-      <button type="button" className="text-sm text-gray-600 underline" onClick={onClose}>Закрыть камеру</button>
+      <button type="button" className="text-sm text-gray-600 underline" onClick={onClose}>{t("Закрыть камеру")}</button>
     </div>
   );
 }

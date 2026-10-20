@@ -51,7 +51,7 @@ export async function createReplacement(shopId: string, input: NewReplacement) {
   await notifySupplierStaff(order.supplierId, {
     type: "replacement.new",
     title: `Заявка на замену №${r.number}`,
-    body: `${item.productName} — ${formatQty(input.qty)} ${item.unitLabel}, ${input.reason}`,
+    body: `${item.productName} — ${formatQty(input.qty)} ${item.unitLabel}. Причина: ${input.reason}`,
     link: `/supplier/replacements/${r.id}`,
     entity: "Replacement",
     entityId: r.id,

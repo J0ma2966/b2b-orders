@@ -9,9 +9,11 @@ import { MapPicker } from "@/components/map/map-picker";
 import { TerritorySelect } from "@/components/territory/territory-select";
 import type { TerritoryOption } from "@/components/territory/types";
 import { initialFormState } from "@/lib/forms";
+import { useT } from "@/lib/i18n/client";
 import { registerShopAction } from "../actions";
 
 export function ShopRegisterForm({ territories, loggedIn }: { territories: TerritoryOption[]; loggedIn: boolean }) {
+  const t = useT();
   const [state, action, pending] = useActionState(registerShopAction, initialFormState);
   const e = state.fieldErrors ?? {};
   const v = state.values ?? {};
@@ -21,7 +23,7 @@ export function ShopRegisterForm({ territories, loggedIn }: { territories: Terri
       {state.error && <Alert tone="error">{state.error}</Alert>}
       {!loggedIn && <AccountFields state={state} />}
       <fieldset className="space-y-4">
-        <legend className="mb-2 text-base font-semibold">Магазин</legend>
+        <legend className="mb-2 text-base font-semibold">{t("Магазин")}</legend>
         <Field label="Название магазина" name="name" error={e.name}>
           <Input name="name" defaultValue={v.name} required />
         </Field>
@@ -41,17 +43,18 @@ export function ShopRegisterForm({ territories, loggedIn }: { territories: Terri
         </div>
         <TerritorySelect territories={territories} defaultValue={v.territoryId} error={e.territoryId} />
         <Field label="Адрес" name="address" error={e.address}>
-          <Input name="address" defaultValue={v.address} placeholder="Улица, дом, ориентир" required />
+          <Input name="address" defaultValue={v.address} placeholder={t("Улица, дом, ориентир")} required />
         </Field>
         <div>
-          <span className="mb-1 block text-sm font-medium text-gray-700">Расположение на карте</span>
+          <span className="mb-1 block text-sm font-medium text-gray-700">{t("Расположение на карте")}</span>
+
           <MapPicker defaultValue={point} error={e.lat?.[0]} />
         </div>
         <Field label="Фото магазина" name="photo" error={e.photo} hint="JPG, PNG или WEBP до 10 МБ">
           <Input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
         </Field>
       </fieldset>
-      <SubmitButton className="w-full sm:w-auto" pendingText="Регистрируем…">Зарегистрировать магазин</SubmitButton>
+      <SubmitButton className="w-full sm:w-auto" pendingText="Регистрируем…">{t("Зарегистрировать магазин")}</SubmitButton>
     </ActionForm>
   );
 }

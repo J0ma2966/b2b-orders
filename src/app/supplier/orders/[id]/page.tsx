@@ -7,15 +7,16 @@ import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedIte
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { availableSupplierOrderActions, canAssignCourier, canEditForced, CLOSED, PAYMENT_LABEL, RECEIVED } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { Badge } from "@/components/ui";
 import { removeForcedAction } from "../actions";
+import { getT } from "@/lib/i18n/server";
 
 export default async function SupplierOrderPage({ params }: PageProps<"/supplier/orders/[id]">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const { id } = await params;
   const order = await db.order.findUnique({
@@ -44,19 +45,19 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
   return (
     <>
       <PageHeader
-        title={`Заказ №${order.number}`}
+        title={t("Заказ №{n}", { n: order.number })}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <OrderStatusBadge status={order.status} />
-            <span>{formatDateTime(order.placedAt)}</span>
+            <span>{t.dateTime(order.placedAt)}</span>
           </span>
         }
-        actions={<Link href="/supplier/orders" className="text-sm text-brand-600">← Все заказы</Link>}
+        actions={<Link href="/supplier/orders" className="text-sm text-brand-600">{t("← Все заказы")}</Link>}
       />
       <div className="space-y-4">
         {order.cancelReason && (
           <Alert tone="error">
-            {order.cancelledBy === "SHOP" ? "Магазин отменил заказ" : "Заказ отменён поставщиком"} {formatDateTime(order.cancelledAt)}. Причина: {order.cancelReason}
+            {t(order.cancelledBy === "SHOP" ? "Магазин отменил заказ {date}. Причина: {reason}" : "Заказ отменён поставщиком {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
           </Alert>
         )}
         {order.status === "NEEDS_CONFIRMATION" && (
@@ -65,12 +66,12 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
         {order.status === "DELIVERY_PROBLEM" && (
           <Card><ResolveProblemForm orderId={order.id} note={order.problemNote ?? ""} /></Card>
         )}
-        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">Не доставлен: {order.problemNote}</Alert>}
+        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">{t("Не доставлен: {note}", { note: order.problemNote })}</Alert>}
         {received && (
           <div className="flex flex-wrap gap-2">
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>🧾 Чек</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>📄 Накладная</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>💰 Счёт магазина</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>{t("💰 Счёт магазина")}</Link>
           </div>
         )}
         {!CLOSED.includes(order.status) && actions.length > 0 && (
@@ -88,7 +89,7 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                   <form action={removeForcedAction} className="mt-1">
                     <input type="hidden" name="itemId" value={i.id} />
                     <input type="hidden" name="orderId" value={order.id} />
-                    <SubmitButton variant="ghost" className="min-h-0 px-0 py-0 text-xs text-red-600" pendingText="…" confirm="Убрать позицию и снять резерв?">Убрать</SubmitButton>
+                    <SubmitButton variant="ghost" className="min-h-0 px-0 py-0 text-xs text-red-600" pendingText="…" confirm="Убрать позицию и снять резерв?">{t("Убрать")}</SubmitButton>
                   </form>
                 ) : null
               }
@@ -96,27 +97,27 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
             <OrderFinance o={order} currentBalance={account ? Number(account.balance) : undefined} />
             {received && (
               <Card>
-                <h2 className="mb-1 font-semibold">Корректирующая операция</h2>
-                <p className="mb-3 text-sm text-gray-500">Полученный заказ не редактируется. Исправление суммы записывается отдельной операцией и меняет задолженность магазина (ТЗ п. 65–66).</p>
+                <h2 className="mb-1 font-semibold">{t("Корректирующая операция")}</h2>
+                <p className="mb-3 text-sm text-gray-500">{t("Полученный заказ не редактируется. Исправление суммы записывается отдельной операцией и меняет задолженность магазина (ТЗ п. 65–66).")}</p>
                 <CorrectionForm orderId={order.id} shopId={order.shopId} />
               </Card>
             )}
             {editable && (
               <Card>
-                <h2 className="mb-1 font-semibold">Принудительная продажа</h2>
-                <p className="mb-3 text-sm text-gray-500">Позиция появится в заказе отдельно с отметкой, войдёт в сумму и сразу зарезервируется. Магазин получит уведомление.</p>
+                <h2 className="mb-1 font-semibold">{t("Принудительная продажа")}</h2>
+                <p className="mb-3 text-sm text-gray-500">{t("Позиция появится в заказе отдельно с отметкой, войдёт в сумму и сразу зарезервируется. Магазин получит уведомление.")}</p>
                 <ForcedItemForm
                   orderId={order.id}
                   units={units.map((u) => ({
                     id: u.id,
-                    label: `${u.product.name} — ${unitName(u)}, ${formatMoney(u.price)}`,
+                    label: `${u.product.name} — ${t(unitName(u))}, ${t.money(u.price)}`,
                     available: formatQty(Number(u.physicalQty) - Number(u.reservedQty)),
                   }))}
                 />
               </Card>
             )}
             <Card>
-              <h2 className="mb-3 font-semibold">История</h2>
+              <h2 className="mb-3 font-semibold">{t("История")}</h2>
               <OrderHistory events={events} />
             </Card>
           </div>
@@ -130,21 +131,21 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                 items={[
                   ["Адрес", order.deliveryAddress],
                   ["Контакт", order.contactName && <>{order.contactName}, <a className="text-brand-600" href={`tel:${order.contactPhone}`}>{formatPhone(order.contactPhone ?? "")}</a></>],
-                  ["Желаемая дата", order.deliveryDate ? formatDate(order.deliveryDate) : null],
-                  ["Оплата", order.paymentMethod ? PAYMENT_LABEL[order.paymentMethod] : null],
+                  ["Желаемая дата", order.deliveryDate ? t.date(order.deliveryDate) : null],
+                  ["Оплата", order.paymentMethod ? t(PAYMENT_LABEL[order.paymentMethod]) : null],
                   ["Комментарий", order.comment],
                   ["Комиссия платформы", order.commissionRate !== null ? `${order.commissionRate.toString()}%` : null],
                 ]}
               />
               {order.deliveryLat && order.deliveryLng && (
                 <a className="mt-2 inline-block text-sm text-brand-600" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${order.deliveryLat}&mlon=${order.deliveryLng}#map=17/${order.deliveryLat}/${order.deliveryLng}`}>
-                  Открыть на карте →
+                  {t("Открыть на карте →")}
                 </a>
               )}
             </Card>
             {(assignable || order.courier) && (
               <Card>
-                <h2 className="mb-3 font-semibold">Доставка</h2>
+                <h2 className="mb-3 font-semibold">{t("Доставка")}</h2>
                 {assignable ? (
                   <AssignCourierForm
                     orderId={order.id}

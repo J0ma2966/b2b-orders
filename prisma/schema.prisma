@@ -30,6 +30,8 @@ model User {
   mustChangePassword Boolean @default(false)
   // Push-уведомления; внутренние уведомления сохраняются независимо (ТЗ п. 57)
   pushEnabled  Boolean    @default(true)
+  // Язык интерфейса (ru, uz): для push и уведомлений, когда пользователь не в приложении
+  locale       String     @default("ru")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

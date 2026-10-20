@@ -7,25 +7,28 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { debtPaymentAction, setCreditAction } from "@/app/supplier/shops/actions";
+import { useT } from "@/lib/i18n/client";
 
 export function CreditForm({ shopId, creditAllowed, creditLimit }: { shopId: string; creditAllowed: boolean; creditLimit: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(setCreditAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
       <input type="hidden" name="shopId" value={shopId} />
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="creditAllowed" defaultChecked={creditAllowed} /> Разрешить работу в долг
+        <input type="checkbox" name="creditAllowed" defaultChecked={creditAllowed} /> {t("Разрешить работу в долг")}
       </label>
       <Field label="Лимит задолженности, сум" name="creditLimit" error={state.fieldErrors?.creditLimit} hint="Пусто — без лимита">
         <Input name="creditLimit" inputMode="decimal" defaultValue={state.values?.creditLimit ?? creditLimit} />
       </Field>
-      <SubmitButton variant="secondary">Сохранить</SubmitButton>
+      <SubmitButton variant="secondary">{t("Сохранить")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function DebtPaymentForm({ shopId, today }: { shopId: string; today: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(debtPaymentAction, initialFormState);
   const fe = state.fieldErrors ?? {};
   return (
@@ -41,16 +44,16 @@ export function DebtPaymentForm({ shopId, today }: { shopId: string; today: stri
         </Field>
         <Field label="Способ" name="method">
           <Select name="method" defaultValue={state.values?.method ?? "CASH"}>
-            <option value="CASH">Наличные</option>
-            <option value="CARD">Карта</option>
-            <option value="TRANSFER">Безналичный</option>
+            <option value="CASH">{t("Наличные")}</option>
+            <option value="CARD">{t("Карта")}</option>
+            <option value="TRANSFER">{t("Безналичный")}</option>
           </Select>
         </Field>
       </div>
       <Field label="Комментарий" name="comment">
         <Input name="comment" defaultValue={state.values?.comment} />
       </Field>
-      <SubmitButton>Зарегистрировать погашение</SubmitButton>
+      <SubmitButton>{t("Зарегистрировать погашение")}</SubmitButton>
     </ActionForm>
   );
 }

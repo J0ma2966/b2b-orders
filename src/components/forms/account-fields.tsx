@@ -1,4 +1,5 @@
 import { Field, Input } from "@/components/ui";
+import { Tr } from "@/components/ui/tr";
 import type { FormState } from "@/lib/forms";
 
 // Поля учётной записи при регистрации (не показываются, если пользователь уже вошёл).
@@ -6,7 +7,8 @@ export function AccountFields({ state }: { state: FormState }) {
   const e = state.fieldErrors ?? {};
   return (
     <fieldset className="space-y-4">
-      <legend className="mb-2 text-base font-semibold">Учётная запись</legend>
+      <legend className="mb-2 text-base font-semibold"><Tr>Учётная запись</Tr></legend>
+
       <Field label="Ваше ФИО" name="fullName" error={e.fullName}>
         <Input name="fullName" autoComplete="name" defaultValue={state.values?.fullName} required />
       </Field>

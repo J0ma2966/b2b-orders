@@ -7,8 +7,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { addMemberAction, resetMemberPasswordAction } from "../actions";
+import { useT } from "@/lib/i18n/client";
 
 export function AddMemberForm({ roles }: { roles: [string, string][] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(addMemberAction, initialFormState);
   return (
     <ActionForm key={state.at ?? "add"} action={action} pending={pending} className="space-y-3">
@@ -16,7 +18,7 @@ export function AddMemberForm({ roles }: { roles: [string, string][] }) {
       <Field label="Роль" name="role">
         <Select name="role" defaultValue={state.values?.role ?? roles[roles.length - 1][0]}>
           {roles.map(([v, l]) => (
-            <option key={v} value={v}>{l}</option>
+            <option key={v} value={v}>{t(l)}</option>
           ))}
         </Select>
       </Field>
@@ -26,18 +28,19 @@ export function AddMemberForm({ roles }: { roles: [string, string][] }) {
       <Field label="Телефон" name="phone" error={state.fieldErrors?.phone} hint="По этому номеру сотрудник будет входить">
         <Input name="phone" type="tel" inputMode="tel" defaultValue={state.ok ? "" : state.values?.phone} required />
       </Field>
-      <SubmitButton>Добавить</SubmitButton>
+      <SubmitButton>{t("Добавить")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function ResetPasswordButton({ memberId }: { memberId: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(resetMemberPasswordAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="contents">
       <input type="hidden" name="memberId" value={memberId} />
       <SubmitButton variant="ghost" className="min-h-0 px-2 py-1 text-xs" confirm="Выдать новый временный пароль? Сотрудник выйдет на всех устройствах.">
-        Сбросить пароль
+        {t("Сбросить пароль")}
       </SubmitButton>
       {(state.message || state.error) && (
         <div className="w-full basis-full">

@@ -7,8 +7,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { changePasswordAction } from "@/app/(auth)/actions";
+import { useT } from "@/lib/i18n/client";
 
 export function PasswordForm() {
+  const t = useT();
   const [state, action, pending] = useActionState(changePasswordAction, initialFormState);
   const e = state.fieldErrors ?? {};
   return (
@@ -23,7 +25,7 @@ export function PasswordForm() {
       <Field label="Повторите новый пароль" name="password2" error={e.password2}>
         <Input name="password2" type="password" autoComplete="new-password" required />
       </Field>
-      <SubmitButton>Сменить пароль</SubmitButton>
+      <SubmitButton>{t("Сменить пароль")}</SubmitButton>
     </ActionForm>
   );
 }

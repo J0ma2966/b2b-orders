@@ -6,30 +6,32 @@ import { Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { formatMoney } from "@/lib/format";
 import { distributePayment } from "@/lib/finance-core";
 import { confirmDeliveryAction, problemAction, startDeliveryAction } from "@/app/courier/actions";
 import { QrScanner } from "./qr-scanner";
+import { useT } from "@/lib/i18n/client";
 
 export function StartDeliveryForm({ orderId }: { orderId: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(startDeliveryAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-2">
       <FormMessage state={state} />
       <input type="hidden" name="orderId" value={orderId} />
-      <SubmitButton className="w-full" pendingText="…">🚚 Выехал к магазину</SubmitButton>
+      <SubmitButton className="w-full" pendingText="…">{t("🚚 Выехал к магазину")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; allowNotDelivered: boolean }) {
+  const t = useT();
   const [state, action, pending] = useActionState(problemAction, initialFormState);
   const [open, setOpen] = useState(false);
   if (state.ok) return <FormMessage state={state} />;
   if (!open) {
     return (
       <button type="button" className="text-sm text-red-600 underline" onClick={() => setOpen(true)}>
-        Проблема с доставкой
+        {t("Проблема с доставкой")}
       </button>
     );
   }
@@ -38,13 +40,13 @@ export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; a
       <FormMessage state={state} />
       <input type="hidden" name="orderId" value={orderId} />
       <Field label="Что случилось" name="note" error={state.fieldErrors?.note}>
-        <Textarea name="note" defaultValue={state.values?.note} placeholder="Например: магазин закрыт, не отвечают по телефону" />
+        <Textarea name="note" defaultValue={state.values?.note} placeholder={t("Например: магазин закрыт, не отвечают по телефону")} />
       </Field>
       <div className="flex flex-wrap gap-2">
-        <SubmitButton variant="secondary" name="kind" value="problem" pendingText="…">Сообщить поставщику</SubmitButton>
+        <SubmitButton variant="secondary" name="kind" value="problem" pendingText="…">{t("Сообщить поставщику")}</SubmitButton>
         {allowNotDelivered && (
           <SubmitButton variant="danger" name="kind" value="not_delivered" pendingText="…" confirm="Отметить заказ как недоставленный? Товар вернётся на склад.">
-            Не доставлен
+            {t("Не доставлен")}
           </SubmitButton>
         )}
       </div>
@@ -55,6 +57,7 @@ export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; a
 export type AcceptItem = { id: string; name: string; unitLabel: string; kind: "REGULAR" | "FORCED" | "BONUS"; qty: number; price: number; step: string };
 
 export function AcceptanceForm({ orderId, items, balanceBefore }: { orderId: string; items: AcceptItem[]; balanceBefore: number }) {
+  const t = useT();
   const [state, action, pending] = useActionState(confirmDeliveryAction, initialFormState);
   const [accepted, setAccepted] = useState<Record<string, number>>(() => Object.fromEntries(items.map((i) => [i.id, i.qty])));
   const [received, setReceived] = useState<string>("");
@@ -83,7 +86,7 @@ export function AcceptanceForm({ orderId, items, balanceBefore }: { orderId: str
           <div key={i.id} className="rounded-lg p-3 ring-1 ring-gray-200">
             <input type="hidden" name="itemId" value={i.id} />
             <div className="text-sm font-medium">
-              {i.name} <span className="text-gray-500">· заказано {i.qty} {i.unitLabel}{i.kind === "BONUS" ? " · бонус" : i.kind === "FORCED" ? " · принуд. продажа" : ""}</span>
+              {i.name} <span className="text-gray-500">· {t("заказано {qty} {unit}", { qty: i.qty, unit: t(i.unitLabel) })}{i.kind === "BONUS" ? ` · ${t("бонус")}` : i.kind === "FORCED" ? ` · ${t("принуд. продажа")}` : ""}</span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <Field label="Доставлено" name={`delivered_${i.id}`}>
@@ -106,10 +109,10 @@ export function AcceptanceForm({ orderId, items, balanceBefore }: { orderId: str
         ))}
       </div>
       <div className="rounded-lg bg-gray-50 p-3 text-sm">
-        <div className="flex justify-between"><span>Сумма по принятому</span><b>{formatMoney(total)}</b></div>
-        {balanceBefore > 0 && <div className="flex justify-between"><span>Прежний долг магазина</span><b>{formatMoney(balanceBefore)}</b></div>}
-        {balanceBefore < 0 && <div className="flex justify-between"><span>Переплата магазина</span><b>{formatMoney(-balanceBefore)}</b></div>}
-        <div className="mt-1 flex justify-between text-base"><span>Всего к получению</span><b>{formatMoney(toCollect)}</b></div>
+        <div className="flex justify-between"><span>{t("Сумма по принятому")}</span><b>{t.money(total)}</b></div>
+        {balanceBefore > 0 && <div className="flex justify-between"><span>{t("Прежний долг магазина")}</span><b>{t.money(balanceBefore)}</b></div>}
+        {balanceBefore < 0 && <div className="flex justify-between"><span>{t("Переплата магазина")}</span><b>{t.money(-balanceBefore)}</b></div>}
+        <div className="mt-1 flex justify-between text-base"><span>{t("Всего к получению")}</span><b>{t.money(toCollect)}</b></div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Получено, сум" name="received">
@@ -117,27 +120,27 @@ export function AcceptanceForm({ orderId, items, balanceBefore }: { orderId: str
         </Field>
         <Field label="Способ оплаты" name="method">
           <Select name="method" defaultValue={state.values?.method ?? "CASH"}>
-            <option value="CASH">Наличные</option>
-            <option value="CARD">Карта</option>
-            <option value="TRANSFER">Безналичный</option>
+            <option value="CASH">{t("Наличные")}</option>
+            <option value="CARD">{t("Карта")}</option>
+            <option value="TRANSFER">{t("Безналичный")}</option>
           </Select>
         </Field>
       </div>
       {dist && (
         <p className="text-xs text-gray-600">
-          В оплату заказа {formatMoney(dist.toOrder)}
-          {dist.toDebt > 0 && `, погашение долга ${formatMoney(dist.toDebt)}`}
-          {dist.overpaid > 0 && `, переплата ${formatMoney(dist.overpaid)}`}
-          {dist.orderDebt > 0 && `, долг по заказу ${formatMoney(dist.orderDebt)}`}
+          {t("В оплату заказа {sum}", { sum: t.money(dist.toOrder) })}
+          {dist.toDebt > 0 && `, ${t("погашение долга {sum}", { sum: t.money(dist.toDebt) })}`}
+          {dist.overpaid > 0 && `, ${t("переплата {sum}", { sum: t.money(dist.overpaid) })}`}
+          {dist.orderDebt > 0 && `, ${t("долг по заказу {sum}", { sum: t.money(dist.orderDebt) })}`}
         </p>
       )}
       <div className="space-y-2">
         <Field label="QR магазина" name="qr" hint="Магазин нажимает «Подтвердить получение» и показывает QR">
-          <Input name="qr" value={qr} onChange={(e) => setQr(e.target.value)} placeholder="Код под QR" autoComplete="off" />
+          <Input name="qr" value={qr} onChange={(e) => setQr(e.target.value)} placeholder={t("Код под QR")} autoComplete="off" />
         </Field>
-        {scanning ? <QrScanner onScan={onScan} onClose={() => setScanning(false)} /> : <Button type="button" variant="secondary" onClick={() => setScanning(true)}>📷 Сканировать QR</Button>}
+        {scanning ? <QrScanner onScan={onScan} onClose={() => setScanning(false)} /> : <Button type="button" variant="secondary" onClick={() => setScanning(true)}>{t("📷 Сканировать QR")}</Button>}
       </div>
-      <SubmitButton className="w-full" pendingText="Подтверждаю…">Подтвердить получение</SubmitButton>
+      <SubmitButton className="w-full" pendingText="Подтверждаю…">{t("Подтвердить получение")}</SubmitButton>
     </ActionForm>
   );
 }

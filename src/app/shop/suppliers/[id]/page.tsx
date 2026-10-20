@@ -5,13 +5,13 @@ import { db } from "@/lib/db";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatMoney } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { shopCatalog, supplierForShop } from "@/lib/shop-catalog";
 import { fileUrl } from "@/lib/storage-url";
 
 export default async function ShopSupplierPage({ params, searchParams }: PageProps<"/shop/suppliers/[id]">) {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const { id } = await params;
   const sp = await searchParams;
   if (ctx.shop.isBlocked) notFound();
@@ -34,17 +34,17 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
             <a href={`tel:${supplier.phone}`} className="text-brand-600">{formatPhone(supplier.phone)}</a>
           </span>
         }
-        actions={<ButtonLink href={`/shop/cart/${supplier.id}`} variant={cartCount ? "primary" : "secondary"}>🛒 Корзина{cartCount ? ` · ${cartCount}` : ""}</ButtonLink>}
+        actions={<ButtonLink href={`/shop/cart/${supplier.id}`} variant={cartCount ? "primary" : "secondary"}>{t("🛒 Корзина")}{cartCount ? ` · ${cartCount}` : ""}</ButtonLink>}
       />
-      {supplier.ordersDisabled && <div className="mb-4"><Alert tone="warning">Поставщик временно не принимает новые заказы.</Alert></div>}
+      {supplier.ordersDisabled && <div className="mb-4"><Alert tone="warning">{t("Поставщик временно не принимает новые заказы.")}</Alert></div>}
       <form className="mb-3 flex gap-2">
         {categoryId && <input type="hidden" name="c" value={categoryId} />}
-        <Input name="q" defaultValue={q} placeholder="Поиск товара" aria-label="Поиск товара" />
+        <Input name="q" defaultValue={q} placeholder={t("Поиск товара")} aria-label={t("Поиск товара")} />
       </form>
       {categories.length > 0 && (
         <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
           <Link href={q ? `${base}?q=${encodeURIComponent(q)}` : base} className={cn("shrink-0 rounded-full px-3 py-1.5 text-sm", !categoryId ? "bg-brand-600 text-white" : "bg-white ring-1 ring-gray-200")}>
-            Все
+            {t("Все")}
           </Link>
           {categories.map((c) => (
             <Link
@@ -58,7 +58,7 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
         </div>
       )}
       {products.length === 0 ? (
-        <EmptyState>{q || categoryId ? "Ничего не найдено" : "Каталог поставщика пока пуст"}</EmptyState>
+        <EmptyState>{q || categoryId ? t("Ничего не найдено") : t("Каталог поставщика пока пуст")}</EmptyState>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => {
@@ -73,8 +73,9 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
                       const avail = Number(u.physicalQty) - Number(u.reservedQty);
                       return (
                         <div key={u.id} className="text-xs">
-                          <b>{formatMoney(u.price)}</b> / {unitName(u)}
-                          <span className={avail > 0 ? " text-gray-500" : " text-red-600"}>{avail > 0 ? ` · ${formatQty(avail)}` : " · нет"}</span>
+                          <b>{t.money(u.price)}</b> / {t(unitName(u))}
+                          <span className={avail > 0 ? " text-gray-500" : " text-red-600"}>{avail > 0 ? ` · ${formatQty(avail)}` : ` · ${t("нет")}`}</span>
+
                         </div>
                       );
                     })}

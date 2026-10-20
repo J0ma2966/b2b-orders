@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { formatDateTime } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { fileUrl } from "@/lib/storage";
 import { loadTerritoryMap } from "@/lib/territory";
@@ -16,8 +15,10 @@ import {
 } from "@/lib/statuses";
 import { startImpersonationAction } from "../../impersonation-actions";
 import { CommissionForm, ModerationForm } from "./forms";
+import { getT } from "@/lib/i18n/server";
 
 export default async function SupplierDetailPage({ params }: PageProps<"/admin/suppliers/[id]">) {
+  const t = await getT();
   await requireSuperAdmin();
   const { id } = await params;
   const [supplier, byId, defaultRate] = await Promise.all([
@@ -47,7 +48,7 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
           <Card>
             <div className="mb-3 flex items-center gap-3">
               {logo && <img src={logo} alt="" className="size-14 rounded-lg object-cover ring-1 ring-gray-200" />}
-              <h2 className="font-semibold">Данные заявки</h2>
+              <h2 className="font-semibold">{t("Данные заявки")}</h2>
             </div>
             <DefinitionList
               items={[
@@ -60,7 +61,7 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
                 ["Сайт", supplier.website],
                 ["Контактное лицо", supplier.contactPerson],
                 ["Описание", supplier.description],
-                ["Офис", [supplier.officeTerritoryId && territoryLabel(supplier.officeTerritoryId, byId), supplier.officeAddress].filter(Boolean).join(", ")],
+                ["Офис", [supplier.officeTerritoryId && territoryLabel(supplier.officeTerritoryId, byId, t), supplier.officeAddress].filter(Boolean).join(", ")],
                 [
                   "Координаты офиса",
                   supplier.officeLat && supplier.officeLng ? (
@@ -69,26 +70,26 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
                     </a>
                   ) : null,
                 ],
-                ["Территория доставки", supplier.territories.map((t) => territoryLabel(t.territoryId, byId)).join("; ")],
-                ["Заявка подана", formatDateTime(supplier.createdAt)],
+                ["Территория доставки", supplier.territories.map((x) => territoryLabel(x.territoryId, byId, t)).join("; ")],
+                ["Заявка подана", t.dateTime(supplier.createdAt)],
               ]}
             />
           </Card>
           <Card>
-            <h2 className="mb-3 font-semibold">Сотрудники и доставщики</h2>
+            <h2 className="mb-3 font-semibold">{t("Сотрудники и доставщики")}</h2>
             <ul className="divide-y divide-gray-100">
               {supplier.members.map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <div>
                     <div className="text-sm font-medium">{m.user.fullName}</div>
                     <div className="text-xs text-gray-500">
-                      {SUPPLIER_ROLE_LABEL[m.role]} · {formatPhone(m.user.phone)} {!m.isActive && "· отключён"}
+                      {t(SUPPLIER_ROLE_LABEL[m.role])} · {formatPhone(m.user.phone)}{!m.isActive && ` · ${t("отключён")}`}
                     </div>
                   </div>
                   {m.isActive && (
                     <form action={startImpersonationAction}>
                       <input type="hidden" name="memberId" value={m.id} />
-                      <button className="text-sm text-brand-600 hover:underline">Действовать от имени</button>
+                      <button className="text-sm text-brand-600 hover:underline">{t("Действовать от имени")}</button>
                     </form>
                   )}
                 </li>
@@ -99,12 +100,12 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
         <div className="space-y-4">
           {actions.length > 0 && (
             <Card>
-              <h2 className="mb-3 font-semibold">Модерация</h2>
+              <h2 className="mb-3 font-semibold">{t("Модерация")}</h2>
               <ModerationForm supplierId={supplier.id} actions={actions} currentComment={supplier.moderationComment} />
             </Card>
           )}
           <Card>
-            <h2 className="mb-3 font-semibold">Комиссия платформы</h2>
+            <h2 className="mb-3 font-semibold">{t("Комиссия платформы")}</h2>
             <CommissionForm
               supplierId={supplier.id}
               current={supplier.commissionRate?.toString() ?? ""}
@@ -112,16 +113,16 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
             />
           </Card>
           <Card>
-            <h2 className="mb-3 font-semibold">История статусов</h2>
+            <h2 className="mb-3 font-semibold">{t("История статусов")}</h2>
             <ol className="space-y-3">
               {supplier.statusHistory.map((h) => (
                 <li key={h.id} className="text-sm">
                   <div>
-                    {h.fromStatus ? `${SUPPLIER_STATUS_LABEL[h.fromStatus]} → ` : ""}
-                    <b>{SUPPLIER_STATUS_LABEL[h.toStatus]}</b>
+                    {h.fromStatus ? `${t(SUPPLIER_STATUS_LABEL[h.fromStatus])} → ` : ""}
+                    <b>{t(SUPPLIER_STATUS_LABEL[h.toStatus])}</b>
                   </div>
-                  <div className="text-xs text-gray-500">{formatDateTime(h.createdAt)}</div>
-                  {h.comment && <div className="text-xs text-gray-700">{h.comment}</div>}
+                  <div className="text-xs text-gray-500">{t.dateTime(h.createdAt)}</div>
+                  {h.comment && <div className="text-xs text-gray-700">{t(h.comment)}</div>}
                 </li>
               ))}
             </ol>

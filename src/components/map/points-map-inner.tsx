@@ -3,6 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 import { useEffect } from "react";
+import { useT } from "@/lib/i18n/client";
 import type { MapPoint } from "./points-map";
 
 function Fit({ points }: { points: MapPoint[] }) {
@@ -15,6 +16,7 @@ function Fit({ points }: { points: MapPoint[] }) {
 }
 
 export default function PointsMapInner({ points }: { points: MapPoint[] }) {
+  const t = useT();
   return (
     <MapContainer center={[41.3111, 69.2797]} zoom={11} className="h-[60vh] min-h-80 w-full rounded-xl ring-1 ring-gray-300" scrollWheelZoom>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -23,9 +25,10 @@ export default function PointsMapInner({ points }: { points: MapPoint[] }) {
         <CircleMarker key={i} center={[p.lat, p.lng]} radius={p.size ?? 8} pathOptions={{ color: p.color, fillColor: p.color, fillOpacity: 0.8 }}>
           <Popup>
             <div className="text-sm">
-              <div className="font-medium">{p.label}</div>
-              {p.note && <div className="text-gray-600">{p.note}</div>}
-              {p.href && <a href={p.href}>Открыть →</a>}
+              <div className="font-medium">{t(p.label)}</div>
+              {p.note && <div className="text-gray-600">{t(p.note)}</div>}
+              {p.href && <a href={p.href}>{t("Открыть →")}</a>}
+
             </div>
           </Popup>
         </CircleMarker>

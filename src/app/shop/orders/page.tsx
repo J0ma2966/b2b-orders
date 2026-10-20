@@ -6,9 +6,10 @@ import { OrdersList } from "@/components/orders/order-view";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/orders">) {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const sp = await searchParams;
   const status = typeof sp.status === "string" ? sp.status : "";
   const page = pageFrom(sp);
@@ -23,7 +24,8 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
       <FilterBar search={false} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" />
       {rows.length === 0 ? (
         <EmptyState>
-          Заказов нет. <Link href="/shop/suppliers" className="text-brand-600">Выбрать поставщика</Link>
+          {t("Заказов нет.")} <Link href="/shop/suppliers" className="text-brand-600">{t("Выбрать поставщика")}</Link>
+
         </EmptyState>
       ) : (
         <OrdersList rows={rows} href={(id) => `/shop/orders/${id}`} party={(o) => o.supplier.displayName} />

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { formatQty } from "@/lib/catalog";
-import { formatDate, formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { ITEM_KIND_LABEL } from "@/lib/order-core";
 import { OrderStatusBadge } from "./order-view";
 import type { OrderItemKind, OrderStatus } from "@/generated/prisma/enums";
+import { getT } from "@/lib/i18n/server";
 
 type Card = {
   id: string;
@@ -32,7 +32,8 @@ export function mapLinks(lat: number, lng: number) {
 }
 
 // Карточка доставки (ТЗ п. 29–30): навигация передаётся во внешние карты.
-export function DeliveryCard({ o, href, replacements = 0 }: { o: Card; href?: string; replacements?: number }) {
+export async function DeliveryCard({ o, href, replacements = 0 }: { o: Card; href?: string; replacements?: number }) {
+  const t = await getT();
   const links = o.deliveryLat && o.deliveryLng ? mapLinks(o.deliveryLat, o.deliveryLng) : null;
   return (
     <Card>
@@ -47,25 +48,25 @@ export function DeliveryCard({ o, href, replacements = 0 }: { o: Card; href?: st
         <a className="text-brand-600" href={`tel:${o.contactPhone}`}>📞 {o.contactName}, {formatPhone(o.contactPhone ?? "")}</a>
         {links && (
           <>
-            <a className="text-brand-600" href={links.yandex} target="_blank" rel="noreferrer">🗺️ Яндекс Карты</a>
+            <a className="text-brand-600" href={links.yandex} target="_blank" rel="noreferrer">{t("🗺️ Яндекс Карты")}</a>
             <a className="text-brand-600" href={links.google} target="_blank" rel="noreferrer">Google Maps</a>
-            <a className="text-brand-600" href={links.geo}>Навигатор</a>
+            <a className="text-brand-600" href={links.geo}>{t("Навигатор")}</a>
           </>
         )}
-        {o.deliveryDate && <span>📅 {formatDate(o.deliveryDate)}</span>}
+        {o.deliveryDate && <span>📅 {t.date(o.deliveryDate)}</span>}
       </div>
-      {links && <div className="mt-1 text-xs text-gray-500">Координаты: {o.deliveryLat!.toFixed(6)}, {o.deliveryLng!.toFixed(6)}</div>}
+      {links && <div className="mt-1 text-xs text-gray-500">{t("Координаты: {lat}, {lng}", { lat: o.deliveryLat!.toFixed(6), lng: o.deliveryLng!.toFixed(6) })}</div>}
       <ul className="mt-3 divide-y divide-gray-100 text-sm">
         {o.items.map((i) => (
           <li key={i.id} className="flex justify-between py-1.5">
-            <span>{i.productName}{i.kind !== "REGULAR" && <span className="text-xs text-gray-500"> · {ITEM_KIND_LABEL[i.kind]}</span>}</span>
-            <span className="shrink-0">{formatQty(i.qty)} {i.unitLabel}</span>
+            <span>{i.productName}{i.kind !== "REGULAR" && <span className="text-xs text-gray-500"> · {t(ITEM_KIND_LABEL[i.kind])}</span>}</span>
+            <span className="shrink-0">{formatQty(i.qty)} {t(i.unitLabel)}</span>
           </li>
         ))}
       </ul>
-      {replacements > 0 && <p className="mt-2 text-sm text-yellow-700">🔁 Замен для этого магазина: {replacements}</p>}
+      {replacements > 0 && <p className="mt-2 text-sm text-yellow-700">{t("🔁 Замен для этого магазина: {n}", { n: replacements })}</p>}
       {o.comment && <p className="mt-2 text-sm text-gray-700">💬 {o.comment}</p>}
-      <div className="mt-2 text-right font-semibold">Сумма: {formatMoney(o.total)}</div>
+      <div className="mt-2 text-right font-semibold">{t("Сумма: {sum}", { sum: t.money(o.total) })}</div>
     </Card>
   );
 }

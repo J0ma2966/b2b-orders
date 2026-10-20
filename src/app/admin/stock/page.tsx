@@ -5,8 +5,10 @@ import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import type { Prisma } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function AdminStockPage({ searchParams }: PageProps<"/admin/stock">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
@@ -25,14 +27,14 @@ export default async function AdminStockPage({ searchParams }: PageProps<"/admin
     <>
       <PageHeader title="Остатки" subtitle="Доступно = физический − резерв" />
       <FilterBar q={q} status={status} statuses={[["reserved", "Есть резерв"], ["empty", "Закончились"]]} allLabel="Все" placeholder="Товар или поставщик" />
-      {rows.length === 0 ? <EmptyState>Нет данных</EmptyState> : (
+      {rows.length === 0 ? <EmptyState>{t("Нет данных")}</EmptyState> : (
         <Card className="overflow-x-auto p-0 sm:p-0">
           <table className="w-full min-w-[600px] text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="px-4 py-2 text-left">Товар</th><th className="px-2 text-left">Поставщик</th><th className="px-2 text-right">Физический</th><th className="px-2 text-right">Резерв</th><th className="px-4 text-right">Доступно</th></tr></thead>
+            <thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="px-4 py-2 text-left">{t("Товар")}</th><th className="px-2 text-left">{t("Поставщик")}</th><th className="px-2 text-right">{t("Физический")}</th><th className="px-2 text-right">{t("Резерв")}</th><th className="px-4 text-right">{t("Доступно")}</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {rows.map((u) => (
                 <tr key={u.id}>
-                  <td className="px-4 py-2">{u.product.name} · {unitName(u)}</td>
+                  <td className="px-4 py-2">{u.product.name} · {t(unitName(u))}</td>
                   <td className="px-2">{u.product.supplier.displayName}</td>
                   <td className="px-2 text-right">{formatQty(u.physicalQty)}</td>
                   <td className="px-2 text-right">{formatQty(u.reservedQty)}</td>

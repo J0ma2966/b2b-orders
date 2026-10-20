@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { resolveAntifraudAction } from "./actions";
+import { useT } from "@/lib/i18n/client";
 
 const BUTTONS = [
   ["confirm", "Подтвердить", "secondary"],
@@ -18,12 +19,13 @@ const BUTTONS = [
 ] as const;
 
 export function ResolveForm({ eventId }: { eventId: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(resolveAntifraudAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="mt-3 space-y-2 border-t border-gray-100 pt-3">
       <FormMessage state={state} />
       <input type="hidden" name="eventId" value={eventId} />
-      <Input name="comment" placeholder="Комментарий (для блокировки обязателен)" aria-label="Комментарий" />
+      <Input name="comment" placeholder={t("Комментарий (для блокировки обязателен)")} aria-label={t("Комментарий")} />
       <div className="flex flex-wrap gap-2">
         {BUTTONS.map(([value, label, variant]) => (
           <SubmitButton

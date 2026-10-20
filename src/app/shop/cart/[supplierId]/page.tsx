@@ -5,14 +5,14 @@ import { CartQtyForm, CheckoutForm } from "@/components/orders/shop-forms";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty } from "@/lib/catalog";
-import { formatMoney } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { allowsFraction, lineTotal } from "@/lib/order-core";
 import { previewBonuses } from "@/lib/orders";
 import { supplierForShop } from "@/lib/shop-catalog";
 
 export default async function CartPage({ params }: PageProps<"/shop/cart/[supplierId]">) {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const { supplierId } = await params;
   const supplier = await supplierForShop(ctx.shop.territoryId, supplierId);
   if (!supplier) notFound();
@@ -32,7 +32,7 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
       />
       {items.length === 0 ? (
         <EmptyState>
-          В корзине пока ничего нет. <Link href={`/shop/suppliers/${supplier.id}`} className="text-brand-600">Перейти в каталог</Link>
+          {t("В корзине пока ничего нет.")} <Link href={`/shop/suppliers/${supplier.id}`} className="text-brand-600">{t("Перейти в каталог")}</Link>
         </EmptyState>
       ) : (
         <div className="grid gap-4 lg:grid-cols-5">
@@ -49,13 +49,13 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-medium">{i.productName}</div>
-                          <div className="text-xs text-gray-500">{formatMoney(gone ? i.price : u.price)} / {i.unitLabel} · в наличии {formatQty(Math.max(0, available))}</div>
+                          <div className="text-xs text-gray-500">{t.money(gone ? i.price : u.price)} / {t(i.unitLabel)} · {t("в наличии {qty}", { qty: formatQty(Math.max(0, available)) })}</div>
                         </div>
-                        <div className="shrink-0 text-sm font-medium">{formatMoney(lineTotal(Number(gone ? i.price : u.price), Number(i.qty)))}</div>
+                        <div className="shrink-0 text-sm font-medium">{t.money(lineTotal(Number(gone ? i.price : u.price), Number(i.qty)))}</div>
                       </div>
-                      {gone && <p className="text-xs text-red-600">Товар больше не продаётся, при оформлении он будет убран</p>}
-                      {priceChanged && <p className="text-xs text-yellow-700">Цена изменилась: было {formatMoney(i.price)}</p>}
-                      {!gone && Number(i.qty) > available && <p className="text-xs text-red-600">Доступно меньше, чем в корзине</p>}
+                      {gone && <p className="text-xs text-red-600">{t("Товар больше не продаётся, при оформлении он будет убран")}</p>}
+                      {priceChanged && <p className="text-xs text-yellow-700">{t("Цена изменилась: было {price}", { price: t.money(i.price) })}</p>}
+                      {!gone && Number(i.qty) > available && <p className="text-xs text-red-600">{t("Доступно меньше, чем в корзине")}</p>}
                       <CartQtyForm itemId={i.id} qty={String(Number(i.qty))} step={allowsFraction(u.kind) ? "0.001" : "1"} />
                     </li>
                   );
@@ -64,27 +64,28 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
             </Card>
             {bonuses.length > 0 && (
               <Alert tone="success">
-                <p className="font-medium">Подарки по акциям:</p>
+                <p className="font-medium">{t("Подарки по акциям:")}</p>
                 <ul className="mt-1 list-disc pl-5">
                   {bonuses.map((b) => (
                     <li key={b.promotionId}>
-                      {b.name} — {formatQty(b.qty)} {b.unitLabel} ({b.promotion})
-                      {b.qty < b.entitled && ` · положено ${formatQty(b.entitled)}, в наличии меньше`}
+                      {b.name} — {formatQty(b.qty)} {t(b.unitLabel)} ({b.promotion})
+                      {b.qty < b.entitled && ` · ${t("положено {qty}, в наличии меньше", { qty: formatQty(b.entitled) })}`}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1 text-xs">Окончательно подарки рассчитываются при оформлении.</p>
+                <p className="mt-1 text-xs">{t("Окончательно подарки рассчитываются при оформлении.")}</p>
               </Alert>
             )}
           </div>
           <div className="lg:col-span-2">
             <Card>
               <div className="mb-4 flex justify-between text-lg font-semibold">
-                <span>Итого</span>
-                <span>{formatMoney(items.reduce((s, i) => s + lineTotal(Number(i.productUnit.price ?? i.price), Number(i.qty)), 0))}</span>
+                <span>{t("Итого")}</span>
+                <span>{t.money(
+items.reduce((s, i) => s + lineTotal(Number(i.productUnit.price ?? i.price), Number(i.qty)), 0))}</span>
               </div>
               {blocked ? (
-                <Alert tone="warning">{ctx.shop.isBlocked ? "Магазин заблокирован, оформление заказов недоступно." : "Поставщик временно не принимает заказы."}</Alert>
+                <Alert tone="warning">{ctx.shop.isBlocked ? t("Магазин заблокирован, оформление заказов недоступно.") : t("Поставщик временно не принимает заказы.")}</Alert>
               ) : (
                 <CheckoutForm
                   supplierId={supplier.id}

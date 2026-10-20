@@ -4,14 +4,14 @@ import { Card, DefinitionList, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatMoney } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { shopVisibleProduct, shopVisibleUnits, supplierForShop } from "@/lib/shop-catalog";
 import { fileUrl } from "@/lib/storage-url";
 import { allowsFraction } from "@/lib/order-core";
 import { AddToCartForm } from "@/components/orders/shop-forms";
 
 export default async function ShopProductPage({ params }: PageProps<"/shop/suppliers/[id]/products/[productId]">) {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const { id, productId } = await params;
   if (ctx.shop.isBlocked) notFound();
   const supplier = await supplierForShop(ctx.shop.territoryId, id);
@@ -43,23 +43,24 @@ export default async function ShopProductPage({ params }: PageProps<"/shop/suppl
                 return (
                   <li key={u.id} className="space-y-2 py-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold">{formatMoney(u.price)} <span className="text-sm font-normal text-gray-500">/ {unitName(u)}</span></span>
-                      <span className={avail > 0 ? "text-sm text-gray-600" : "text-sm text-red-600"}>{avail > 0 ? `в наличии ${formatQty(avail)}` : "нет в наличии"}</span>
+                      <span className="text-lg font-semibold">{t.money(u.price)} <span className="text-sm font-normal text-gray-500">/ {t(unitName(u))}</span></span>
+                      <span className={avail > 0 ? "text-sm text-gray-600" : "text-sm text-red-600"}>{avail > 0 ? t("в наличии {qty}", { qty: formatQty(avail) }) : t("нет в наличии")}</span>
                     </div>
                     {avail > 0 && <AddToCartForm supplierId={supplier.id} unitId={u.id} step={allowsFraction(u.kind) ? "0.001" : "1"} max={avail} />}
                   </li>
                 );
               })}
             </ul>
-            <Link href={`/shop/cart/${supplier.id}`} className="mt-2 block text-sm text-brand-600">Перейти в корзину →</Link>
+            <Link href={`/shop/cart/${supplier.id}`} className="mt-2 block text-sm text-brand-600">{t("Перейти в корзину →")}</Link>
           </Card>
           <Card>
             <DefinitionList
               items={[
                 ["Категория", product.category?.name],
                 ["Бренд", product.brand],
-                ["Вес", product.weightKg ? `${formatQty(product.weightKg)} кг` : null],
-                ...attrs.map((a) => [a.name, a.value || "да"] as [string, string]),
+                ["Вес", product.weightKg ? `${formatQty(product.weightKg)} ${t("кг")}` : null],
+                ...attrs.map((a) => [a.name, a.value || t("да")] as [string, string]),
+
               ]}
             />
             {product.description && <p className="mt-3 text-sm whitespace-pre-line text-gray-700">{product.description}</p>}

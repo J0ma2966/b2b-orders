@@ -10,8 +10,10 @@ import { TerritorySelect } from "@/components/territory/territory-select";
 import type { TerritoryOption } from "@/components/territory/types";
 import { initialFormState } from "@/lib/forms";
 import { updateShopProfileAction } from "../actions";
+import { useT } from "@/lib/i18n/client";
 
 export function ShopProfileForm({ territories, defaults }: { territories: TerritoryOption[]; defaults: Record<string, string> }) {
+  const t = useT();
   const [state, action, pending] = useActionState(updateShopProfileAction, initialFormState);
   const e = state.fieldErrors ?? {};
   const v = { ...defaults, ...state.values };
@@ -43,7 +45,7 @@ export function ShopProfileForm({ territories, defaults }: { territories: Territ
       <Field label="Добавить фото" name="photo" error={e.photo}>
         <Input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
       </Field>
-      <SubmitButton>Сохранить</SubmitButton>
+      <SubmitButton>{t("Сохранить")}</SubmitButton>
     </ActionForm>
   );
 }

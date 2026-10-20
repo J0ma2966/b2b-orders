@@ -7,14 +7,16 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { createBonusAction } from "./actions";
+import { useT } from "@/lib/i18n/client";
 
 export function BonusForm({ units, today }: { units: { id: string; label: string }[]; today: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(createBonusAction, initialFormState);
   const v = state.values ?? {};
   const fe = state.fieldErrors ?? {};
   const unitOptions = (
     <>
-      <option value="">— выберите —</option>
+      <option value="">{t("— выберите —")}</option>
       {units.map((u) => (
         <option key={u.id} value={u.id}>{u.label}</option>
       ))}
@@ -24,7 +26,7 @@ export function BonusForm({ units, today }: { units: { id: string; label: string
     <ActionForm key={state.at ?? "b"} action={action} pending={pending} className="space-y-4">
       <FormMessage state={state} />
       <Field label="Название акции" name="name" error={fe.name}>
-        <Input name="name" defaultValue={v.name} placeholder="10 + 1 на воду" />
+        <Input name="name" defaultValue={v.name} placeholder={t("10 + 1 на воду")} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="sm:col-span-2">
@@ -48,7 +50,7 @@ export function BonusForm({ units, today }: { units: { id: string; label: string
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="repeatable" defaultChecked={v.repeatable ? v.repeatable === "on" : true} />
-        За каждые N штук (20 шт. — 2 подарка). Без отметки — один подарок на заказ.
+        {t("За каждые N штук (20 шт. — 2 подарка). Без отметки — один подарок на заказ.")}
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Действует с" name="startsAt" error={fe.startsAt}>
@@ -58,7 +60,7 @@ export function BonusForm({ units, today }: { units: { id: string; label: string
           <Input name="endsAt" type="date" defaultValue={v.endsAt} />
         </Field>
       </div>
-      <SubmitButton>Создать акцию</SubmitButton>
+      <SubmitButton>{t("Создать акцию")}</SubmitButton>
     </ActionForm>
   );
 }

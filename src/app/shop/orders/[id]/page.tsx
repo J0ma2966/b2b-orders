@@ -6,13 +6,13 @@ import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/comp
 import { CancelOrderForm, ConfirmReceiptQr, RequestCancelForm } from "@/components/orders/shop-forms";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
 
 export default async function ShopOrderPage({ params, searchParams }: PageProps<"/shop/orders/[id]">) {
-  const ctx = await requireShop();
+  const [ctx, t] = await Promise.all([requireShop(), getT()]);
   const { id } = await params;
   const sp = await searchParams;
   const order = await db.order.findUnique({
@@ -27,7 +27,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
   return (
     <>
       <PageHeader
-        title={`Заказ №${order.number}`}
+        title={t("Заказ №{n}", { n: order.number })}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <OrderStatusBadge status={order.status} />
@@ -36,15 +36,15 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         }
       />
       <div className="space-y-4">
-        {sp.placed && <Alert tone="success">Заказ оформлен, товар зарезервирован. Поставщик получил уведомление.</Alert>}
+        {sp.placed && <Alert tone="success">{t("Заказ оформлен, товар зарезервирован. Поставщик получил уведомление.")}</Alert>}
         {sp.placed && placedEvent?.comment && <Alert tone="warning">{placedEvent.comment}</Alert>}
         {order.cancelReason && (
           <Alert tone="error">
-            {order.cancelledBy === "SHOP" ? "Вы отменили заказ" : "Поставщик отменил заказ"} {formatDateTime(order.cancelledAt)}. Причина: {order.cancelReason}
+            {t(order.cancelledBy === "SHOP" ? "Вы отменили заказ {date}. Причина: {reason}" : "Поставщик отменил заказ {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
           </Alert>
         )}
-        {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">Вы попросили отменить заказ: {order.cancelRequestReason}. Ждём решения поставщика.</Alert>}
-        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">Заказ не доставлен: {order.problemNote}</Alert>}
+        {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">{t("Вы попросили отменить заказ: {reason}. Ждём решения поставщика.", { reason: order.cancelRequestReason })}</Alert>}
+        {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">{t("Заказ не доставлен: {note}", { note: order.problemNote })}</Alert>}
         {qr && (
           <Card>
             <ConfirmReceiptQr dataUrl={qr} code={order.qrToken!} />
@@ -52,9 +52,9 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         )}
         {RECEIVED.includes(order.status) && (
           <div className="flex flex-wrap gap-2">
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>🧾 Чек</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>📄 Накладная</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/shop/replacements/new?order=${order.id}`}>🔁 Заявка на замену</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
+            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/shop/replacements/new?order=${order.id}`}>{t("🔁 Заявка на замену")}</Link>
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-5">
@@ -62,7 +62,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
             <OrderItems items={order.items} total={order.total} />
             <OrderFinance o={order} currentBalance={account ? Number(account.balance) : undefined} />
             <Card>
-              <h2 className="mb-3 font-semibold">История</h2>
+              <h2 className="mb-3 font-semibold">{t("История")}</h2>
               <OrderHistory events={events} />
             </Card>
           </div>
@@ -70,11 +70,11 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
             <Card>
               <DefinitionList
                 items={[
-                  ["Оформлен", formatDateTime(order.placedAt)],
-                  ["Оплата", order.paymentMethod ? PAYMENT_LABEL[order.paymentMethod] : null],
+                  ["Оформлен", t.dateTime(order.placedAt)],
+                  ["Оплата", order.paymentMethod ? t(PAYMENT_LABEL[order.paymentMethod]) : null],
                   ["Адрес", order.deliveryAddress],
                   ["Контакт", order.contactName && `${order.contactName}, ${formatPhone(order.contactPhone ?? "")}`],
-                  ["Желаемая дата", order.deliveryDate ? formatDate(order.deliveryDate) : null],
+                  ["Желаемая дата", order.deliveryDate ? t.date(order.deliveryDate) : null],
                   ["Доставщик", order.courier ? <>{order.courier.fullName}, <a className="text-brand-600" href={`tel:${order.courier.phone}`}>{formatPhone(order.courier.phone)}</a></> : null],
                   ["Комментарий", order.comment],
                 ]}
@@ -82,14 +82,15 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
             </Card>
             {shopCanRequestCancel(order.status) && (
               <Card>
-                <h2 className="mb-3 font-semibold">Отмена заказа</h2>
+                <h2 className="mb-3 font-semibold">{t("Отмена заказа")}</h2>
                 <RequestCancelForm orderId={order.id} />
               </Card>
             )}
             {shopCanCancel(order.status) && (
               <Card>
-                <h2 className="mb-3 font-semibold">Отмена заказа</h2>
-                <CancelOrderForm orderId={order.id} />
+                <h2 className="mb-3 font-semibold">{t("Отмена заказа")}</h2>
+                <CancelOrderForm
+ orderId={order.id} />
               </Card>
             )}
           </div>

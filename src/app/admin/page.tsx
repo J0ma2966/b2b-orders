@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { formatMoney } from "@/lib/format";
 import { periodRange } from "@/lib/report-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function AdminDashboard() {
   await requireSuperAdmin();
+  const t = await getT();
   const month = periodRange("month", new Date());
   const [suppliers, shops, antifraud, active, monthSales, debt, replacements] = await Promise.all([
     db.supplier.groupBy({ by: ["status"], _count: true }),
@@ -17,17 +18,17 @@ export default async function AdminDashboard() {
     db.shopAccount.aggregate({ where: { balance: { gt: 0 } }, _sum: { balance: true } }),
     db.replacement.count({ where: { status: "NEW" } }),
   ]);
-  const turnover = monthSales.reduce((t, o) => t + Number(o.total) + Number(o.correctionTotal), 0);
-  const commission = monthSales.reduce((t, o) => t + ((Number(o.total) + Number(o.correctionTotal)) * Number(o.commissionRate ?? 0)) / 100, 0);
+  const turnover = monthSales.reduce((sum, o) => sum + Number(o.total) + Number(o.correctionTotal), 0);
+  const commission = monthSales.reduce((sum, o) => sum + ((Number(o.total) + Number(o.correctionTotal)) * Number(o.commissionRate ?? 0)) / 100, 0);
   const s = Object.fromEntries(suppliers.map((r) => [r.status, r._count]));
   const sh = Object.fromEntries(shops.map((r) => [r.status, r._count]));
   const tiles = [
     { label: "Заявки на проверке", value: (s.PENDING ?? 0) + (s.NEEDS_INFO ?? 0), href: "/admin/suppliers?status=PENDING", accent: true },
     { label: "Антифрод: новые события", value: antifraud, href: "/admin/antifraud", accent: true },
     { label: "Заказы в работе", value: active, href: "/admin/orders?status=active" },
-    { label: "Оборот за месяц", value: formatMoney(turnover), href: "/admin/reports" },
-    { label: "Комиссия за месяц", value: formatMoney(commission), href: "/admin/commissions" },
-    { label: "Долг магазинов", value: formatMoney(debt._sum.balance ?? 0), href: "/admin/finance" },
+    { label: "Оборот за месяц", value: t.money(turnover), href: "/admin/reports" },
+    { label: "Комиссия за месяц", value: t.money(commission), href: "/admin/commissions" },
+    { label: "Долг магазинов", value: t.money(debt._sum.balance ?? 0), href: "/admin/finance" },
     { label: "Замены на рассмотрении", value: replacements, href: "/admin/replacements?status=NEW" },
     { label: "Активные поставщики", value: s.ACTIVE ?? 0, href: "/admin/suppliers?status=ACTIVE" },
     { label: "Заблокированные поставщики", value: s.BLOCKED ?? 0, href: "/admin/suppliers?status=BLOCKED" },
@@ -39,11 +40,11 @@ export default async function AdminDashboard() {
     <>
       <PageHeader title="Обзор" />
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-        {tiles.map((t) => (
-          <Link key={t.label} href={t.href}>
-            <Card className={t.accent && Number(t.value) > 0 ? "ring-2 ring-yellow-400" : "hover:ring-gray-300"}>
-              <div className="text-2xl font-semibold sm:text-3xl">{t.value}</div>
-              <div className="mt-1 text-sm text-gray-500">{t.label}</div>
+        {tiles.map((tile) => (
+          <Link key={tile.label} href={tile.href}>
+            <Card className={tile.accent && Number(tile.value) > 0 ? "ring-2 ring-yellow-400" : "hover:ring-gray-300"}>
+              <div className="text-2xl font-semibold sm:text-3xl">{tile.value}</div>
+              <div className="mt-1 text-sm text-gray-500">{t(tile.label)}</div>
             </Card>
           </Link>
         ))}

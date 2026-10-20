@@ -191,7 +191,10 @@ export async function confirmDelivery(courierId: string, orderId: string, input:
         await tx.shopStatusHistory.create({ data: { shopId: shop.id, fromStatus: "NEW", toStatus: "VERIFIED", reason: `Первая доставка, заказ №${order.number}`, userId: actor.userId } });
       }
     }
-    const body = `Сумма ${formatMoney(total)}, получено ${formatMoney(input.received)}${dist.orderDebt > 0 ? `, долг по заказу ${formatMoney(dist.orderDebt)}` : ""}`;
+    const body =
+      dist.orderDebt > 0
+        ? `Сумма ${formatMoney(total)}, получено ${formatMoney(input.received)}, долг по заказу ${formatMoney(dist.orderDebt)}`
+        : `Сумма ${formatMoney(total)}, получено ${formatMoney(input.received)}`;
     await notifyShop(order.shopId, shopNote(order, "получение подтверждено", body), tx);
     await notifySupplierStaff(order.supplierId, { type: "order.delivered", title: `Доставка №${order.number} подтверждена`, body, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
     return { status, total, ...dist };

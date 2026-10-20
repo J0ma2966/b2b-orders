@@ -2,6 +2,7 @@
 
 import { Field, Input, Select, Textarea } from "@/components/ui";
 import type { FormState } from "@/lib/forms";
+import { useT } from "@/lib/i18n/client";
 
 export type ProductDefaults = Partial<Record<"name" | "description" | "brand" | "sku" | "categoryId" | "weightKg" | "attributes", string>> & {
   isAvailable?: boolean;
@@ -18,6 +19,7 @@ export function ProductFields({
   categories: { id: string; name: string }[];
   defaults?: ProductDefaults;
 }) {
+  const t = useT();
   const e = state.fieldErrors ?? {};
   const v = { ...defaults, ...state.values } as Record<string, string | undefined>;
   return (
@@ -28,7 +30,7 @@ export function ProductFields({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Категория" name="categoryId" error={e.categoryId}>
           <Select name="categoryId" defaultValue={v.categoryId ?? ""}>
-            <option value="">Без категории</option>
+            <option value="">{t("Без категории")}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -53,11 +55,11 @@ export function ProductFields({
       <div className="flex flex-wrap gap-6">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isAvailable" defaultChecked={defaults.isAvailable ?? true} className="size-4" />
-          Доступен для заказа
+          {t("Доступен для заказа")}
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="allowReplacement" defaultChecked={defaults.allowReplacement ?? true} className="size-4" />
-          Можно заменить по заявке
+          {t("Можно заменить по заявке")}
         </label>
       </div>
       <Field label="Фотографии" name="photos" error={e.photos} hint="До 8 фото, JPG/PNG/WEBP до 10 МБ каждое">

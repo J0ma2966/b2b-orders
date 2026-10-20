@@ -7,6 +7,7 @@ import { normalizePhone } from "@/lib/phone";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, requestMeta } from "@/lib/auth/session";
 import { homePathFor, requireAuth } from "@/lib/auth/current";
+import { syncLocaleOnLogin } from "@/lib/i18n/server";
 import { formValues, invalid, parseForm, type FormState } from "@/lib/forms";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -42,6 +43,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   if (user.status !== "ACTIVE") return { error: "Учётная запись заблокирована. Обратитесь к администратору.", values };
 
   await createSession(user.id);
+  await syncLocaleOnLogin(user);
   if (user.mustChangePassword) redirect("/account/password");
   redirect(await homePathFor({ isSuperAdmin: user.isSuperAdmin, user }));
 }

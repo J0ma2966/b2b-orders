@@ -22,10 +22,12 @@ export function isCovered(shopTerritoryId: string, supplierTerritoryIds: Iterabl
   return ancestorChain(shopTerritoryId, byId).some((t) => covered.has(t.id));
 }
 
-export function territoryLabel(id: string, byId: Map<string, TerritoryNode>) {
+// translateName — перевод названий (сами названия хранятся в базе на русском)
+export function territoryLabel(id: string, byId: Map<string, TerritoryNode>, translateName: (name: string) => string = (n) => n) {
   return ancestorChain(id, byId)
     .filter((t) => t.type !== "COUNTRY")
     .reverse()
-    .map((t) => t.name)
+    .map((t) => translateName(t.name))
+
     .join(", ");
 }

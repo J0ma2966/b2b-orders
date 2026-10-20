@@ -4,14 +4,15 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { formatDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { loadTerritoryMap } from "@/lib/territory";
 import { territoryLabel } from "@/lib/territory-core";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import type { Prisma, ShopStatus } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function ShopsPage({ searchParams }: PageProps<"/admin/shops">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
@@ -38,7 +39,7 @@ export default async function ShopsPage({ searchParams }: PageProps<"/admin/shop
       <PageHeader title="Магазины" />
       <FilterBar q={q} status={status} statuses={Object.entries(SHOP_STATUS_LABEL)} placeholder="Название, ИНН, телефон, адрес" />
       {rows.length === 0 ? (
-        <EmptyState>Магазинов не найдено</EmptyState>
+        <EmptyState>{t("Магазинов не найдено")}</EmptyState>
       ) : (
         <Card className="p-0 sm:p-0">
           <ul className="divide-y divide-gray-100">
@@ -46,9 +47,9 @@ export default async function ShopsPage({ searchParams }: PageProps<"/admin/shop
               <li key={s.id}>
                 <Link href={`/admin/shops/${s.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{s.name} {s.isBlocked && <span className="text-xs text-red-600">· заблокирован</span>}</div>
+                    <div className="truncate font-medium">{s.name} {s.isBlocked && <span className="text-xs text-red-600">{t("· заблокирован")}</span>}</div>
                     <div className="text-xs text-gray-500">
-                      {territoryLabel(s.territoryId, byId)} · {formatPhone(s.phone)} · с {formatDate(s.createdAt)}
+                      {territoryLabel(s.territoryId, byId, t)} · {formatPhone(s.phone)} · {t("с {date}", { date: t.date(s.createdAt) })}
                     </div>
                   </div>
                   <Badge color={SHOP_STATUS_COLOR[s.status]}>{SHOP_STATUS_LABEL[s.status]}</Badge>

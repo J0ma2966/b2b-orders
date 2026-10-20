@@ -6,8 +6,10 @@ import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
 import type { Prisma } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function SupplierOrdersPage({ searchParams }: PageProps<"/supplier/orders">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const sp = await searchParams;
   const status = typeof sp.status === "string" ? sp.status : "active";
@@ -28,7 +30,7 @@ export default async function SupplierOrdersPage({ searchParams }: PageProps<"/s
       <PageHeader title="Заказы" />
       <FilterBar q={q} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" placeholder="Номер или магазин" />
       {rows.length === 0 ? (
-        <EmptyState>Заказов не найдено</EmptyState>
+        <EmptyState>{t("Заказов не найдено")}</EmptyState>
       ) : (
         <OrdersList rows={rows} href={(id) => `/supplier/orders/${id}`} party={(o) => o.shop.name} />
       )}

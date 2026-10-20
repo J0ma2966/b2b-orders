@@ -6,8 +6,10 @@ import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
 import type { Prisma } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function AdminOrdersPage({ searchParams }: PageProps<"/admin/orders">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const status = typeof sp.status === "string" ? sp.status : "";
@@ -33,7 +35,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
       <PageHeader title="Заказы" />
       <FilterBar q={q} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" placeholder="Номер, магазин, поставщик" />
       {rows.length === 0 ? (
-        <EmptyState>Заказов не найдено</EmptyState>
+        <EmptyState>{t("Заказов не найдено")}</EmptyState>
       ) : (
         <OrdersList rows={rows} href={(id) => `/admin/orders/${id}`} party={(o) => `${o.supplier.displayName} → ${o.shop.name}`} />
       )}

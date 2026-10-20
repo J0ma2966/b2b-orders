@@ -5,11 +5,12 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { attributesToText, formatQty, unitName } from "@/lib/catalog";
-import { formatDateTime, formatMoney } from "@/lib/format";
 import { toggleArchiveProductAction } from "../actions";
 import { EditProductForm, StockForm, UnitsForm } from "./forms";
+import { getT } from "@/lib/i18n/server";
 
 export default async function ProductPage({ params, searchParams }: PageProps<"/supplier/catalog/[id]">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const { id } = await params;
   const sp = await searchParams;
@@ -38,8 +39,8 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         title={product.name}
         subtitle={
           <span className="flex gap-2">
-            {product.archivedAt && <Badge>Удалён из каталога {formatDateTime(product.archivedAt)}</Badge>}
-            {!product.isAvailable && <Badge color="yellow">Снят с продажи</Badge>}
+            {product.archivedAt && <Badge>{t("Удалён из каталога {date}", { date: t.dateTime(product.archivedAt) })}</Badge>}
+            {!product.isAvailable && <Badge color="yellow">{t("Снят с продажи")}</Badge>}
           </span>
         }
         actions={
@@ -54,10 +55,10 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           </form>
         }
       />
-      {sp.created && <div className="mb-4"><Alert tone="success">Товар создан</Alert></div>}
+      {sp.created && <div className="mb-4"><Alert tone="success">{t("Товар создан")}</Alert></div>}
       <div className="grid gap-4 xl:grid-cols-5">
         <Card className="xl:col-span-3">
-          <h2 className="mb-3 font-semibold">Карточка товара</h2>
+          <h2 className="mb-3 font-semibold">{t("Карточка товара")}</h2>
           <EditProductForm
             productId={product.id}
             categories={categories.map((c) => ({ id: c.id, name: c.name }))}
@@ -77,30 +78,30 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         </Card>
         <div className="space-y-4 xl:col-span-2">
           <Card>
-            <h2 className="mb-3 font-semibold">Единицы, цены и остатки</h2>
+            <h2 className="mb-3 font-semibold">{t("Единицы, цены и остатки")}</h2>
             <UnitsForm productId={product.id} units={units} />
           </Card>
           {units.length > 0 && (
             <Card>
-              <h2 className="mb-3 font-semibold">Складская операция</h2>
+              <h2 className="mb-3 font-semibold">{t("Складская операция")}</h2>
               <StockForm units={units.map((u) => ({ id: u.id, label: u.label }))} />
             </Card>
           )}
           <Card>
-            <h2 className="mb-3 font-semibold">История</h2>
+            <h2 className="mb-3 font-semibold">{t("История")}</h2>
             <ul className="space-y-2 text-sm">
               {product.units.map((u) => (
                 <li key={u.id}>
                   <div className="flex items-center justify-between">
-                    <b>{unitName(u)}</b>
-                    <Link href={`/supplier/stock/${u.id}`} className="text-xs text-brand-600">Журнал склада →</Link>
+                    <b>{t(unitName(u))}</b>
+                    <Link href={`/supplier/stock/${u.id}`} className="text-xs text-brand-600">{t("Журнал склада →")}</Link>
                   </div>
                   {u.priceHistory.map((h) => (
                     <div key={h.id} className="text-xs text-gray-500">
-                      {formatDateTime(h.createdAt)}: {h.oldPrice ? formatMoney(h.oldPrice) : "—"} → {h.newPrice ? formatMoney(h.newPrice) : "без цены"}
+                      {t.dateTime(h.createdAt)}: {h.oldPrice ? t.money(h.oldPrice) : "—"} → {h.newPrice ? t.money(h.newPrice) : t("без цены")}
                     </div>
                   ))}
-                  <div className="text-xs text-gray-500">Физический {formatQty(u.physicalQty)}, в резерве {formatQty(u.reservedQty)}</div>
+                  <div className="text-xs text-gray-500">{t("Физический {p}, в резерве {r}", { p: formatQty(u.physicalQty), r: formatQty(u.reservedQty) })}</div>
                 </li>
               ))}
             </ul>

@@ -4,7 +4,6 @@ import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { formatDateTime } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { fileUrl } from "@/lib/storage";
 import { availableSuppliersForShop, loadTerritoryMap } from "@/lib/territory";
@@ -12,8 +11,10 @@ import { territoryLabel } from "@/lib/territory-core";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { toggleShopBlockAction } from "../../actions";
 import { ShopStatusForm } from "./status-form";
+import { getT } from "@/lib/i18n/server";
 
 export default async function ShopDetailPage({ params }: PageProps<"/admin/shops/[id]">) {
+  const t = await getT();
   await requireSuperAdmin();
   const { id } = await params;
   const [shop, byId] = await Promise.all([
@@ -32,7 +33,7 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
         subtitle={
           <span className="flex gap-2">
             <Badge color={SHOP_STATUS_COLOR[shop.status]}>{SHOP_STATUS_LABEL[shop.status]}</Badge>
-            {shop.isBlocked && <Badge color="red">Заблокирован</Badge>}
+            {shop.isBlocked && <Badge color="red">{t("Заблокирован")}</Badge>}
           </span>
         }
       />
@@ -52,7 +53,7 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
                 ["Телефон", formatPhone(shop.phone)],
                 ["Запасной телефон", shop.phone2 && formatPhone(shop.phone2)],
                 ["Контактное лицо", shop.contactName],
-                ["Регион", territoryLabel(shop.territoryId, byId)],
+                ["Регион", territoryLabel(shop.territoryId, byId, t)],
                 ["Адрес", shop.address],
                 [
                   "Координаты",
@@ -60,16 +61,16 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
                     {shop.lat.toFixed(5)}, {shop.lng.toFixed(5)}
                   </a>,
                 ],
-                ["Зарегистрирован", formatDateTime(shop.createdAt)],
+                ["Зарегистрирован", t.dateTime(shop.createdAt)],
                 ["Пользователи", shop.members.map((m) => `${m.user.fullName} (${formatPhone(m.user.phone)})`).join(", ")],
-                ["Доступные поставщики", suppliers.length ? suppliers.map((s) => s.displayName).join(", ") : "нет"],
+                ["Доступные поставщики", suppliers.length ? suppliers.map((s) => s.displayName).join(", ") : t("нет")],
               ]}
             />
           </Card>
         </div>
         <div className="space-y-4">
           <Card>
-            <h2 className="mb-3 font-semibold">Статус</h2>
+            <h2 className="mb-3 font-semibold">{t("Статус")}</h2>
             <ShopStatusForm shopId={shop.id} current={shop.status} />
             <form action={toggleShopBlockAction} className="mt-4 border-t border-gray-100 pt-4">
               <input type="hidden" name="shopId" value={shop.id} />
@@ -79,16 +80,16 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
             </form>
           </Card>
           <Card>
-            <h2 className="mb-3 font-semibold">История статусов</h2>
+            <h2 className="mb-3 font-semibold">{t("История статусов")}</h2>
             <ol className="space-y-3">
               {shop.statusHistory.map((h) => (
                 <li key={h.id} className="text-sm">
                   <div>
-                    {h.fromStatus ? `${SHOP_STATUS_LABEL[h.fromStatus]} → ` : ""}
-                    <b>{SHOP_STATUS_LABEL[h.toStatus]}</b>
+                    {h.fromStatus ? `${t(SHOP_STATUS_LABEL[h.fromStatus])} → ` : ""}
+                    <b>{t(SHOP_STATUS_LABEL[h.toStatus])}</b>
                   </div>
-                  <div className="text-xs text-gray-500">{formatDateTime(h.createdAt)}</div>
-                  {h.reason && <div className="text-xs text-gray-700">{h.reason}</div>}
+                  <div className="text-xs text-gray-500">{t.dateTime(h.createdAt)}</div>
+                  {h.reason && <div className="text-xs text-gray-700">{t(h.reason)}</div>}
                 </li>
               ))}
             </ol>

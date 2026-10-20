@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Tr } from "./tr";
 
 export const PAGE_SIZE = 20;
 
@@ -30,11 +31,11 @@ export function Pagination({
   return (
     <div className="mt-4 flex items-center justify-between text-sm">
       <span className="text-gray-500">
-        Страница {page} из {pages} · всего {total}
+        <Tr text="Страница {page} из {pages} · всего {total}" params={{ page, pages, total }} />
       </span>
       <div className="flex gap-2">
-        {page > 1 && <Link className="rounded-lg px-3 py-1.5 ring-1 ring-gray-300 hover:bg-gray-50" href={href(page - 1)}>← Назад</Link>}
-        {page < pages && <Link className="rounded-lg px-3 py-1.5 ring-1 ring-gray-300 hover:bg-gray-50" href={href(page + 1)}>Вперёд →</Link>}
+        {page > 1 && <Link className="rounded-lg px-3 py-1.5 ring-1 ring-gray-300 hover:bg-gray-50" href={href(page - 1)}><Tr>← Назад</Tr></Link>}
+        {page < pages && <Link className="rounded-lg px-3 py-1.5 ring-1 ring-gray-300 hover:bg-gray-50" href={href(page + 1)}><Tr>Вперёд →</Tr></Link>}
       </div>
     </div>
   );

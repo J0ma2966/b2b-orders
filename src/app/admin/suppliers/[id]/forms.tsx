@@ -8,6 +8,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { SUPPLIER_ACTION_LABEL, SUPPLIER_ACTION_NEEDS_COMMENT, type SupplierModerationAction } from "@/lib/statuses";
 import { moderateSupplierAction, setSupplierCommissionAction } from "../../actions";
+import { useT } from "@/lib/i18n/client";
 
 export function ModerationForm({
   supplierId,
@@ -18,6 +19,7 @@ export function ModerationForm({
   actions: SupplierModerationAction[];
   currentComment: string | null;
 }) {
+  const t = useT();
   const [state, formAction, pending] = useActionState(moderateSupplierAction, initialFormState);
   const [picked, setPicked] = useState<SupplierModerationAction>(actions[0]);
   // После смены статуса список действий меняется — выбранное может стать недоступным
@@ -28,13 +30,13 @@ export function ModerationForm({
   return (
     <ActionForm action={formAction} pending={pending} className="space-y-3">
       <FormMessage state={state} />
-      {currentComment && <p className="text-xs text-gray-500">Последний комментарий: {currentComment}</p>}
+      {currentComment && <p className="text-xs text-gray-500">{t("Последний комментарий:")}{" "}{currentComment}</p>}
       <input type="hidden" name="supplierId" value={supplierId} />
       <div className="flex flex-wrap gap-2">
         {actions.map((a) => (
           <label key={a} className={`cursor-pointer rounded-lg px-3 py-1.5 text-sm ring-1 ${a === action ? "bg-brand-50 ring-brand-500" : "ring-gray-300"}`}>
             <input type="radio" name="action" value={a} checked={a === action} onChange={() => setAction(a)} className="sr-only" />
-            {SUPPLIER_ACTION_LABEL[a]}
+            {t(SUPPLIER_ACTION_LABEL[a])}
           </label>
         ))}
       </div>
@@ -45,13 +47,14 @@ export function ModerationForm({
         variant={danger ? "danger" : "primary"}
         confirm={danger ? `${SUPPLIER_ACTION_LABEL[action]} поставщика?` : undefined}
       >
-        {SUPPLIER_ACTION_LABEL[action]}
+        {t(SUPPLIER_ACTION_LABEL[action])}
       </SubmitButton>
     </ActionForm>
   );
 }
 
 export function CommissionForm({ supplierId, current, defaultRate }: { supplierId: string; current: string; defaultRate: string }) {
+  const t = useT();
   const [state, formAction, pending] = useActionState(setSupplierCommissionAction, initialFormState);
   return (
     <ActionForm action={formAction} pending={pending} className="space-y-3">
@@ -60,7 +63,7 @@ export function CommissionForm({ supplierId, current, defaultRate }: { supplierI
       <Field label="Индивидуальная ставка, %" name="commissionRate" error={state.fieldErrors?.commissionRate} hint={`Пусто — стандартная ставка (${defaultRate}%)`}>
         <Input name="commissionRate" inputMode="decimal" defaultValue={current} />
       </Field>
-      <SubmitButton variant="secondary">Сохранить</SubmitButton>
+      <SubmitButton variant="secondary">{t("Сохранить")}</SubmitButton>
     </ActionForm>
   );
 }

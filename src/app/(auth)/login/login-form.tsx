@@ -6,8 +6,10 @@ import { Alert, Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { initialFormState } from "@/lib/forms";
 import { loginAction } from "../actions";
+import { useT } from "@/lib/i18n/client";
 
 export function LoginForm() {
+  const t = useT();
   const [state, action, pending] = useActionState(loginAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-4">
@@ -18,7 +20,7 @@ export function LoginForm() {
       <Field label="Пароль" name="password" error={state.fieldErrors?.password}>
         <Input name="password" type="password" autoComplete="current-password" required />
       </Field>
-      <SubmitButton className="w-full" pendingText="Входим…">Войти</SubmitButton>
+      <SubmitButton className="w-full" pendingText="Входим…">{t("Войти")}</SubmitButton>
     </ActionForm>
   );
 }

@@ -4,11 +4,12 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { balanceLabel } from "@/components/orders/order-view";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
-import { formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { getT } from "@/lib/i18n/server";
 
 // Магазины поставщика и задолженность (ТЗ п. 73)
 export default async function SupplierShopsPage({ searchParams }: PageProps<"/supplier/shops">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
@@ -30,10 +31,10 @@ export default async function SupplierShopsPage({ searchParams }: PageProps<"/su
   const totalDebt = shops.reduce((s, sh) => s + Math.max(0, Number(sh.accounts[0]?.balance ?? 0)), 0);
   return (
     <>
-      <PageHeader title="Магазины и задолженность" subtitle={`Общий долг магазинов: ${formatMoney(totalDebt)}`} />
+      <PageHeader title="Магазины и задолженность" subtitle={`Общий долг магазинов: ${t.money(totalDebt)}`} />
       <FilterBar q={q} status={filter} statuses={[["debt", "С долгом"], ["credit", "Работают в долг"]]} allLabel="Все магазины" placeholder="Название магазина" />
       {shops.length === 0 ? (
-        <EmptyState>Магазины появятся после первых заказов</EmptyState>
+        <EmptyState>{t("Магазины появятся после первых заказов")}</EmptyState>
       ) : (
         <Card className="p-0 sm:p-0">
           <ul className="divide-y divide-gray-100">
@@ -45,9 +46,9 @@ export default async function SupplierShopsPage({ searchParams }: PageProps<"/su
                   <Link href={`/supplier/shops/${s.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50">
                     <div>
                       <div className="font-medium">{s.name}</div>
-                      <div className="text-xs text-gray-500">{formatPhone(s.phone)} · заказов {s._count.orders} · {acc?.creditAllowed ? "в долг разрешено" : "без долга"}</div>
+                      <div className="text-xs text-gray-500">{formatPhone(s.phone)} · {t("заказов {n}", { n: s._count.orders })} · {acc?.creditAllowed ? t("в долг разрешено") : t("без долга")}</div>
                     </div>
-                    <div className={balance > 0 ? "font-semibold text-red-700" : "text-gray-600"}>{balanceLabel(balance)}</div>
+                    <div className={balance > 0 ? "font-semibold text-red-700" : "text-gray-600"}>{balanceLabel(balance, t)}</div>
                   </Link>
                 </li>
               );

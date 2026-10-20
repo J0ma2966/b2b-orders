@@ -4,12 +4,12 @@ import { FilterBar } from "@/components/ui/filter-bar";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { unitName } from "@/lib/catalog";
-import { formatDateTime, formatMoney } from "@/lib/format";
 import { ancestorChain } from "@/lib/territory-core";
 import { loadTerritoryMap } from "@/lib/territory";
 import type { AntifraudStatus } from "@/generated/prisma/enums";
 import { restoreSupplierVisibilityAction } from "./actions";
 import { ResolveForm } from "./resolve-form";
+import { getT } from "@/lib/i18n/server";
 
 const STATUS: Record<AntifraudStatus, [string, "yellow" | "green" | "red" | "blue"]> = {
   OPEN: ["Новое", "yellow"],
@@ -19,6 +19,7 @@ const STATUS: Record<AntifraudStatus, [string, "yellow" | "green" | "red" | "blu
 };
 
 export default async function AntifraudPage({ searchParams }: PageProps<"/admin/antifraud">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const status = typeof sp.status === "string" && sp.status in STATUS ? (sp.status as AntifraudStatus) : undefined;
@@ -46,7 +47,7 @@ export default async function AntifraudPage({ searchParams }: PageProps<"/admin/
       <PageHeader title="Антифрод цен" subtitle="Снижение цены на 30% и более" />
       <FilterBar status={status} allLabel="Открытые" statuses={Object.entries(STATUS).map(([k, v]) => [k, v[0]])} search={false} />
       {events.length === 0 ? (
-        <EmptyState>Событий нет</EmptyState>
+        <EmptyState>{t("Событий нет")}</EmptyState>
       ) : (
         <div className="space-y-4">
           {events.map((e) => (
@@ -54,41 +55,41 @@ export default async function AntifraudPage({ searchParams }: PageProps<"/admin/
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="font-semibold">
-                    {e.productUnit.product.name} · {unitName(e.productUnit)}
+                    {e.productUnit.product.name} · {t(unitName(e.productUnit))}
                   </div>
                   <div className="text-sm">
                     <Link href={`/admin/suppliers/${e.supplierId}`} className="text-brand-600">{e.supplier.displayName}</Link>
-                    {e.supplier.ordersDisabled && <Badge color="red">заказы запрещены</Badge>} {e.supplier.hiddenFromShops && <Badge color="red">скрыт</Badge>}
+                    {e.supplier.ordersDisabled && <Badge color="red">{t("заказы запрещены")}</Badge>} {e.supplier.hiddenFromShops && <Badge color="red">{t("скрыт")}</Badge>}
                   </div>
                 </div>
                 <Badge color={STATUS[e.status][1]}>{STATUS[e.status][0]}</Badge>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <div><div className="text-xs text-gray-500">Было</div>{formatMoney(e.oldPrice)}</div>
-                <div><div className="text-xs text-gray-500">Стало</div>{formatMoney(e.newPrice)}</div>
-                <div><div className="text-xs text-gray-500">Изменение</div><b className="text-red-600">{e.changePct.toString()}%</b></div>
-                <div><div className="text-xs text-gray-500">Текущая цена</div>{formatMoney(e.productUnit.price)}</div>
-                <div><div className="text-xs text-gray-500">Кто</div>{e.userId ? users.get(e.userId) : "—"}{e.onBehalfOfUserId && ` (от имени ${users.get(e.onBehalfOfUserId)})`}</div>
-                <div><div className="text-xs text-gray-500">Когда</div>{formatDateTime(e.createdAt)}</div>
-                <div><div className="text-xs text-gray-500">Магазинов на территории</div>{shopCounts.get(e.supplierId)}</div>
-                <div><div className="text-xs text-gray-500">Активные заказы, оборот, комиссия</div><span className="text-gray-400">после этапа заказов</span></div>
+                <div><div className="text-xs text-gray-500">{t("Было")}</div>{t.money(e.oldPrice)}</div>
+                <div><div className="text-xs text-gray-500">{t("Стало")}</div>{t.money(e.newPrice)}</div>
+                <div><div className="text-xs text-gray-500">{t("Изменение")}</div><b className="text-red-600">{e.changePct.toString()}%</b></div>
+                <div><div className="text-xs text-gray-500">{t("Текущая цена")}</div>{t.money(e.productUnit.price)}</div>
+                <div><div className="text-xs text-gray-500">{t("Кто")}</div>{e.userId ? users.get(e.userId) : "—"}{e.onBehalfOfUserId && ` ${t("(от имени {name})", { name: users.get(e.onBehalfOfUserId) })}`}</div>
+                <div><div className="text-xs text-gray-500">{t("Когда")}</div>{t.dateTime(e.createdAt)}</div>
+                <div><div className="text-xs text-gray-500">{t("Магазинов на территории")}</div>{shopCounts.get(e.supplierId)}</div>
+                <div><div className="text-xs text-gray-500">{t("Активные заказы, оборот, комиссия")}</div><span className="text-gray-400">{t("после этапа заказов")}</span></div>
               </div>
               {(e.status === "OPEN" || e.status === "WATCHING") && <ResolveForm eventId={e.id} />}
-              {e.resolution && <p className="mt-2 text-xs text-gray-500">Комментарий: {e.resolution}</p>}
+              {e.resolution && <p className="mt-2 text-xs text-gray-500">{t("Комментарий:")} {e.resolution}</p>}
               {(e.supplier.ordersDisabled || e.supplier.hiddenFromShops) && (
                 <div className="mt-3 flex gap-3 border-t border-gray-100 pt-3">
                   {e.supplier.ordersDisabled && (
                     <form action={restoreSupplierVisibilityAction}>
                       <input type="hidden" name="supplierId" value={e.supplierId} />
                       <input type="hidden" name="field" value="ordersDisabled" />
-                      <button className="text-xs text-brand-600">Снова разрешить заказы</button>
+                      <button className="text-xs text-brand-600">{t("Снова разрешить заказы")}</button>
                     </form>
                   )}
                   {e.supplier.hiddenFromShops && (
                     <form action={restoreSupplierVisibilityAction}>
                       <input type="hidden" name="supplierId" value={e.supplierId} />
                       <input type="hidden" name="field" value="hiddenFromShops" />
-                      <button className="text-xs text-brand-600">Снова показывать магазинам</button>
+                      <button className="text-xs text-brand-600">{t("Снова показывать магазинам")}</button>
                     </form>
                   )}
                 </div>

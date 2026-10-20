@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 
 export type NavItem = { href: string; label: string; icon?: string };
 
@@ -16,6 +17,7 @@ export function SideNav({ items, root }: { items: NavItem[]; root: string }) {
 
 // Без подсветки — пока путь не известен (пререндер динамических маршрутов)
 export function SideNavView({ items, root, pathname = "" }: { items: NavItem[]; root: string; pathname?: string }) {
+  const t = useT();
   return (
     <nav className="flex gap-1 overflow-x-auto px-2 pb-2 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
       {items.map((item) => (
@@ -28,7 +30,7 @@ export function SideNavView({ items, root, pathname = "" }: { items: NavItem[]; 
           )}
         >
           {item.icon && <span aria-hidden>{item.icon}</span>}
-          {item.label}
+          {t(item.label)}
         </Link>
       ))}
     </nav>
@@ -41,6 +43,7 @@ export function BottomNav({ items, root }: { items: NavItem[]; root: string }) {
 }
 
 export function BottomNavView({ items, root, pathname = "" }: { items: NavItem[]; root: string; pathname?: string }) {
+  const t = useT();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-[1000] grid border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map((item) => (
@@ -53,7 +56,7 @@ export function BottomNavView({ items, root, pathname = "" }: { items: NavItem[]
           )}
         >
           <span className="text-lg leading-none" aria-hidden>{item.icon}</span>
-          {item.label}
+          {t(item.label)}
         </Link>
       ))}
     </nav>

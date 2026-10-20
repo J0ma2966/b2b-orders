@@ -11,8 +11,10 @@ import { createReplacementAction } from "@/app/shop/replacements/actions";
 import { assignReplacementAction, decideReplacementAction, returnedStatusAction } from "@/app/supplier/replacements/actions";
 import { completeReplacementAction } from "@/app/courier/replacements/actions";
 import type { ReturnedStatus } from "@/generated/prisma/enums";
+import { useT } from "@/lib/i18n/client";
 
 export function NewReplacementForm({ orderId, items }: { orderId: string; items: { id: string; label: string }[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(createReplacementAction, initialFormState);
   const v = state.values ?? {};
   const fe = state.fieldErrors ?? {};
@@ -22,7 +24,7 @@ export function NewReplacementForm({ orderId, items }: { orderId: string; items:
       <input type="hidden" name="orderId" value={orderId} />
       <Field label="Товар" name="orderItemId" error={fe.orderItemId}>
         <Select name="orderItemId" defaultValue={v.orderItemId ?? (items.length === 1 ? items[0].id : "")}>
-          <option value="">— выберите —</option>
+          <option value="">{t("— выберите —")}</option>
           {items.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
         </Select>
       </Field>
@@ -32,8 +34,8 @@ export function NewReplacementForm({ orderId, items }: { orderId: string; items:
         </Field>
         <Field label="Причина" name="reason" error={fe.reason}>
           <Select name="reason" defaultValue={v.reason ?? ""}>
-            <option value="">— выберите —</option>
-            {REPLACEMENT_REASONS.map((r) => <option key={r}>{r}</option>)}
+            <option value="">{t("— выберите —")}</option>
+            {REPLACEMENT_REASONS.map((r) => <option key={r} value={r}>{t(r)}</option>)}
           </Select>
         </Field>
       </div>
@@ -46,12 +48,13 @@ export function NewReplacementForm({ orderId, items }: { orderId: string; items:
       <Field label="Видео" name="videos" hint="MP4, WEBM, MOV до 50 МБ">
         <Input name="videos" type="file" accept="video/mp4,video/webm,video/quicktime" />
       </Field>
-      <SubmitButton pendingText="Отправляю…">Отправить заявку</SubmitButton>
+      <SubmitButton pendingText="Отправляю…">{t("Отправить заявку")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function DecideReplacementForm({ id }: { id: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(decideReplacementAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
@@ -61,14 +64,15 @@ export function DecideReplacementForm({ id }: { id: string }) {
         <Input name="comment" defaultValue={state.values?.comment} />
       </Field>
       <div className="flex flex-wrap gap-2">
-        <SubmitButton name="decision" value="approve" pendingText="…">Согласовать и зарезервировать</SubmitButton>
-        <SubmitButton name="decision" value="reject" variant="danger" pendingText="…">Отклонить</SubmitButton>
+        <SubmitButton name="decision" value="approve" pendingText="…">{t("Согласовать и зарезервировать")}</SubmitButton>
+        <SubmitButton name="decision" value="reject" variant="danger" pendingText="…">{t("Отклонить")}</SubmitButton>
       </div>
     </ActionForm>
   );
 }
 
 export function AssignReplacementForm({ id, couriers, orders }: { id: string; couriers: { id: string; name: string }[]; orders: { id: string; label: string }[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(assignReplacementAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-3">
@@ -88,12 +92,13 @@ export function AssignReplacementForm({ id, couriers, orders }: { id: string; co
           </Select>
         </Field>
       )}
-      <SubmitButton pendingText="…">Назначить</SubmitButton>
+      <SubmitButton pendingText="…">{t("Назначить")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function CompleteReplacementForm({ id }: { id: string }) {
+  const t = useT();
   const [state, action, pending] = useActionState(completeReplacementAction, initialFormState);
   if (state.ok) return <FormMessage state={state} />;
   return (
@@ -106,22 +111,23 @@ export function CompleteReplacementForm({ id }: { id: string }) {
       <Field label="Комментарий" name="comment">
         <Input name="comment" />
       </Field>
-      <SubmitButton pendingText="…" confirm="Подтвердить: новый товар передан, старый забран?">Передал новый, забрал старый</SubmitButton>
+      <SubmitButton pendingText="…" confirm="Подтвердить: новый товар передан, старый забран?">{t("Передал новый, забрал старый")}</SubmitButton>
     </ActionForm>
   );
 }
 
 export function ReturnedStatusForm({ id, current, options }: { id: string; current: ReturnedStatus; options: ReturnedStatus[] }) {
+  const t = useT();
   const [state, action, pending] = useActionState(returnedStatusAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="mt-2 flex flex-wrap items-end gap-2">
       <input type="hidden" name="id" value={id} />
-      <Select name="status" defaultValue={current} aria-label="Статус" className="w-48">
-        {options.map((s) => <option key={s} value={s}>{RETURNED_STATUS_LABEL[s]}</option>)}
+      <Select name="status" defaultValue={current} aria-label={t("Статус")} className="w-48">
+        {options.map((s) => <option key={s} value={s}>{t(RETURNED_STATUS_LABEL[s])}</option>)}
       </Select>
-      <Input name="comment" placeholder="Комментарий" aria-label="Комментарий" className="w-48" />
-      <SubmitButton variant="secondary" pendingText="…" confirm={undefined}>Сохранить</SubmitButton>
-      {(state.error || state.message) && <p className={state.error ? "w-full text-xs text-red-600" : "w-full text-xs text-green-700"}>{state.error ?? state.message}</p>}
+      <Input name="comment" placeholder={t("Комментарий")} aria-label={t("Комментарий")} className="w-48" />
+      <SubmitButton variant="secondary" pendingText="…" confirm={undefined}>{t("Сохранить")}</SubmitButton>
+      {(state.error || state.message) && <p className={state.error ? "w-full text-xs text-red-600" : "w-full text-xs text-green-700"}>{t(state.error ?? state.message)}</p>}
     </ActionForm>
   );
 }

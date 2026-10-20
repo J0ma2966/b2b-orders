@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Button } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 import type { LatLng } from "./map-picker-inner";
 
 const Inner = dynamic(() => import("./map-picker-inner"), {
@@ -25,6 +26,7 @@ export function MapPicker({
   defaultValue?: LatLng | null;
   error?: string;
 }) {
+  const t = useT();
   const [point, setPoint] = useState<LatLng | null>(defaultValue ?? null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
@@ -50,17 +52,18 @@ export function MapPicker({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" onClick={locate} disabled={locating}>
-          {locating ? "Определяем…" : "📍 Моё местоположение"}
+          {locating ? t("Определяем…") : t("📍 Моё местоположение")}
         </Button>
-        <span className="text-xs text-gray-500">или нажмите на карту в нужном месте</span>
+        <span className="text-xs text-gray-500">{t("или нажмите на карту в нужном месте")}</span>
       </div>
       <Inner value={point} onChange={setPoint} center={point ?? DEFAULT_CENTER} />
       <input type="hidden" name={latName} value={point?.lat ?? ""} />
       <input type="hidden" name={lngName} value={point?.lng ?? ""} />
       <div className="text-xs text-gray-500">
-        {point ? `Координаты: ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}` : "Точка не выбрана"}
+        {point ? t("Координаты: {lat}, {lng}", { lat: point.lat.toFixed(6), lng: point.lng.toFixed(6) }) : t("Точка не выбрана")}
       </div>
-      {(geoError || error) && <div className="text-xs text-red-600">{geoError ?? error}</div>}
+      {(geoError || error) && <div className="text-xs text-red-600">{t(geoError ?? error)}</div>}
+
     </div>
   );
 }

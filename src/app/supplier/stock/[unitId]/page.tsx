@@ -4,11 +4,12 @@ import { Card, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatDateTime } from "@/lib/format";
 import { MOVEMENT_LABEL } from "@/lib/stock-core";
+import { getT } from "@/lib/i18n/server";
 
 // Журнал складских операций по единице товара (ТЗ п. 20)
 export default async function StockJournalPage({ params }: PageProps<"/supplier/stock/[unitId]">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const { unitId } = await params;
   const unit = await db.productUnit.findUnique({ where: { id: unitId }, include: { product: true } });
@@ -23,35 +24,35 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
   return (
     <>
       <PageHeader
-        title={`${unit.product.name} · ${unitName(unit)}`}
-        subtitle={<Link href={`/supplier/catalog/${unit.productId}`} className="text-brand-600">← К товару</Link>}
+        title={`${unit.product.name} · ${t(unitName(unit))}`}
+        subtitle={<Link href={`/supplier/catalog/${unit.productId}`} className="text-brand-600">{t("← К товару")}</Link>}
       />
       <Card className="overflow-x-auto p-0 sm:p-0">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-gray-200 text-left text-xs text-gray-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Когда</th>
-              <th className="px-4 py-2 font-medium">Операция</th>
-              <th className="px-4 py-2 text-right font-medium">Физ.</th>
-              <th className="px-4 py-2 text-right font-medium">Резерв</th>
-              <th className="px-4 py-2 text-right font-medium">Остаток после</th>
-              <th className="px-4 py-2 font-medium">Кто · основание</th>
+              <th className="px-4 py-2 font-medium">{t("Когда")}</th>
+              <th className="px-4 py-2 font-medium">{t("Операция")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("Физ.")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("Резерв")}</th>
+              <th className="px-4 py-2 text-right font-medium">{t("Остаток после")}</th>
+              <th className="px-4 py-2 font-medium">{t("Кто · основание")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {moves.map((m) => (
               <tr key={m.id} className="align-top">
-                <td className="px-4 py-2 whitespace-nowrap text-gray-500">{formatDateTime(m.createdAt)}</td>
-                <td className="px-4 py-2">{MOVEMENT_LABEL[m.type]}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-gray-500">{t.dateTime(m.createdAt)}</td>
+                <td className="px-4 py-2">{t(MOVEMENT_LABEL[m.type])}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{signed(m.physicalDelta)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{signed(m.reservedDelta)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {formatQty(m.physicalAfter)} / {formatQty(m.reservedAfter)}
                 </td>
                 <td className="px-4 py-2 text-xs">
-                  {m.userId ? users.get(m.userId) : "Система"}
-                  {m.onBehalfOfUserId && <span className="text-yellow-700"> (от имени {users.get(m.onBehalfOfUserId)})</span>}
-                  {m.reason && <div className="text-gray-500">{m.reason}</div>}
+                  {m.userId ? users.get(m.userId) : t("Система")}
+                  {m.onBehalfOfUserId && <span className="text-yellow-700"> {t("(от имени {name})", { name: users.get(m.onBehalfOfUserId) })}</span>}
+                  {m.reason && <div className="text-gray-500">{t(m.reason)}</div>}
                   {m.relatedEntity && <div className="text-gray-400">{m.relatedEntity} {m.relatedId}</div>}
                 </td>
               </tr>

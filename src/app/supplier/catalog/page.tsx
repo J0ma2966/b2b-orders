@@ -5,11 +5,12 @@ import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
-import { formatMoney } from "@/lib/format";
 import { fileUrl } from "@/lib/storage-url";
 import type { Prisma } from "@/generated/prisma/client";
+import { getT } from "@/lib/i18n/server";
 
 export default async function CatalogPage({ searchParams }: PageProps<"/supplier/catalog">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
@@ -40,7 +41,7 @@ export default async function CatalogPage({ searchParams }: PageProps<"/supplier
   ]);
   return (
     <>
-      <PageHeader title="Каталог" actions={<ButtonLink href="/supplier/catalog/new">+ Товар</ButtonLink>} />
+      <PageHeader title="Каталог" actions={<ButtonLink href="/supplier/catalog/new">{t("+ Товар")}</ButtonLink>} />
       <FilterBar
         q={q}
         status={filter}
@@ -49,7 +50,7 @@ export default async function CatalogPage({ searchParams }: PageProps<"/supplier
         placeholder="Название, бренд, артикул"
       />
       {products.length === 0 ? (
-        <EmptyState>{q || filter ? "Ничего не найдено" : "Каталог пуст. Добавьте первый товар."}</EmptyState>
+        <EmptyState>{q || filter ? t("Ничего не найдено") : t("Каталог пуст. Добавьте первый товар.")}</EmptyState>
       ) : (
         <Card className="p-0 sm:p-0">
           <ul className="divide-y divide-gray-100">
@@ -62,16 +63,16 @@ export default async function CatalogPage({ searchParams }: PageProps<"/supplier
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-medium">{p.name}</span>
-                        {!p.isAvailable && <Badge color="yellow">Снят с продажи</Badge>}
-                        {p.archivedAt && <Badge color="gray">Удалён</Badge>}
+                        {!p.isAvailable && <Badge color="yellow">{t("Снят с продажи")}</Badge>}
+                        {p.archivedAt && <Badge color="gray">{t("Удалён")}</Badge>}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {[p.category?.name, p.brand, p.sku && `арт. ${p.sku}`].filter(Boolean).join(" · ")}
+                        {[p.category?.name, p.brand, p.sku && t("арт. {sku}", { sku: p.sku })].filter(Boolean).join(" · ")}
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {p.units.map((u) => (
                           <span key={u.id} className={u.isActive ? "" : "text-gray-400 line-through"}>
-                            {unitName(u)}: <b>{u.price ? formatMoney(u.price) : "без цены"}</b> · доступно {formatQty(Number(u.physicalQty) - Number(u.reservedQty))}
+                            {t(unitName(u))}: <b>{u.price ? t.money(u.price) : t("без цены")}</b> · {t("доступно {n}", { n: formatQty(Number(u.physicalQty) - Number(u.reservedQty)) })}
                           </span>
                         ))}
                       </div>

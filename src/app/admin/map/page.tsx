@@ -3,8 +3,10 @@ import { PointsMap, type MapPoint } from "@/components/map/points-map";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { DELIVERY_ACTIVE } from "@/lib/order-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function AdminMapPage({ searchParams }: PageProps<"/admin/map">) {
+  const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
   const supplierId = typeof sp.supplier === "string" ? sp.supplier : "";
@@ -22,11 +24,11 @@ export default async function AdminMapPage({ searchParams }: PageProps<"/admin/m
     <>
       <PageHeader title="Карта" />
       <form className="mb-3 flex gap-2">
-        <select name="supplier" defaultValue={supplierId} className="rounded-lg px-2 py-1.5 text-sm ring-1 ring-gray-300" aria-label="Поставщик">
-          <option value="">Все поставщики</option>
+        <select name="supplier" defaultValue={supplierId} className="rounded-lg px-2 py-1.5 text-sm ring-1 ring-gray-300" aria-label={t("Поставщик")}>
+          <option value="">{t("Все поставщики")}</option>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.displayName}</option>)}
         </select>
-        <button className="rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-300">Показать</button>
+        <button className="rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Показать")}</button>
       </form>
       <PointsMap points={points} legend={[{ color: "#1f5ad6", label: "Офисы поставщиков" }, { color: "#16a34a", label: "Магазины" }, { color: "#6b7280", label: "Заблокированные" }, { color: "#f59e0b", label: "Текущие доставки" }]} />
     </>

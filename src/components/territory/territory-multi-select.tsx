@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import type { TerritoryOption } from "./types";
 
 // Территория доставки поставщика: целые регионы или отдельные города/районы (ТЗ п. 10).
@@ -13,11 +14,12 @@ export function TerritoryMultiSelect({
   name?: string;
   defaultValue?: string[];
 }) {
+  const t = useT();
   const [selected, setSelected] = useState(new Set(defaultValue));
   const [open, setOpen] = useState<Set<string>>(
-    () => new Set(territories.filter((t) => t.type !== "REGION" && selected.has(t.id)).map((t) => t.parentId!)),
+    () => new Set(territories.filter((x) => x.type !== "REGION" && selected.has(x.id)).map((x) => x.parentId!)),
   );
-  const regions = territories.filter((t) => t.type === "REGION");
+  const regions = territories.filter((x) => x.type === "REGION");
 
   function toggle(id: string, childIds: string[] = []) {
     setSelected((prev) => {
@@ -35,7 +37,7 @@ export function TerritoryMultiSelect({
   return (
     <div className="max-h-96 divide-y divide-gray-100 overflow-y-auto rounded-lg ring-1 ring-gray-300">
       {regions.map((r) => {
-        const children = territories.filter((t) => t.parentId === r.id);
+        const children = territories.filter((x) => x.parentId === r.id);
         const regionOn = selected.has(r.id);
         const partial = children.filter((c) => selected.has(c.id)).length;
         return (
@@ -49,8 +51,8 @@ export function TerritoryMultiSelect({
                 id={`t-${r.id}`}
               />
               <label htmlFor={`t-${r.id}`} className="flex-1 text-sm font-medium">
-                {r.name} {regionOn && <span className="text-xs font-normal text-gray-500">(весь регион)</span>}
-                {!regionOn && partial > 0 && <span className="text-xs font-normal text-gray-500">(выбрано: {partial})</span>}
+                {t(r.name)} {regionOn && <span className="text-xs font-normal text-gray-500">{t("(весь регион)")}</span>}
+                {!regionOn && partial > 0 && <span className="text-xs font-normal text-gray-500">{t("(выбрано: {n})", { n: partial })}</span>}
               </label>
               {children.length > 0 && !regionOn && (
                 <button
@@ -65,7 +67,7 @@ export function TerritoryMultiSelect({
                     })
                   }
                 >
-                  {open.has(r.id) ? "Скрыть" : "Города и районы"}
+                  {open.has(r.id) ? t("Скрыть") : t("Города и районы")}
                 </button>
               )}
             </div>
@@ -74,7 +76,8 @@ export function TerritoryMultiSelect({
                 {children.map((c) => (
                   <label key={c.id} className="flex items-center gap-2 text-sm">
                     <input type="checkbox" className="size-4" checked={selected.has(c.id)} onChange={() => toggle(c.id)} />
-                    {c.name}
+                    {t(c.name)}
+
                   </label>
                 ))}
               </div>

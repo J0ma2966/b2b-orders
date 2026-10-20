@@ -11,6 +11,7 @@ import { getAuth } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { notifySuperAdmins } from "@/lib/notify";
 import { isRealFile, saveImage, UploadError } from "@/lib/storage";
+import { getLocale } from "@/lib/i18n/server";
 import { coord, formValues, invalid, opt, parseForm, req, type FormState } from "@/lib/forms";
 
 const phoneField = (msg = "Телефон в формате +998 90 123-45-67") =>
@@ -60,6 +61,7 @@ async function resolveAccount(formData: FormData) {
       fullName: parsed.data.fullName,
       phone: parsed.data.loginPhone,
       passwordHash: await hashPassword(parsed.data.password),
+      locale: await getLocale(),
     },
   };
 }

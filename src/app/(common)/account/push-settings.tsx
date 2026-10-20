@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 import { savePushSubscriptionAction, setPushEnabledAction } from "./push-actions";
 
 function keyToBytes(base64: string) {
@@ -12,6 +13,7 @@ function keyToBytes(base64: string) {
 
 // Push управляется отдельно; уведомления в колокольчике сохраняются всегда (ТЗ п. 57)
 export function PushSettings({ enabled, devices, publicKey }: { enabled: boolean; devices: number; publicKey: string | null }) {
+  const t = useT();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
@@ -33,11 +35,12 @@ export function PushSettings({ enabled, devices, publicKey }: { enabled: boolean
     <div className="space-y-3 text-sm">
       <label className="flex items-center gap-2">
         <input type="checkbox" checked={enabled} disabled={pending} onChange={(e) => start(() => setPushEnabledAction(e.target.checked))} />
-        Присылать push-уведомления
+        {t("Присылать push-уведомления")}
       </label>
-      <p className="text-gray-500">Устройств с push: {devices}. Уведомления в колокольчике сохраняются независимо от этой настройки.</p>
-      <Button type="button" variant="secondary" disabled={pending} onClick={() => start(subscribe)}>🔔 Включить push на этом устройстве</Button>
-      {message && <p className="text-gray-700">{message}</p>}
+      <p className="text-gray-500">{t("Устройств с push: {n}. Уведомления в колокольчике сохраняются независимо от этой настройки.", { n: devices })}</p>
+      <Button type="button" variant="secondary" disabled={pending} onClick={() => start(subscribe)}>{t("🔔 Включить push на этом устройстве")}</Button>
+      {message && <p className="text-gray-700">{t(message)}</p>}
+
     </div>
   );
 }

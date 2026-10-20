@@ -6,10 +6,11 @@ import { AssignReplacementForm, DecideReplacementForm } from "@/components/order
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty } from "@/lib/catalog";
-import { formatDateTime } from "@/lib/format";
 import { REPLACEMENT_STATUS_COLOR, REPLACEMENT_STATUS_LABEL } from "@/lib/replacement-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function SupplierReplacementPage({ params }: PageProps<"/supplier/replacements/[id]">) {
+  const t = await getT();
   const ctx = await requireActiveSupplier();
   const { id } = await params;
   const r = await db.replacement.findUnique({ where: { id }, include: { shop: true, order: true, courier: true, newOrder: true, productUnit: true } });
@@ -22,23 +23,23 @@ export default async function SupplierReplacementPage({ params }: PageProps<"/su
   return (
     <>
       <PageHeader
-        title={`Замена №${r.number}`}
+        title={t("Замена №{n}", { n: r.number })}
         subtitle={<Badge color={REPLACEMENT_STATUS_COLOR[r.status]}>{REPLACEMENT_STATUS_LABEL[r.status]}</Badge>}
-        actions={<Link href="/supplier/replacements" className="text-sm text-brand-600">← Все замены</Link>}
+        actions={<Link href="/supplier/replacements" className="text-sm text-brand-600">{t("← Все замены")}</Link>}
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-3">
           <DefinitionList
             items={[
-              ["Товар", `${r.productName} — ${formatQty(r.qty)} ${r.unitLabel}`],
+              ["Товар", `${r.productName} — ${formatQty(r.qty)} ${t(r.unitLabel)}`],
               ["Магазин", <Link key="s" className="text-brand-600" href={`/supplier/shops/${r.shopId}`}>{r.shop.name}</Link>],
               ["Исходный заказ", <Link key="o" className="text-brand-600" href={`/supplier/orders/${r.orderId}`}>№{r.order.number}</Link>],
-              ["Причина", r.reason],
+              ["Причина", t(r.reason)],
               ["Комментарий", r.comment],
-              ["Создана", formatDateTime(r.createdAt)],
+              ["Создана", t.dateTime(r.createdAt)],
               ["Решение", r.decisionComment],
-              ["Доставщик", r.courier?.fullName ?? (r.newOrder ? `с заказом №${r.newOrder.number}` : null)],
-              ["Выполнена", r.completedAt ? formatDateTime(r.completedAt) : null],
+              ["Доставщик", r.courier?.fullName ?? (r.newOrder ? t("с заказом №{n}", { n: r.newOrder.number }) : null)],
+              ["Выполнена", r.completedAt ? t.dateTime(r.completedAt) : null],
             ]}
           />
           <Media photos={r.photoPaths} videos={r.videoPaths} />
@@ -46,18 +47,18 @@ export default async function SupplierReplacementPage({ params }: PageProps<"/su
         <div className="space-y-4">
           {r.status === "NEW" && (
             <Card>
-              <h2 className="mb-1 font-semibold">Решение</h2>
-              <p className="mb-3 text-sm text-gray-500">На складе доступно {formatQty(available)} {r.unitLabel}. При согласовании новый товар резервируется.</p>
+              <h2 className="mb-1 font-semibold">{t("Решение")}</h2>
+              <p className="mb-3 text-sm text-gray-500">{t("На складе доступно {qty} {unit}. При согласовании новый товар резервируется.", { qty: formatQty(available), unit: t(r.unitLabel) })}</p>
               <DecideReplacementForm id={r.id} />
             </Card>
           )}
           {(r.status === "APPROVED" || r.status === "ASSIGNED") && (
             <Card>
-              <h2 className="mb-3 font-semibold">Кто выполнит замену</h2>
+              <h2 className="mb-3 font-semibold">{t("Кто выполнит замену")}</h2>
               <AssignReplacementForm
                 id={r.id}
                 couriers={couriers.map((c) => ({ id: c.userId, name: c.user.fullName }))}
-                orders={orders.map((o) => ({ id: o.id, label: `Заказ №${o.number}` }))}
+                orders={orders.map((o) => ({ id: o.id, label: t("Заказ №{n}", { n: o.number }) }))}
               />
             </Card>
           )}

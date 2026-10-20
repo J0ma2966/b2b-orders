@@ -3,8 +3,10 @@ import { PointsMap, type MapPoint } from "@/components/map/points-map";
 import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { DELIVERY_ACTIVE } from "@/lib/order-core";
+import { getT } from "@/lib/i18n/server";
 
 export default async function CourierMapPage() {
+  const t = await getT();
   const ctx = await requireSupplier(["COURIER"]);
   const me = ctx.auth.user.id;
   const [orders, replacements] = await Promise.all([
@@ -18,7 +20,7 @@ export default async function CourierMapPage() {
   return (
     <>
       <PageHeader title="Карта доставок" />
-      {points.length === 0 ? <EmptyState>Точек доставки нет</EmptyState> : <PointsMap points={points} legend={[{ color: "#f59e0b", label: "Доставки" }, { color: "#7c3aed", label: "Замены" }]} />}
+      {points.length === 0 ? <EmptyState>{t("Точек доставки нет")}</EmptyState> : <PointsMap points={points} legend={[{ color: "#f59e0b", label: "Доставки" }, { color: "#7c3aed", label: "Замены" }]} />}
     </>
   );
 }
