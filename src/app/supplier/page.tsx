@@ -9,10 +9,13 @@ import { resubmitSupplierAction } from "./actions";
 export default async function SupplierHome() {
   const ctx = await requireSupplier(["OWNER", "ADMIN"]);
   const s = ctx.supplier;
-  const [members, territories] = await Promise.all([
+  const [members, territories, orders] = await Promise.all([
     db.supplierMember.groupBy({ by: ["role"], where: { supplierId: s.id, isActive: true }, _count: true }),
     db.supplierTerritory.count({ where: { supplierId: s.id } }),
+    db.order.groupBy({ by: ["status"], where: { supplierId: s.id, status: { in: ["PLACED", "ACCEPTED", "ASSEMBLING", "READY", "ASSIGNED", "IN_TRANSIT"] } }, _count: true }),
   ]);
+  const byStatus = Object.fromEntries(orders.map((o) => [o.status, o._count])) as Record<string, number>;
+  const inWork = (byStatus.ACCEPTED ?? 0) + (byStatus.ASSEMBLING ?? 0) + (byStatus.ASSIGNED ?? 0) + (byStatus.IN_TRANSIT ?? 0);
   const count = Object.fromEntries(members.map((m) => [m.role, m._count]));
   const canResubmit = supplierTransition("resubmit", s.status) !== null;
   return (
@@ -53,12 +56,18 @@ export default async function SupplierHome() {
             <SubmitButton>Отправить заявку на проверку</SubmitButton>
           </form>
         )}
+        {s.status === "ACTIVE" && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            <Link href="/supplier/orders?status=PLACED"><Card className={byStatus.PLACED ? "ring-brand-500" : ""}><div className="text-2xl font-semibold">{byStatus.PLACED ?? 0}</div><div className="text-sm text-gray-500">Новые заказы</div></Card></Link>
+            <Link href="/supplier/orders?status=active"><Card><div className="text-2xl font-semibold">{inWork}</div><div className="text-sm text-gray-500">В работе</div></Card></Link>
+            <Link href="/supplier/orders?status=READY"><Card><div className="text-2xl font-semibold">{byStatus.READY ?? 0}</div><div className="text-sm text-gray-500">Ждут доставщика</div></Card></Link>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <Link href="/supplier/team"><Card><div className="text-2xl font-semibold">{count.ADMIN ?? 0}</div><div className="text-sm text-gray-500">Администраторы</div></Card></Link>
           <Link href="/supplier/team"><Card><div className="text-2xl font-semibold">{count.COURIER ?? 0}</div><div className="text-sm text-gray-500">Доставщики</div></Card></Link>
           <Link href="/supplier/territory"><Card><div className="text-2xl font-semibold">{territories}</div><div className="text-sm text-gray-500">Территорий доставки</div></Card></Link>
         </div>
-        <Alert>Каталог, остатки и заказы появятся на следующих этапах разработки.</Alert>
       </div>
     </>
   );

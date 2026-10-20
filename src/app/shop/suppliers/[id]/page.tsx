@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Alert, EmptyState, Input, PageHeader, cn } from "@/components/ui";
+import { Alert, ButtonLink, EmptyState, Input, PageHeader, cn } from "@/components/ui";
+import { db } from "@/lib/db";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
@@ -21,6 +22,7 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
   const page = pageFrom(sp);
   const { total, products, categories } = await shopCatalog(supplier.id, { q, categoryId, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE });
   const logo = fileUrl(supplier.logoPath);
+  const cartCount = await db.orderItem.count({ where: { order: { shopId: ctx.shop.id, supplierId: supplier.id, status: "DRAFT" } } });
   const base = `/shop/suppliers/${supplier.id}`;
   return (
     <>
@@ -32,6 +34,7 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
             <a href={`tel:${supplier.phone}`} className="text-brand-600">{formatPhone(supplier.phone)}</a>
           </span>
         }
+        actions={<ButtonLink href={`/shop/cart/${supplier.id}`} variant={cartCount ? "primary" : "secondary"}>🛒 Корзина{cartCount ? ` · ${cartCount}` : ""}</ButtonLink>}
       />
       {supplier.ordersDisabled && <div className="mb-4"><Alert tone="warning">Поставщик временно не принимает новые заказы.</Alert></div>}
       <form className="mb-3 flex gap-2">

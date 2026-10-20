@@ -1,4 +1,4 @@
-import { Card, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, PageHeader } from "@/components/ui";
 import { requireShop } from "@/lib/auth/current";
 import { getTerritoryOptions } from "@/lib/territory";
 import { fileUrl } from "@/lib/storage-url";
@@ -10,7 +10,7 @@ export default async function ShopProfilePage() {
   const territories = await getTerritoryOptions();
   return (
     <>
-      <PageHeader title="Профиль магазина" />
+      <PageHeader title="Профиль магазина" actions={<ButtonLink href="/shop/points" variant="secondary">📍 Мои точки</ButtonLink>} />
       <Card className="max-w-2xl">
         {s.photoPaths.length > 0 && (
           <div className="mb-4 flex gap-2 overflow-x-auto">

@@ -1,4 +1,4 @@
-// Сквозной сценарий (этапы 1–2) на запущенном приложении: node tests/e2e/flow.mjs
+// Сквозной сценарий (этапы 1–3) на запущенном приложении: node tests/e2e/flow.mjs
 // Нужен супер-админ +998900000000 с паролем superadmin-1 (или ADMIN_PW).
 import { chromium } from "playwright";
 
@@ -273,6 +273,112 @@ await sup.getByText("Журнал склада →").first().click();
 await sup.waitForURL(/supplier\/stock\//, { waitUntil: "commit" });
 await sup.waitForTimeout(1000);
 log("журнал:", (await sup.locator("tbody tr:visible").count()), "операций");
+
+// ═════════ Этап 3: заказы ═════════
+const visible = (page, text) => page.getByText(text).locator("visible=true");
+const plusDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+
+// Бонусная акция 10 + 1
+await sup.goto(`${BASE}/supplier/bonuses`);
+await sup.getByLabel("Название акции").fill("10 + 1 на воду");
+await sup.locator("[name=triggerUnitId]").selectOption({ label: "Вода питьевая 1 л — шт." });
+await sup.locator("[name=giftUnitId]").selectOption({ label: "Вода питьевая 1 л — шт." });
+await sup.locator("[name=endsAt]").fill(plusDays(30));
+await sup.getByRole("button", { name: "Создать акцию" }).click();
+await sup.waitForTimeout(1500);
+log("акция создана:", await visible(sup, "Акция «10 + 1 на воду» создана").count() > 0);
+
+// Магазин кладёт в корзину 12 штук и 1 коробку
+await shop.locator("[name=qty]:visible").first().fill("12");
+await shop.getByRole("button", { name: "В корзину" }).first().click();
+await shop.waitForTimeout(1500);
+log("в корзину:", await visible(shop, /Добавлено в корзину/).count() > 0);
+await shop.locator("[name=qty]:visible").first().fill("1000");
+await shop.getByRole("button", { name: "В корзину" }).first().click();
+await shop.waitForTimeout(1500);
+log("сверх остатка:", JSON.stringify(await shop.locator(".bg-red-50:visible").first().innerText().catch(() => "")));
+await shop.goto(`${BASE}/shop/cart/${supplierId}`);
+await shop.waitForTimeout(1200);
+log("подарок в корзине:", await visible(shop, /Подарки по акциям/).count() > 0);
+await shot(shop, "16-shop-cart-mobile");
+await shop.getByRole("button", { name: "Оформить заказ" }).click();
+await shop.waitForURL(/shop\/orders\/[^/]+\?placed=1/, { timeout: 15000, waitUntil: "commit" });
+await shop.waitForTimeout(1200);
+const orderUrlShop = shop.url().split("?")[0];
+const orderId = orderUrlShop.split("/").pop();
+log("заказ оформлен:", await shop.locator("h1:visible").innerText(), "| бонус:", await visible(shop, "Бонус").count() > 0);
+await shot(shop, "17-shop-order-placed-mobile");
+
+// Поставщик: новый заказ, принять, собрать, принудительная продажа, готов, доставщик
+await sup.goto(`${BASE}/supplier`);
+await sup.waitForTimeout(800);
+log("плитка новых заказов:", (await sup.locator("a[href='/supplier/orders?status=PLACED']").innerText()).replace(/\n/g, " "));
+await sup.goto(`${BASE}/supplier/orders/${orderId}`);
+await sup.waitForTimeout(1000);
+for (const b of ["Принять заказ", "Начать сборку"]) {
+  await sup.getByRole("button", { name: b }).click();
+  await sup.waitForTimeout(1500);
+}
+log("статус после сборки:", await visible(sup, "Статус: Собирается").count() > 0);
+await sup.locator("[name=unitId]").selectOption({ index: 2 });
+await sup.locator("[name=qty]:visible").fill("1");
+await sup.getByRole("button", { name: "Добавить как принудительную продажу" }).click();
+await sup.waitForTimeout(1500);
+log("принудительная продажа:", await visible(sup, "Позиция добавлена и зарезервирована").count() > 0);
+await sup.getByRole("button", { name: "Готов к доставке" }).click();
+await sup.waitForTimeout(1500);
+await sup.locator("[name=courierId]").selectOption({ label: "Бобур Доставщик · в работе 0" });
+await sup.getByRole("button", { name: "Назначить" }).click();
+await sup.waitForTimeout(1500);
+log("доставщик назначен:", await visible(sup, "Доставщик назначен").count() > 0);
+await sup.reload();
+await sup.waitForTimeout(1000);
+await shot(sup, "18-supplier-order");
+log("итог у поставщика:", JSON.stringify(await sup.locator("text=Итого").locator("xpath=..").first().innerText()));
+
+// Доставщик видит карточку доставки
+await cour.goto(`${BASE}/courier`);
+await cour.waitForTimeout(1000);
+await shot(cour, "19-courier-mobile");
+log("у доставщика:", JSON.stringify((await cour.locator("main").innerText()).slice(0, 200)));
+
+// Остатки: штуки 12 + 1 бонус в резерве, коробка 1
+await sup.goto(`${BASE}/supplier/stock`);
+await sup.waitForTimeout(800);
+log("остатки:", JSON.stringify((await sup.locator("main").innerText()).slice(0, 400)));
+
+// Магазин видит историю и уведомления
+await shop.goto(orderUrlShop);
+await shop.waitForTimeout(1000);
+await shot(shop, "20-shop-order-history-mobile");
+log("история у магазина:", JSON.stringify((await shop.locator("ol").first().innerText()).slice(0, 400)));
+
+// Второй заказ магазин отменяет сам
+await shop.goto(`${BASE}/shop/suppliers/${supplierId}/products/${productUrl.split("/").pop()}`);
+await shop.waitForTimeout(800);
+await shop.locator("[name=qty]:visible").nth(1).fill("2");
+await shop.getByRole("button", { name: "В корзину" }).nth(1).click();
+await shop.waitForTimeout(1500);
+await shop.goto(`${BASE}/shop/cart/${supplierId}`);
+await shop.getByLabel("Способ оплаты").selectOption("TRANSFER");
+await shop.getByRole("button", { name: "Оформить заказ" }).click();
+await shop.waitForURL(/placed=1/, { timeout: 15000, waitUntil: "commit" });
+await shop.waitForTimeout(800);
+await shop.getByLabel("Причина отмены").fill("Ошиблись количеством");
+shop.once("dialog", (d) => d.accept());
+await shop.getByRole("button", { name: "Отменить заказ" }).click();
+await shop.waitForTimeout(1500);
+log("отмена магазином:", await visible(shop, /Вы отменили заказ/).count() > 0);
+await sup.goto(`${BASE}/supplier/stock`);
+await sup.waitForTimeout(800);
+log("остатки после отмены:", JSON.stringify((await sup.locator("main").innerText()).slice(0, 400)));
+
+await admin.goto(`${BASE}/admin/orders`);
+await admin.waitForTimeout(800);
+log("заказы у админа:", await admin.locator("main li:visible").count());
+await admin.goto(`${BASE}/admin/orders/${orderId}`);
+await admin.waitForTimeout(800);
+await shot(admin, "21-admin-order");
 
 // удаление из каталога — магазин больше не видит
 await sup.goto(productUrl);

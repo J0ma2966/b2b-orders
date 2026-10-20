@@ -4,6 +4,7 @@ const NAV = [
   { href: "/admin", label: "Обзор", icon: "📊" },
   { href: "/admin/suppliers", label: "Поставщики", icon: "🏭" },
   { href: "/admin/shops", label: "Магазины", icon: "🏪" },
+  { href: "/admin/orders", label: "Заказы", icon: "📋" },
   { href: "/admin/antifraud", label: "Антифрод", icon: "🚨" },
   { href: "/admin/territories", label: "Территории", icon: "🗺️" },
   { href: "/admin/audit", label: "Аудит", icon: "📜" },

@@ -7,6 +7,8 @@ import { formatQty, unitName } from "@/lib/catalog";
 import { formatMoney } from "@/lib/format";
 import { shopVisibleProduct, shopVisibleUnits, supplierForShop } from "@/lib/shop-catalog";
 import { fileUrl } from "@/lib/storage-url";
+import { allowsFraction } from "@/lib/order-core";
+import { AddToCartForm } from "@/components/orders/shop-forms";
 
 export default async function ShopProductPage({ params }: PageProps<"/shop/suppliers/[id]/products/[productId]">) {
   const ctx = await requireShop();
@@ -39,14 +41,17 @@ export default async function ShopProductPage({ params }: PageProps<"/shop/suppl
               {product.units.map((u) => {
                 const avail = Number(u.physicalQty) - Number(u.reservedQty);
                 return (
-                  <li key={u.id} className="flex items-center justify-between py-2">
-                    <span className="text-lg font-semibold">{formatMoney(u.price)} <span className="text-sm font-normal text-gray-500">/ {unitName(u)}</span></span>
-                    <span className={avail > 0 ? "text-sm text-gray-600" : "text-sm text-red-600"}>{avail > 0 ? `в наличии ${formatQty(avail)}` : "нет в наличии"}</span>
+                  <li key={u.id} className="space-y-2 py-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold">{formatMoney(u.price)} <span className="text-sm font-normal text-gray-500">/ {unitName(u)}</span></span>
+                      <span className={avail > 0 ? "text-sm text-gray-600" : "text-sm text-red-600"}>{avail > 0 ? `в наличии ${formatQty(avail)}` : "нет в наличии"}</span>
+                    </div>
+                    {avail > 0 && <AddToCartForm supplierId={supplier.id} unitId={u.id} step={allowsFraction(u.kind) ? "0.001" : "1"} max={avail} />}
                   </li>
                 );
               })}
             </ul>
-            <p className="mt-2 text-xs text-gray-500">Корзина и оформление заказа появятся на следующем этапе.</p>
+            <Link href={`/shop/cart/${supplier.id}`} className="mt-2 block text-sm text-brand-600">Перейти в корзину →</Link>
           </Card>
           <Card>
             <DefinitionList

@@ -5,11 +5,18 @@ import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop, loadTerritoryMap } from "@/lib/territory";
 import { territoryLabel } from "@/lib/territory-core";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
+import { db } from "@/lib/db";
+import { OrdersList } from "@/components/orders/order-view";
+import { orderStatusFilter } from "@/lib/order-core";
 
 export default async function ShopHome() {
   const ctx = await requireShop();
   const shop = ctx.shop;
-  const [suppliers, byId] = await Promise.all([availableSuppliersForShop(shop.territoryId), loadTerritoryMap()]);
+  const [suppliers, byId, active] = await Promise.all([
+    availableSuppliersForShop(shop.territoryId),
+    loadTerritoryMap(),
+    db.order.findMany({ where: { shopId: shop.id, status: orderStatusFilter("active") }, include: { supplier: true }, orderBy: { placedAt: "desc" }, take: 5 }),
+  ]);
   return (
     <>
       <PageHeader
@@ -25,6 +32,13 @@ export default async function ShopHome() {
         <Alert tone="error">Магазин заблокирован администратором платформы. Заказы недоступны.</Alert>
       ) : (
         <>
+          {active.length > 0 && (
+            <div className="mb-6">
+              <h2 className="mb-2 font-semibold">Заказы в работе</h2>
+              <OrdersList rows={active} href={(id) => `/shop/orders/${id}`} party={(o) => o.supplier.displayName} />
+              <Link href="/shop/orders" className="mt-2 inline-block text-sm text-brand-600">Все заказы →</Link>
+            </div>
+          )}
           <h2 className="mb-2 font-semibold">Поставщики в вашем районе</h2>
           {suppliers.length === 0 ? (
             <EmptyState>Пока ни один поставщик не доставляет в ваш район. Мы сообщим, когда появятся.</EmptyState>

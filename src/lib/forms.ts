@@ -4,6 +4,8 @@ export type FormState = {
   ok?: boolean;
   message?: string;
   error?: string;
+  // Подробности к сообщению (например, что изменилось в корзине)
+  details?: string[];
   fieldErrors?: Record<string, string[] | undefined>;
   // Значения, чтобы форма не очищалась после ошибки
   values?: Record<string, string>;

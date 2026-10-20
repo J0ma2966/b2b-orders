@@ -36,6 +36,7 @@ model User {
   supplierMembers   SupplierMember[]
   shopMembers       ShopMember[]
   notifications     Notification[]
+  courierOrders     Order[]          @relation("OrderCourier")
 }
 
 model Session {
@@ -144,6 +145,8 @@ model Supplier {
   categories  Category[]
   products    Product[]
   antifraudEvents AntifraudEvent[]
+  orders      Order[]
+  bonusPromotions BonusPromotion[]
 }
 
 enum SupplierRole {
@@ -218,6 +221,7 @@ model Shop {
 
   members       ShopMember[]
   statusHistory ShopStatusHistory[]
+  orders        Order[]
 
   @@index([territoryId])
 }
@@ -383,6 +387,9 @@ model ProductUnit {
   movements    StockMovement[]
   priceHistory PriceHistory[]
   antifraudEvents AntifraudEvent[]
+  orderItems   OrderItem[]
+  bonusTriggers BonusPromotion[] @relation("BonusTrigger")
+  bonusGifts    BonusPromotion[] @relation("BonusGift")
 
   @@unique([productId, kind, customName])
 }
@@ -465,4 +472,157 @@ model AntifraudEvent {
 
   @@index([status, createdAt])
   @@index([supplierId])
+}
+
+// ───────────── Заказы (ТЗ п. 21–29) ─────────────
+
+enum OrderStatus {
+  DRAFT                 // черновик = корзина магазина у одного поставщика
+  PLACED                // оформлен
+  ACCEPTED              // принят поставщиком
+  ASSEMBLING            // собирается
+  READY                 // готов к доставке
+  ASSIGNED              // назначен доставщику
+  IN_TRANSIT            // в пути
+  DELIVERED             // доставлен
+  COMPLETED             // завершён
+  CANCELLED_BY_SHOP     // отменён магазином
+  CANCELLED_BY_SUPPLIER // отменён поставщиком
+  REJECTED              // отклонён поставщиком
+  NOT_DELIVERED         // не доставлен
+  PARTIALLY_ACCEPTED    // частично принят
+  NEEDS_CONFIRMATION    // требует подтверждения
+  DELIVERY_PROBLEM      // проблема при доставке
+}
+
+enum PaymentMethod {
+  CASH     // наличные
+  CARD     // карта
+  TRANSFER // безналичный расчёт
+}
+
+enum OrderItemKind {
+  REGULAR // обычная продажа
+  FORCED  // принудительная продажа
+  BONUS   // бонус
+}
+
+enum CancelSide {
+  SHOP
+  SUPPLIER
+  PLATFORM
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  // Номер присваивается при оформлении (последовательность order_number_seq)
+  number     Int?        @unique
+  supplierId String
+  supplier   Supplier    @relation(fields: [supplierId], references: [id])
+  shopId     String
+  shop       Shop        @relation(fields: [shopId], references: [id])
+  status     OrderStatus @default(DRAFT)
+  createdByUserId String?
+
+  paymentMethod PaymentMethod?
+  comment       String?
+  // Данные доставки фиксируются на момент оформления
+  deliveryAddress String?
+  deliveryLat     Float?
+  deliveryLng     Float?
+  contactName     String?
+  contactPhone    String?
+  deliveryDate    DateTime? @db.Date // желаемая дата доставки
+
+  // Сумма заказанных позиций (обычные + принудительные); после приёмки — по фактически принятому
+  total          Decimal  @default(0) @db.Decimal(14, 2)
+  // Ставка комиссии, действовавшая при оформлении (ТЗ п. 53)
+  commissionRate Decimal? @db.Decimal(5, 2)
+
+  courierId  String?
+  courier    User?     @relation("OrderCourier", fields: [courierId], references: [id])
+
+  placedAt    DateTime?
+  acceptedAt  DateTime?
+  assignedAt  DateTime?
+  cancelledAt DateTime?
+  cancelledBy CancelSide?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items  OrderItem[]
+  events OrderEvent[]
+
+  @@index([shopId, status])
+  @@index([supplierId, status, placedAt])
+  @@index([courierId, status])
+}
+
+model OrderItem {
+  id            String        @id @default(cuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productUnitId String
+  productUnit   ProductUnit   @relation(fields: [productUnitId], references: [id])
+  kind          OrderItemKind @default(REGULAR)
+  // Снимок на момент оформления: каталог может меняться, заказ — нет
+  productName   String
+  unitLabel     String
+  price         Decimal       @db.Decimal(14, 2) // для бонуса 0
+  qty           Decimal       @db.Decimal(14, 3)
+  acceptedQty   Decimal?      @db.Decimal(14, 3)
+  bonusPromotionId String?
+  bonusPromotion   BonusPromotion? @relation(fields: [bonusPromotionId], references: [id])
+  addedByUserId String?
+  createdAt     DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([productUnitId])
+}
+
+model OrderEvent {
+  id         String       @id @default(cuid())
+  orderId    String
+  order      Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type       String       // status, item.forced_added, item.forced_removed, courier.assigned, …
+  fromStatus OrderStatus?
+  toStatus   OrderStatus?
+  userId     String?
+  onBehalfOfUserId String?
+  actorRole  String?
+  comment    String?
+  data       Json?
+  createdAt  DateTime     @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// ───────────── Бонусы (ТЗ п. 50–51) ─────────────
+
+model BonusPromotion {
+  id          String      @id @default(cuid())
+  supplierId  String
+  supplier    Supplier    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name        String
+  // Условие: купить triggerQty единиц triggerUnit
+  triggerUnitId String
+  triggerUnit   ProductUnit @relation("BonusTrigger", fields: [triggerUnitId], references: [id])
+  triggerQty    Decimal     @db.Decimal(14, 3)
+  // Подарок: giftQty единиц giftUnit
+  giftUnitId    String
+  giftUnit      ProductUnit @relation("BonusGift", fields: [giftUnitId], references: [id])
+  giftQty       Decimal     @db.Decimal(14, 3)
+  // За каждые triggerQty (20 шт. → 2 подарка) или один раз на заказ
+  repeatable  Boolean     @default(true)
+  startsAt    DateTime
+  endsAt      DateTime
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items OrderItem[]
+
+  @@index([supplierId, isActive])
 }
