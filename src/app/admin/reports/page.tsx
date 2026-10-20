@@ -46,7 +46,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
         <select name="shop" defaultValue={str("shop")} className={sel} aria-label={t("Магазин")}><option value="">{t("Все магазины")}</option>{shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
         {products.length > 0 && <select name="product" defaultValue={str("product")} className={sel} aria-label={t("Товар")}><option value="">{t("Все товары")}</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
         <select name="status" defaultValue={str("status")} className={sel} aria-label={t("Статус заказа")}><option value="">{t("Полученные заказы")}</option>{(["COMPLETED", "PARTIALLY_ACCEPTED"] as const).map((s) => <option key={s} value={s}>{t(ORDER_STATUS_LABEL[s])}</option>)}</select>
-        <button className="rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Применить")}</button>
+        <button className="rounded-lg bg-surface px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Применить")}</button>
       </form>
       <PeriodTabs base="/admin/reports" period={period} params={params} from={toLocalDateInput(range.from)} to={to} />
       <ReportView r={report} scope="admin" />

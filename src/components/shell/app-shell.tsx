@@ -26,7 +26,7 @@ export function AppShell({
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
-      <header className="sticky top-0 z-[1001] border-b border-gray-200 bg-white/95 backdrop-blur">
+      <header className="sticky top-0 z-[1001] border-b border-gray-200 bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
             <Link href={root} className="shrink-0 font-semibold text-brand-700"><Tr>{title}</Tr></Link>

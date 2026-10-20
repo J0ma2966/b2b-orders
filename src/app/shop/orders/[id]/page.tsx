@@ -10,6 +10,7 @@ import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
+import { isTracked, OrderTracker } from "@/components/shop/order-tracker";
 
 export default async function ShopOrderPage({ params, searchParams }: PageProps<"/shop/orders/[id]">) {
   const [ctx, t] = await Promise.all([requireShop(), getT()]);
@@ -45,16 +46,21 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         )}
         {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">{t("Вы попросили отменить заказ: {reason}. Ждём решения поставщика.", { reason: order.cancelRequestReason })}</Alert>}
         {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">{t("Заказ не доставлен: {note}", { note: order.problemNote })}</Alert>}
+        {isTracked(order.status) && (
+          <Card className="sm:py-5">
+            <OrderTracker status={order.status} />
+          </Card>
+        )}
         {qr && (
-          <Card>
+          <Card className="ring-2 ring-accent">
             <ConfirmReceiptQr dataUrl={qr} code={order.qrToken!} />
           </Card>
         )}
         {RECEIVED.includes(order.status) && (
           <div className="flex flex-wrap gap-2">
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/shop/replacements/new?order=${order.id}`}>{t("🔁 Заявка на замену")}</Link>
+            <Link className="rounded-full bg-surface px-4 py-2 text-sm font-medium ring-1 ring-black/10 hover:ring-brand-500" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
+            <Link className="rounded-full bg-surface px-4 py-2 text-sm font-medium ring-1 ring-black/10 hover:ring-brand-500" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
+            <Link className="rounded-full bg-surface px-4 py-2 text-sm font-medium ring-1 ring-black/10 hover:ring-brand-500" href={`/shop/replacements/new?order=${order.id}`}>{t("🔁 Заявка на замену")}</Link>
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-5">

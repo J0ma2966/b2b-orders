@@ -22,6 +22,8 @@ npm run dev
 
 Супер-админ по умолчанию: `+998900000000` / `admin12345`, при первом входе система попросит сменить пароль. В продакшене задайте `SUPERADMIN_PASSWORD`.
 
+В продакшене приложение работает за обратным прокси (nginx и т. п.), который дописывает адрес клиента в конец `X-Forwarded-For` (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). Лимит попыток входа и журнал берут последний адрес из этого заголовка, поэтому без прокси подменить его может сам клиент.
+
 Проверки: `npm test` (складские тесты с базой: `TEST_DATABASE_URL=postgresql://... npm test`), `npm run typecheck`, `npm run lint`, `npm run build`.
 Сквозной сценарий на запущенном приложении: `node tests/e2e/flow.mjs`.
 

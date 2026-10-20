@@ -1,6 +1,6 @@
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
-import { OrdersList } from "@/components/orders/order-view";
+import { DeliveryRow } from "@/components/orders/delivery-card";
 import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { CLOSED } from "@/lib/order-core";
@@ -18,7 +18,15 @@ export default async function CourierHistory({ searchParams }: PageProps<"/couri
   return (
     <>
       <PageHeader title="История доставок" />
-      {rows.length === 0 ? <EmptyState>{t("Завершённых доставок пока нет")}</EmptyState> : <OrdersList rows={rows} href={(id) => `/courier/orders/${id}`} party={(o) => o.shop.name} />}
+      {rows.length === 0 ? (
+        <EmptyState>{t("Завершённых доставок пока нет")}</EmptyState>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((o) => (
+            <DeliveryRow key={o.id} o={o} />
+          ))}
+        </div>
+      )}
       <Pagination page={page} total={total} basePath="/courier/history" params={{}} />
     </>
   );

@@ -9,12 +9,13 @@ import { useT } from "@/lib/i18n/client";
 
 const SHORT: Record<Locale, string> = { ru: "Рус", uz: "Oʻzb" };
 
-export function LanguageSwitcher({ className }: { className?: string }) {
+// onDark — для цветной шапки витрины магазина
+export function LanguageSwitcher({ className, onDark }: { className?: string; onDark?: boolean }) {
   const t = useT();
   const current = useLocale();
   const [pending, start] = useTransition();
   return (
-    <div className={cn("inline-flex rounded-lg p-0.5 text-xs ring-1 ring-gray-200", pending && "opacity-60", className)} role="group" aria-label={t("Язык / Til")}>
+    <div className={cn("inline-flex rounded-lg p-0.5 text-xs ring-1", onDark ? "ring-white/30" : "ring-gray-200", pending && "opacity-60", className)} role="group" aria-label={t("Язык / Til")}>
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -28,7 +29,10 @@ export function LanguageSwitcher({ className }: { className?: string }) {
             fd.set("locale", l);
             start(() => setLocaleAction(fd));
           }}
-          className={cn("rounded-md px-2 py-1", l === current ? "bg-brand-600 text-white" : "text-gray-600 hover:bg-gray-100")}
+          className={cn(
+            "rounded-md px-2 py-1",
+            l === current ? (onDark ? "bg-white text-brand-700" : "bg-brand-600 text-on-brand") : onDark ? "text-white/80 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100",
+          )}
         >
           {SHORT[l]}
         </button>

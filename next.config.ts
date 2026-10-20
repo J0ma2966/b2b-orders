@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   experimental: {
     serverActions: {
-      // Фото магазина, логотип, позже фото/видео замен
-      bodySizeLimit: "120mb",
+      // Самая тяжёлая форма — заявка на замену: 4 фото по 10 МБ и видео до 50 МБ
+      bodySizeLimit: "95mb",
     },
   },
   turbopack: {

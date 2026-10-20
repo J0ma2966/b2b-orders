@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense, type ReactNode } from "react";
+import "@fontsource-variable/onest";
+import "@fontsource-variable/unbounded";
+import "@fontsource-variable/commissioner";
 import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
 import { I18nProvider } from "@/lib/i18n/client";

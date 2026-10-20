@@ -28,7 +28,7 @@ export default async function AdminMapPage({ searchParams }: PageProps<"/admin/m
           <option value="">{t("Все поставщики")}</option>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.displayName}</option>)}
         </select>
-        <button className="rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Показать")}</button>
+        <button className="rounded-lg bg-surface px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Показать")}</button>
       </form>
       <PointsMap points={points} legend={[{ color: "#1f5ad6", label: "Офисы поставщиков" }, { color: "#16a34a", label: "Магазины" }, { color: "#6b7280", label: "Заблокированные" }, { color: "#f59e0b", label: "Текущие доставки" }]} />
     </>

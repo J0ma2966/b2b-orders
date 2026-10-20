@@ -8,9 +8,9 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 }
 
 const buttonVariants = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 disabled:bg-brand-600/50",
-  secondary: "bg-white text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50",
-  danger: "bg-red-600 text-white hover:bg-red-700",
+  primary: "bg-brand-600 text-on-brand hover:bg-brand-700 disabled:bg-brand-600/50",
+  secondary: "bg-surface text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50",
+  danger: "bg-red-600 text-white hover:bg-red-600/85",
   ghost: "text-gray-700 hover:bg-gray-100",
 };
 
@@ -38,14 +38,14 @@ export function ButtonLink({
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200 sm:p-6", className)} {...props} />;
+  return <div className={cn("rounded-xl bg-surface p-4 shadow-sm ring-1 ring-gray-200 sm:p-6", className)} {...props} />;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3 sm:mb-6">
       <div>
-        <h1 className="text-xl font-semibold sm:text-2xl">{tr(title)}</h1>
+        <h1 className="font-display text-xl font-semibold sm:text-2xl">{tr(title)}</h1>
         {subtitle && <div className="mt-1 text-sm text-gray-500">{tr(subtitle)}</div>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -80,7 +80,7 @@ export function Field({
 }
 
 const inputBase =
-  "block w-full rounded-lg border-0 bg-white px-3 py-2.5 text-base text-gray-900 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500 focus:outline-none sm:text-sm";
+  "block w-full rounded-lg border-0 bg-surface px-3 py-2.5 text-base text-gray-900 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500 focus:outline-none sm:text-sm";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input id={props.name} className={cn(inputBase, className)} {...props} />;

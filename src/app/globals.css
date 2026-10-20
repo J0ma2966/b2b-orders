@@ -1,12 +1,23 @@
 @import "tailwindcss";
 
+/* Оформление по ролям: у кабинетов поставщика и админа — рабочий синий, у магазина — витрина,
+   у доставщика — тёмное приложение для улицы. Тема задаётся атрибутом data-theme на каркасе,
+   поэтому общие компоненты (карточки, кнопки, поля) меняют вид без отдельного кода. */
 @theme {
   --color-brand-50: #eef6ff;
   --color-brand-100: #d9eaff;
   --color-brand-500: #2f6fed;
   --color-brand-600: #1f5ad6;
   --color-brand-700: #1a48ab;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-on-brand: #ffffff;
+  --color-accent: #1f5ad6;
+  --color-on-accent: #ffffff;
+  --color-page: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-ink: #111827;
+
+  --font-sans: "Onest Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Onest Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
 :root {
@@ -14,6 +25,80 @@
 }
 
 body {
-  background: #f5f6f8;
-  color: #111827;
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+/* Магазин: зелень базара и шафран для корзины и акций */
+[data-theme="shop"] {
+  --color-brand-50: #e9f5ee;
+  --color-brand-100: #cbe9d6;
+  --color-brand-500: #1f9a5c;
+  --color-brand-600: #157f4b;
+  --color-brand-700: #0e5f38;
+  --color-accent: #f2a516;
+  --color-on-accent: #2a1c00;
+  --color-page: #f1f5f0;
+  --color-ink: #13241a;
+  --font-display: "Unbounded Variable", "Onest Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Доставщик: асфальт и сигнальный жёлтый, как на жилете и дорожных знаках.
+   Серая шкала перевёрнута, светлые фоны статусов стали тёмными. */
+[data-theme="courier"] {
+  color-scheme: dark;
+  --color-brand-50: #3a3518;
+  --color-brand-100: #4a421a;
+  --color-brand-500: #ffd84d;
+  --color-brand-600: #ffd21f;
+  --color-brand-700: #ffdd55;
+  --color-on-brand: #1d232a;
+  --color-accent: #ffd21f;
+  --color-on-accent: #1d232a;
+  --color-page: #1d232a;
+  --color-surface: #28303a;
+  --color-ink: #f1f3f5;
+
+  --color-gray-50: #303945;
+  --color-gray-100: #36404c;
+  --color-gray-200: #414c59;
+  --color-gray-300: #556170;
+  --color-gray-400: #7d8896;
+  --color-gray-500: #a3adb9;
+  --color-gray-600: #bcc4cd;
+  --color-gray-700: #d3d9df;
+  --color-gray-800: #e4e8ec;
+  --color-gray-900: #f1f3f5;
+
+  --color-red-50: #3b2528;
+  --color-red-100: #4d2a2f;
+  --color-red-200: #6e333a;
+  --color-red-600: #f0575d;
+  --color-red-700: #ff9a9e;
+  --color-red-800: #ffb3b6;
+  --color-green-50: #1f3a2d;
+  --color-green-100: #255039;
+  --color-green-200: #2f6b4c;
+  --color-green-700: #8fe3b4;
+  --color-green-800: #a7ecc5;
+  --color-yellow-50: #3b3418;
+  --color-yellow-100: #4b4119;
+  --color-yellow-200: #6b5a1e;
+  --color-yellow-700: #ffd866;
+  --color-yellow-800: #ffe089;
+
+  --font-sans: "Commissioner Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Commissioner Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

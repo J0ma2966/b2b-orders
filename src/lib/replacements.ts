@@ -11,11 +11,13 @@ import { RETURNED_FINAL, RETURNED_STATUS_LABEL } from "./replacement-core";
 const num = (v: { toString(): string } | null | undefined) => (v == null ? 0 : Number(v.toString()));
 const ACTIVE: ReplacementStatus[] = ["NEW", "APPROVED", "ASSIGNED", "DONE"];
 
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
 // Сколько ещё можно заявить на замену по позиции: принято минус уже заявленное.
-export async function replaceableQty(orderItemId: string) {
-  const item = await db.orderItem.findUnique({ where: { id: orderItemId } });
+export async function replaceableQty(orderItemId: string, client: Tx | typeof db = db) {
+  const item = await client.orderItem.findUnique({ where: { id: orderItemId } });
   if (!item) return 0;
-  const used = await db.replacement.aggregate({ where: { orderItemId, status: { in: ACTIVE } }, _sum: { qty: true } });
+  const used = await client.replacement.aggregate({ where: { orderItemId, status: { in: ACTIVE } }, _sum: { qty: true } });
   return num(item.acceptedQty) - num(used._sum.qty);
 }
 
@@ -29,24 +31,29 @@ export async function createReplacement(shopId: string, input: NewReplacement) {
   if (!item) throw new OrderError("Позиция не найдена");
   if (!item.productUnit.product.allowReplacement) throw new OrderError("Поставщик не принимает замену этого товара");
   if (!validQty(item.productUnit.kind, input.qty)) throw new OrderError("Неверное количество");
-  const left = await replaceableQty(item.id);
-  if (input.qty > left) throw new OrderError(left > 0 ? `Можно заменить не больше ${formatQty(left)} ${item.unitLabel}` : "По этой позиции замена уже заявлена");
-  const r = await db.replacement.create({
-    data: {
-      shopId,
-      supplierId: order.supplierId,
-      orderId: order.id,
-      orderItemId: item.id,
-      productUnitId: item.productUnitId,
-      productName: item.productName,
-      unitLabel: item.unitLabel,
-      qty: input.qty,
-      reason: input.reason,
-      comment: input.comment ?? null,
-      photoPaths: input.photoPaths,
-      videoPaths: input.videoPaths,
-      createdByUserId: actor.userId,
-    },
+  // Проверка остатка и создание — под блокировкой позиции, иначе две параллельные заявки
+  // обе пройдут проверку и в сумме превысят принятое количество
+  const r = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "OrderItem" WHERE id = ${item.id} FOR UPDATE`;
+    const left = await replaceableQty(item.id, tx);
+    if (input.qty > left) throw new OrderError(left > 0 ? `Можно заменить не больше ${formatQty(left)} ${item.unitLabel}` : "По этой позиции замена уже заявлена");
+    return tx.replacement.create({
+      data: {
+        shopId,
+        supplierId: order.supplierId,
+        orderId: order.id,
+        orderItemId: item.id,
+        productUnitId: item.productUnitId,
+        productName: item.productName,
+        unitLabel: item.unitLabel,
+        qty: input.qty,
+        reason: input.reason,
+        comment: input.comment ?? null,
+        photoPaths: input.photoPaths,
+        videoPaths: input.videoPaths,
+        createdByUserId: actor.userId,
+      },
+    });
   });
   await notifySupplierStaff(order.supplierId, {
     type: "replacement.new",
@@ -59,7 +66,7 @@ export async function createReplacement(shopId: string, input: NewReplacement) {
   return r;
 }
 
-async function lockReplacement(tx: Parameters<Parameters<typeof db.$transaction>[0]>[0], id: string) {
+async function lockReplacement(tx: Tx, id: string) {
   await tx.$queryRaw`SELECT id FROM "Replacement" WHERE id = ${id} FOR UPDATE`;
   const r = await tx.replacement.findUnique({ where: { id }, include: { newOrder: true } });
   if (!r) throw new OrderError("Заявка не найдена");

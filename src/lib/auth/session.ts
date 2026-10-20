@@ -11,10 +11,17 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+// Первые адреса в X-Forwarded-For пишет сам клиент, им верить нельзя. Последний адрес
+// добавляет наш обратный прокси (nginx: proxy_add_x_forwarded_for) — его и берём.
+export function clientIp(forwardedFor: string | null, realIp: string | null) {
+  const hops = forwardedFor?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  return hops.at(-1) || realIp || null;
+}
+
 export async function requestMeta() {
   const h = await headers();
   return {
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null,
+    ip: clientIp(h.get("x-forwarded-for"), h.get("x-real-ip")),
     userAgent: h.get("user-agent"),
   };
 }

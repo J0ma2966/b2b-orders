@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { parseAmount } from "@/lib/catalog";
-import { registerDebtPayment, setCredit } from "@/lib/delivery";
+import { registerDebtPayment, setCredit, supplierServesShop } from "@/lib/delivery";
 import { OrderError } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { formValues, success, type FormState } from "@/lib/forms";
@@ -14,19 +14,10 @@ function roleTag(role: string) {
   return role === "OWNER" ? "SUPPLIER_OWNER" : "SUPPLIER_ADMIN";
 }
 
-// Магазин должен быть в работе у поставщика: заказывал или есть счёт
-async function ownShop(supplierId: string, shopId: string) {
-  const [order, account] = await Promise.all([
-    db.order.findFirst({ where: { supplierId, shopId, status: { not: "DRAFT" } }, select: { id: true } }),
-    db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId, supplierId } } }),
-  ]);
-  return !!order || !!account;
-}
-
 export async function setCreditAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireActiveSupplier();
   const shopId = String(formData.get("shopId") ?? "");
-  if (!(await ownShop(ctx.supplier.id, shopId))) return { error: "Магазин не найден" };
+  if (!(await supplierServesShop(db, ctx.supplier.id, shopId))) return { error: "Магазин не найден" };
   const creditAllowed = formData.get("creditAllowed") === "on";
   const limitRaw = String(formData.get("creditLimit") ?? "").trim();
   const creditLimit = limitRaw ? parseAmount(limitRaw) : null;
@@ -43,7 +34,7 @@ export async function setCreditAction(_prev: FormState, formData: FormData): Pro
 export async function debtPaymentAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireActiveSupplier();
   const shopId = String(formData.get("shopId") ?? "");
-  if (!(await ownShop(ctx.supplier.id, shopId))) return { error: "Магазин не найден" };
+  if (!(await supplierServesShop(db, ctx.supplier.id, shopId))) return { error: "Магазин не найден" };
   const amount = parseAmount(String(formData.get("amount") ?? ""));
   const method = String(formData.get("method") ?? "CASH") as "CASH" | "CARD" | "TRANSFER";
   const date = String(formData.get("date") ?? "");

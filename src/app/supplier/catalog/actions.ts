@@ -9,7 +9,7 @@ import { diffFields, writeAudit } from "@/lib/audit";
 import { applyStock, StockError } from "@/lib/stock";
 import { changeUnitPrice } from "@/lib/pricing";
 import { isSuspiciousDrop } from "@/lib/stock-core";
-import { isRealFile, saveImage, UploadError } from "@/lib/storage";
+import { realFiles, saveImage, UploadError } from "@/lib/storage";
 import { parseAmount, parseAttributes, parseSignedAmount, UNIT_KINDS } from "@/lib/catalog";
 import { formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
 import type { UnitKind } from "@/generated/prisma/enums";
@@ -29,9 +29,7 @@ async function loadOwnProduct(productId: string) {
 
 async function savePhotos(formData: FormData) {
   const paths: string[] = [];
-  for (const f of formData.getAll("photos")) {
-    if (isRealFile(f)) paths.push(await saveImage(f, "products"));
-  }
+  for (const f of realFiles(formData, "photos", MAX_PHOTOS)) paths.push(await saveImage(f, "products"));
   return paths;
 }
 

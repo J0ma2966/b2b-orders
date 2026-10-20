@@ -265,10 +265,22 @@ export async function resolveProblem(supplierId: string, orderId: string, resolu
 
 // ───────────── Погашение и корректировки (ТЗ п. 44, 65) ─────────────
 
+// Магазин работает с поставщиком: есть оформленный заказ или счёт. Финансовые операции
+// по чужим магазинам запрещены, даже если их id подставлен в форму.
+export async function supplierServesShop(client: Tx | typeof db, supplierId: string, shopId: string) {
+  if (!shopId) return false;
+  const [order, account] = await Promise.all([
+    client.order.findFirst({ where: { supplierId, shopId, status: { not: "DRAFT" } }, select: { id: true } }),
+    client.shopAccount.findUnique({ where: { shopId_supplierId: { shopId, supplierId } }, select: { id: true } }),
+  ]);
+  return !!order || !!account;
+}
+
 export async function registerDebtPayment(supplierId: string, shopId: string, amount: number, method: PaymentMethod, occurredAt: Date, comment: string | null) {
   if (!Number.isFinite(amount) || amount <= 0) throw new OrderError("Сумма должна быть больше нуля");
   const actor = await currentActor();
   return db.$transaction(async (tx) => {
+    if (!(await supplierServesShop(tx, supplierId, shopId))) throw new OrderError("Магазин не найден");
     const account = await lockAccount(tx, shopId, supplierId);
     const entry = await addDebtEntry(tx, account, { type: "DEBT_PAYMENT", amount: -amount, paymentMethod: method, occurredAt, comment }, actor);
     await notifyShop(shopId, { type: "debt.payment", title: `Зарегистрировано погашение ${formatMoney(amount)}`, body: `Остаток: ${formatMoney(entry!.balanceAfter)}`, link: "/shop/debts", entity: "ShopAccount", entityId: account.id }, tx);
@@ -288,6 +300,8 @@ export async function correctBalance(supplierId: string, shopId: string, amount:
       if (!["COMPLETED", "PARTIALLY_ACCEPTED"].includes(order.status)) throw new OrderError("Корректировать можно только полученный заказ");
       await tx.order.update({ where: { id: order.id }, data: { correctionTotal: { increment: amount } } });
       await addEvent(tx, order.id, { type: "correction", comment: reason, actorRole, data: { amount: formatMoney(amount) } }, actor);
+    } else if (!(await supplierServesShop(tx, supplierId, shopId))) {
+      throw new OrderError("Магазин не найден");
     }
     const account = await lockAccount(tx, shopId, supplierId);
     const entry = await addDebtEntry(tx, account, { type: "CORRECTION", amount, orderId, comment: reason }, actor);
@@ -298,6 +312,7 @@ export async function correctBalance(supplierId: string, shopId: string, amount:
 
 export async function setCredit(supplierId: string, shopId: string, creditAllowed: boolean, creditLimit: number | null) {
   return db.$transaction(async (tx) => {
+    if (!(await supplierServesShop(tx, supplierId, shopId))) throw new OrderError("Магазин не найден");
     const account = await lockAccount(tx, shopId, supplierId);
     await tx.shopAccount.update({ where: { id: account.id }, data: { creditAllowed, creditLimit } });
     return { before: { creditAllowed: account.creditAllowed, creditLimit: account.creditLimit?.toString() ?? null } };

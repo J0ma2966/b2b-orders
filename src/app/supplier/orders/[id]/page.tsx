@@ -69,9 +69,9 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
         {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">{t("Не доставлен: {note}", { note: order.problemNote })}</Alert>}
         {received && (
           <div className="flex flex-wrap gap-2">
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
-            <Link className="rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>{t("💰 Счёт магазина")}</Link>
+            <Link className="rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/receipt`}>{t("🧾 Чек")}</Link>
+            <Link className="rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-gray-300" href={`/documents/orders/${order.id}/invoice`}>{t("📄 Накладная")}</Link>
+            <Link className="rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>{t("💰 Счёт магазина")}</Link>
           </div>
         )}
         {!CLOSED.includes(order.status) && actions.length > 0 && (

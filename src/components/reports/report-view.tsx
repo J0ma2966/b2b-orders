@@ -15,7 +15,7 @@ export async function PeriodTabs({ base, period, params, from, to, children }: {
     <div className="mb-4 space-y-3">
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
         {(Object.keys(PERIOD_LABEL) as Period[]).filter((p) => p !== "custom").map((p) => (
-          <Link key={p} href={href(p)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-sm", period === p ? "bg-brand-600 text-white" : "bg-white ring-1 ring-gray-200")}>{t(PERIOD_LABEL[p])}</Link>
+          <Link key={p} href={href(p)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-sm", period === p ? "bg-brand-600 text-on-brand" : "bg-surface ring-1 ring-gray-200")}>{t(PERIOD_LABEL[p])}</Link>
         ))}
       </div>
       <form className="flex flex-wrap items-end gap-2">
@@ -24,7 +24,7 @@ export async function PeriodTabs({ base, period, params, from, to, children }: {
         <label className="text-sm">{t("С")} <input type="date" name="from" defaultValue={from} className="ml-1 rounded-lg px-2 py-1.5 ring-1 ring-gray-300" /></label>
         <label className="text-sm">{t("по")} <input type="date" name="to" defaultValue={to} className="ml-1 rounded-lg px-2 py-1.5 ring-1 ring-gray-300" /></label>
         {children}
-        <button className="rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Показать")}</button>
+        <button className="rounded-lg bg-surface px-3 py-1.5 text-sm ring-1 ring-gray-300">{t("Показать")}</button>
       </form>
     </div>
   );

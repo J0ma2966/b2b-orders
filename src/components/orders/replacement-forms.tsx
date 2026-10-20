@@ -42,7 +42,7 @@ export function NewReplacementForm({ orderId, items }: { orderId: string; items:
       <Field label="Комментарий" name="comment" error={fe.comment}>
         <Textarea name="comment" defaultValue={v.comment} />
       </Field>
-      <Field label="Фото" name="photos" hint="JPG, PNG, WEBP до 10 МБ">
+      <Field label="Фото" name="photos" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое">
         <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple capture="environment" />
       </Field>
       <Field label="Видео" name="videos" hint="MP4, WEBM, MOV до 50 МБ">
@@ -105,13 +105,13 @@ export function CompleteReplacementForm({ id }: { id: string }) {
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
       <input type="hidden" name="id" value={id} />
-      <Field label="Фото забранного товара" name="photos">
+      <Field label="Фото забранного товара" name="photos" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое">
         <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple capture="environment" />
       </Field>
       <Field label="Комментарий" name="comment">
         <Input name="comment" />
       </Field>
-      <SubmitButton pendingText="…" confirm="Подтвердить: новый товар передан, старый забран?">{t("Передал новый, забрал старый")}</SubmitButton>
+      <SubmitButton className="min-h-14 w-full rounded-xl text-lg font-bold" pendingText="…" confirm="Подтвердить: новый товар передан, старый забран?">{t("Передал новый, забрал старый")}</SubmitButton>
     </ActionForm>
   );
 }

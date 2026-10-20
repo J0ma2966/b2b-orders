@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { ActionForm } from "@/components/ui/action-form";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
@@ -21,6 +21,33 @@ export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: s
         <SubmitButton pendingText="Добавляю…" className="flex-1">{t("В корзину")}</SubmitButton>
       </div>
       <FormMessage state={state} />
+    </ActionForm>
+  );
+}
+
+// Кнопка «+» на карточке товара: одна единица в корзину без перехода на страницу товара
+export function QuickAddButton({ supplierId, unitId, label }: { supplierId: string; unitId: string; label: string }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(addToCartAction, initialFormState);
+  const added = state.ok && !pending;
+  return (
+    <ActionForm action={action} pending={pending} className="shrink-0">
+      <input type="hidden" name="supplierId" value={supplierId} />
+      <input type="hidden" name="unitId" value={unitId} />
+      <input type="hidden" name="qty" value="1" />
+      <button
+        disabled={pending}
+        aria-label={t("Добавить в корзину: {name}", { name: label })}
+        title={state.error ? t(state.error) : undefined}
+        className={cn(
+          "grid size-9 place-items-center rounded-full text-lg font-semibold transition-colors",
+          added ? "bg-brand-600 text-on-brand" : state.error ? "bg-red-100 text-red-700" : "bg-accent text-on-accent hover:brightness-95",
+          pending && "opacity-60",
+        )}
+      >
+        <span aria-hidden>{added ? "✓" : state.error ? "!" : "+"}</span>
+      </button>
+      <span className="sr-only" role="status">{added ? t(state.message) : state.error ? t(state.error) : ""}</span>
     </ActionForm>
   );
 }

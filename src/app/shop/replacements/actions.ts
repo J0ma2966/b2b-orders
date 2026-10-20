@@ -8,7 +8,7 @@ import { parseAmount } from "@/lib/catalog";
 import { OrderError } from "@/lib/orders";
 import { cancelReplacement, createReplacement } from "@/lib/replacements";
 import { REPLACEMENT_REASONS } from "@/lib/replacement-core";
-import { isRealFile, saveImage, saveVideo, UploadError } from "@/lib/storage";
+import { realFiles, saveImage, saveVideo, UploadError } from "@/lib/storage";
 import { formValues, type FormState } from "@/lib/forms";
 
 export async function createReplacementAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -28,9 +28,9 @@ export async function createReplacementAction(_prev: FormState, formData: FormDa
   let id: string;
   try {
     const photoPaths: string[] = [];
-    for (const f of formData.getAll("photos")) if (isRealFile(f)) photoPaths.push(await saveImage(f, "replacements"));
+    for (const f of realFiles(formData, "photos", 4)) photoPaths.push(await saveImage(f, "replacements"));
     const videoPaths: string[] = [];
-    for (const f of formData.getAll("videos")) if (isRealFile(f)) videoPaths.push(await saveVideo(f, "replacements"));
+    for (const f of realFiles(formData, "videos", 1)) videoPaths.push(await saveVideo(f, "replacements"));
     const r = await createReplacement(ctx.shop.id, { orderId, orderItemId, qty: qty!, reason, comment, photoPaths, videoPaths });
     id = r.id;
   } catch (e) {

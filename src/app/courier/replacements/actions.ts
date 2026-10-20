@@ -5,7 +5,7 @@ import { requireSupplier } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { OrderError } from "@/lib/orders";
 import { completeReplacement } from "@/lib/replacements";
-import { isRealFile, saveImage, UploadError } from "@/lib/storage";
+import { realFiles, saveImage, UploadError } from "@/lib/storage";
 import { StockError } from "@/lib/stock";
 import { success, type FormState } from "@/lib/forms";
 
@@ -15,7 +15,7 @@ export async function completeReplacementAction(_prev: FormState, formData: Form
   const comment = String(formData.get("comment") ?? "").trim() || null;
   try {
     const photos: string[] = [];
-    for (const f of formData.getAll("photos")) if (isRealFile(f)) photos.push(await saveImage(f, "returned"));
+    for (const f of realFiles(formData, "photos", 4)) photos.push(await saveImage(f, "returned"));
     await completeReplacement(ctx.auth.user.id, id, comment, photos);
   } catch (e) {
     if (e instanceof OrderError || e instanceof StockError || e instanceof UploadError) return { error: e.message };

@@ -134,4 +134,23 @@ describe.skipIf(!enabled)("замены и возвращённые товары
     expect(await stock()).toEqual({ physical: s0.physical, reserved: s0.reserved });
     await expect(setReturnedStatus(supplierId, returned.id, "DEFECTIVE", null)).rejects.toThrow("окончательный");
   });
+
+  it("параллельные заявки на замену не превышают принятое количество", async () => {
+    const { shop, order } = await shopWithOrder(4);
+    await confirmDelivery(courierId, order.id, { items: order.items.map((i) => ({ id: i.id, delivered: 4, accepted: 4 })), received: 4000, method: "CASH", qr: order.qrToken! });
+    const input = { orderId: order.id, orderItemId: order.items[0].id, qty: 1, reason: "Брак", photoPaths: [], videoPaths: [] };
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => createReplacement(shop.id, input)));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(4);
+    expect(await db.replacement.count({ where: { orderItemId: input.orderItemId } })).toBe(4);
+  });
+});
+
+describe.skipIf(!enabled)("чужой поставщик не трогает счёт магазина", () => {
+  it("без заказов и счёта — нельзя начислить долг, оплату или открыть кредит", async () => {
+    const shop = await db.shop.create({ data: { name: `Чужой ${tag}`, phone: "+998901234567", address: "-", lat: 41, lng: 69, contactName: "-", territoryId } });
+    await expect(correctBalance(supplierId, shop.id, 1_000_000, "Ошибка в сумме", null, "SUPPLIER_OWNER")).rejects.toThrow("Магазин не найден");
+    await expect(registerDebtPayment(supplierId, shop.id, 1000, "CASH", new Date(), null)).rejects.toThrow("Магазин не найден");
+    await expect(setCredit(supplierId, shop.id, true, 5_000_000)).rejects.toThrow("Магазин не найден");
+    expect(await db.shopAccount.count({ where: { shopId: shop.id } })).toBe(0);
+  });
 });

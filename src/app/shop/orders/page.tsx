@@ -2,7 +2,7 @@ import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
-import { OrdersList } from "@/components/orders/order-view";
+import { ShopOrderCards } from "@/components/shop/order-tracker";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
@@ -28,7 +28,7 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
 
         </EmptyState>
       ) : (
-        <OrdersList rows={rows} href={(id) => `/shop/orders/${id}`} party={(o) => o.supplier.displayName} />
+        <ShopOrderCards rows={rows} />
       )}
       <Pagination page={page} total={total} basePath="/shop/orders" params={{ status }} />
     </>
