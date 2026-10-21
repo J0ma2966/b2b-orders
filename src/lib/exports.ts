@@ -8,6 +8,8 @@ import { REPLACEMENT_STATUS_LABEL } from "@/lib/replacement-core";
 import type { Report } from "@/lib/reports";
 import type { T } from "@/lib/i18n/core";
 import type { Cell, Sheet } from "@/lib/xlsx";
+import { unitName } from "@/lib/catalog";
+import { IMPORT_COLUMNS } from "@/lib/catalog-import-core";
 
 // П7: выгрузки в Excel. Заголовки — на языке интерфейса пользователя, суммы — числами.
 
@@ -160,4 +162,20 @@ export function reportSheets(r: Report, t: T, admin: boolean): Sheet[] {
       ],
     },
   ];
+}
+
+// Каталог в формате загрузки: можно поправить цены, дописать приход и загрузить обратно
+export async function catalogSheet(supplierId: string, t: T): Promise<Sheet> {
+  const products = await db.product.findMany({
+    where: { supplierId, archivedAt: null },
+    include: { category: true, units: { orderBy: { sortOrder: "asc" } } },
+    orderBy: { name: "asc" },
+  });
+  return {
+    name: t("Каталог"),
+    rows: [
+      IMPORT_COLUMNS.map((c) => t(c)),
+      ...products.flatMap((p) => p.units.map((u): Cell[] => [p.sku, p.name, p.category?.name, t(unitName(u)), n(u.price), null, p.brand, p.description])),
+    ],
+  };
 }

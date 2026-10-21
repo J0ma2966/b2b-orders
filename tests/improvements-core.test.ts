@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { creditLeft, debtAging, requiredPayment } from "@/lib/finance-core";
 import { deliveryDateOptions, isoWeekday, planRoute, tashkentDay, yandexRouteUrl } from "@/lib/order-core";
 import { buildXlsx, readXlsx } from "@/lib/xlsx";
+import { parseImportTable } from "@/lib/catalog-import-core";
 
 describe("оплата при получении (Л1)", () => {
   it("без кредита — вся сумма, с учётом переплаты", () => {
@@ -88,5 +89,43 @@ describe("П7: Excel", () => {
   });
   it("не-Excel файл — понятная ошибка", () => {
     expect(() => readXlsx(Buffer.from("name;price\nЧай;1000"))).toThrow("не похож на Excel");
+  });
+});
+
+describe("П7: разбор загрузки каталога", () => {
+  it("заголовки в любом порядке и по-узбекски, единицы и суммы с валютой", () => {
+    const { rows, errors } = parseImportTable([
+      ["Nomi", "Narx", "Birlik", "Kirim", "Artikul"],
+      ["Чай", "12 500 сум", "dona", 10, "T-1"],
+      ["Чай", 280000, "quti", null, "T-1"],
+      ["Сахар", null, "мешок", "", null],
+    ]);
+    expect(errors).toEqual([]);
+    expect(rows.map((r) => [r.name, r.price, r.unit.kind, r.unit.customName, r.income, r.sku])).toEqual([
+      ["Чай", 12500, "PIECE", "", 10, "T-1"],
+      ["Чай", 280000, "BOX", "", null, "T-1"],
+      ["Сахар", null, "OTHER", "мешок", null, null],
+    ]);
+  });
+  it("ошибочные строки пропускаются с номером строки", () => {
+    const { rows, errors } = parseImportTable([
+      [],
+      ["Название", "Цена", "Приход"],
+      ["", 100, null],
+      ["Мука", "дорого", null],
+      ["Мука", 100, -5],
+      ["Соль", 100, null],
+      ["соль", 120, null],
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Соль"]);
+    expect(errors).toEqual([
+      "Строка 3: не указано название",
+      "Строка 4: цена — число больше нуля",
+      "Строка 5: приход — число не меньше нуля",
+      "Строка 7: повтор строки 6",
+    ]);
+  });
+  it("без столбца «Название» — понятная ошибка", () => {
+    expect(parseImportTable([["Цена"], [1]]).errors[0]).toContain("Нет столбца «Название»");
   });
 });

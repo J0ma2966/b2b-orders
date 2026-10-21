@@ -30,12 +30,18 @@ const add = (k, file, node, sf) => {
   keys.set(k, `${path.relative(ROOT, file)}:${sf.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
 };
 
+// Списки распознаваемых слов (*_ALIASES) — это ввод пользователя, а не текст интерфейса
+const inAliases = (node) => {
+  for (let p = node.parent; p; p = p.parent) if (ts.isVariableDeclaration(p)) return /_ALIASES$/.test(p.name.getText());
+  return false;
+};
+
 // Названия территорий из начальных данных тоже показываются в интерфейсе
 for (const file of [...walk(SRC), path.join(ROOT, "prisma/territories.ts"), path.join(ROOT, "prisma/seed.ts")]) {
   const sf = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const visit = (node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      if (!ts.isImportDeclaration(node.parent)) add(node.text, file, node, sf);
+      if (!ts.isImportDeclaration(node.parent) && !inAliases(node)) add(node.text, file, node, sf);
     } else if (ts.isTemplateExpression(node)) {
       let s = node.head.text;
       node.templateSpans.forEach((span, i) => (s += `{${i}}` + span.literal.text));

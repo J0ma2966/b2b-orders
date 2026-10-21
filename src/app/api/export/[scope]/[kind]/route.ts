@@ -1,7 +1,7 @@
 import type { Prisma, OrderStatus } from "@/generated/prisma/client";
 import { requireActiveSupplier, requireShopOwner, requireShop, requireSuperAdmin } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
-import { debtSheets, ordersSheet, reportSheets } from "@/lib/exports";
+import { catalogSheet, debtSheets, ordersSheet, reportSheets } from "@/lib/exports";
 import { buildReport } from "@/lib/reports";
 import { ORDER_STATUS_LABEL, orderStatusFilter } from "@/lib/order-core";
 import { parsePeriod, periodRange } from "@/lib/report-core";
@@ -25,6 +25,7 @@ export async function GET(req: Request, { params }: RouteContext<"/api/export/[s
     if (kind === "orders") sheets = [await ordersSheet({ ...ordersWhere, supplierId }, t, { shop: true })];
     if (kind === "debts") sheets = await debtSheets({ supplierId }, t);
     if (kind === "report") sheets = reportSheets(await buildReport({ ...range(), supplierId }), t, false);
+    if (kind === "catalog") sheets = [await catalogSheet(supplierId, t)];
   } else if (scope === "shop") {
     const ctx = kind === "orders" ? await requireShop() : await requireShopOwner();
     const shopId = ctx.shop.id;

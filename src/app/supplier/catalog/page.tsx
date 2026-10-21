@@ -41,7 +41,7 @@ export default async function CatalogPage({ searchParams }: PageProps<"/supplier
   ]);
   return (
     <>
-      <PageHeader title="Каталог" actions={<ButtonLink href="/supplier/catalog/new">{t("+ Товар")}</ButtonLink>} />
+      <PageHeader title="Каталог" actions={<><ButtonLink href="/supplier/catalog/import" variant="secondary">{t("Загрузить из Excel")}</ButtonLink><ButtonLink href="/supplier/catalog/new">{t("+ Товар")}</ButtonLink></>} />
       <FilterBar
         q={q}
         status={filter}
