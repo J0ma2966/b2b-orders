@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { diffFields, writeAudit } from "@/lib/audit";
 import { applyStock, StockError } from "@/lib/stock";
+import { setUnitLink } from "@/lib/unit-links";
+import { OrderError } from "@/lib/orders";
 import { changeUnitPrice } from "@/lib/pricing";
 import { isSuspiciousDrop } from "@/lib/stock-core";
 import { realFiles, saveImage, UploadError } from "@/lib/storage";
@@ -259,6 +261,28 @@ export async function saveUnitsAction(_prev: FormState, formData: FormData): Pro
   );
 }
 
+// Л4: «коробка = N шт.»
+export async function setUnitLinkAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const unitId = String(formData.get("unitId") ?? "");
+  const baseUnitId = String(formData.get("baseUnitId") ?? "");
+  const ratio = baseUnitId ? parseAmount(String(formData.get("ratio") ?? "")) : null;
+  if (baseUnitId && (ratio === null || Number.isNaN(ratio) || ratio <= 0)) return { error: "Сколько базовых единиц в одной — число больше нуля", values: formValues(formData) };
+  let r;
+  try {
+    r = await setUnitLink(ctx.supplier.id, unitId, baseUnitId ? { baseUnitId, ratio: ratio! } : null);
+  } catch (e) {
+    if (e instanceof OrderError || e instanceof StockError) return { error: e.message, values: formValues(formData) };
+    throw e;
+  }
+  if (r.changed) {
+    await writeAudit({ entity: "ProductUnit", entityId: unitId, action: "unit.link", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, changes: [{ field: "baseQty", old: r.before ?? null, new: ratio }] });
+  }
+  revalidatePath("/supplier/catalog", "layout");
+  revalidatePath("/supplier/stock", "layout");
+  return success(r.changed ? "Соотношение сохранено" : "Изменений нет");
+}
+
 // ───────────── Удаление из каталога (ТЗ п. 17) ─────────────
 
 export async function toggleArchiveProductAction(formData: FormData) {
@@ -308,7 +332,7 @@ export async function stockOperationAction(_prev: FormState, formData: FormData)
           actorRole: roleTag(ctx.membership.role),
           supplierId: ctx.supplier.id,
           comment: reason,
-          changes: [{ field: "physicalQty", old: Number(unit.physicalQty), new: after.physical }],
+          changes: [{ field: unit.baseUnitId ? "physicalQty:base" : "physicalQty", old: unit.baseUnitId ? null : Number(unit.physicalQty), new: after.physical }],
         },
         tx,
       );

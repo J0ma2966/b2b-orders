@@ -10,7 +10,7 @@ import { UnitRows } from "@/components/catalog/unit-rows";
 import { formatQty } from "@/lib/catalog";
 import { initialFormState } from "@/lib/forms";
 import { fileUrl } from "@/lib/storage-url";
-import { saveUnitsAction, stockOperationAction, updateProductAction } from "../actions";
+import { saveUnitsAction, setUnitLinkAction, stockOperationAction, updateProductAction } from "../actions";
 import { useT } from "@/lib/i18n/client";
 
 export function EditProductForm({
@@ -48,7 +48,7 @@ export function EditProductForm({
   );
 }
 
-type UnitView = { id: string; label: string; price: string; isActive: boolean; physical: number; reserved: number };
+type UnitView = { id: string; label: string; price: string; isActive: boolean; physical: number; reserved: number; baseUnitId: string | null; baseQty: number | null; baseLabel: string | null };
 
 export function UnitsForm({ productId, units }: { productId: string; units: UnitView[] }) {
   const t = useT();
@@ -72,7 +72,11 @@ export function UnitsForm({ productId, units }: { productId: string; units: Unit
             </Field>
             <div className="text-xs text-gray-600">
               <div>{t("Доступно:")} <b>{formatQty(u.physical - u.reserved)}</b></div>
-              <div>{t("Физический {p} · резерв {r}", { p: formatQty(u.physical), r: formatQty(u.reserved) })}</div>
+              {u.baseLabel ? (
+                <div>{t("1 = {n} {unit}, остаток ведётся в «{unit}»", { n: formatQty(u.baseQty ?? 0), unit: t(u.baseLabel) })}</div>
+              ) : (
+                <div>{t("Физический {p} · резерв {r}", { p: formatQty(u.physical), r: formatQty(u.reserved) })}</div>
+              )}
             </div>
           </div>
         </div>
@@ -124,6 +128,36 @@ export function StockForm({ units }: { units: { id: string; label: string }[] })
         <Input name="reason" placeholder={t(type === "INCOME" ? "Накладная №…" : "Причина")} required={type !== "INCOME"} />
       </Field>
       <SubmitButton variant="secondary">{t("Провести")}</SubmitButton>
+    </ActionForm>
+  );
+}
+
+// Л4: «коробка = 24 шт.» — единица считается в другой, остаток один
+export function UnitLinkForm({ unit, bases }: { unit: UnitView; bases: { id: string; label: string }[] }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(setUnitLinkAction, initialFormState);
+  const [base, setBase] = useState(unit.baseUnitId ?? "");
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-2 rounded-lg p-3 ring-1 ring-gray-200">
+      <FormMessage state={state} />
+      <input type="hidden" name="unitId" value={unit.id} />
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold whitespace-nowrap">1 {t(unit.label)} =</span>
+        {base && (
+          <div className="w-20">
+            <Input name="ratio" inputMode="decimal" defaultValue={unit.baseQty ? String(unit.baseQty) : ""} placeholder="24" aria-label={t("Сколько")} required />
+          </div>
+        )}
+        <div className="min-w-28 flex-1">
+          <Select name="baseUnitId" value={base} onChange={(e) => setBase(e.target.value)} aria-label={t("Единиц")}>
+            <option value="">{t("— свой остаток")}</option>
+            {bases.map((b) => (
+              <option key={b.id} value={b.id}>{t(b.label)}</option>
+            ))}
+          </Select>
+        </div>
+        <SubmitButton variant="secondary" pendingText="…">{t("Сохранить")}</SubmitButton>
+      </div>
     </ActionForm>
   );
 }

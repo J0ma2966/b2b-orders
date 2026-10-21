@@ -27,6 +27,14 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
   if (!Number.isFinite(op.qty) || op.qty === 0 || (op.type !== "ADJUSTMENT" && op.qty < 0)) {
     throw new StockError("Количество должно быть больше нуля");
   }
+  // Л4: у связанной единицы («коробка = 24 шт.») своего остатка нет — операция идёт
+  // по базовой единице в пересчёте, в журнале видно исходное количество
+  const link = await tx.productUnit.findUnique({ where: { id: op.unitId }, select: { kind: true, customName: true, baseUnitId: true, baseQty: true } });
+  if (link?.baseUnitId && link.baseQty) {
+    const ratio = Number(link.baseQty);
+    const note = `${formatQty(op.qty)} ${unitName(link)} × ${formatQty(ratio)}`;
+    op = { ...op, unitId: link.baseUnitId, qty: Math.round(op.qty * ratio * 1000) / 1000, reason: op.reason ? `${op.reason} (${note})` : note };
+  }
   const d = movementDeltas(op.type, op.qty);
   const p = new Prisma.Decimal(d.physical);
   const r = new Prisma.Decimal(d.reserved);
@@ -60,6 +68,7 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
   });
   const physical = Number(rows[0].physicalQty);
   const reserved = Number(rows[0].reservedQty);
+  await syncLinkedUnits(tx, op.unitId);
   // П6: доступный остаток опустился ниже порога — сообщаем поставщику один раз при пересечении
   const threshold = rows[0].lowStockThreshold === null ? null : Number(rows[0].lowStockThreshold);
   const after = physical - reserved;
@@ -74,6 +83,16 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
     );
   }
   return { physical, reserved };
+}
+
+// Л4: число целых связанных единиц (коробок) из доступного остатка базовой. Строки связанных
+// единиц блокируются уже после базовой — порядок блокировок всегда «база → связанные».
+export async function syncLinkedUnits(tx: Tx, baseUnitId: string) {
+  await tx.$executeRaw`
+    UPDATE "ProductUnit" u
+       SET "physicalQty" = GREATEST(0, FLOOR((b."physicalQty" - b."reservedQty") / u."baseQty")), "reservedQty" = 0, "updatedAt" = now()
+      FROM "ProductUnit" b
+     WHERE b.id = ${baseUnitId} AND u."baseUnitId" = b.id`;
 }
 
 export async function currentActor() {

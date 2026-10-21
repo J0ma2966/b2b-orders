@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { attributesToText, formatQty, unitName } from "@/lib/catalog";
 import { toggleArchiveProductAction } from "../actions";
-import { EditProductForm, StockForm, UnitsForm } from "./forms";
+import { EditProductForm, StockForm, UnitLinkForm, UnitsForm } from "./forms";
 import { getT } from "@/lib/i18n/server";
 
 export default async function ProductPage({ params, searchParams }: PageProps<"/supplier/catalog/[id]">) {
@@ -32,7 +32,12 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     isActive: u.isActive,
     physical: Number(u.physicalQty),
     reserved: Number(u.reservedQty),
+    baseUnitId: u.baseUnitId,
+    baseQty: u.baseQty === null ? null : Number(u.baseQty),
+    baseLabel: u.baseUnitId ? unitName(product.units.find((b) => b.id === u.baseUnitId)!) : null,
   }));
+  // Основой может быть единица, которая сама ни в чём не считается
+  const linkable = units.filter((u) => !u.baseUnitId);
   return (
     <>
       <PageHeader
@@ -81,6 +86,19 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             <h2 className="mb-3 font-semibold">{t("Единицы, цены и остатки")}</h2>
             <UnitsForm productId={product.id} units={units} />
           </Card>
+          {units.length > 1 && (
+            <Card>
+              <h2 className="mb-1 font-semibold">{t("Соотношение единиц")}</h2>
+              <p className="mb-3 text-sm text-gray-500">{t("Например, коробка = 24 шт.: остаток ведётся в штуках, коробок доступно столько, сколько целых набирается из свободных штук.")}</p>
+              <div className="space-y-2">
+                {units
+                  .filter((u) => !units.some((x) => x.baseUnitId === u.id))
+                  .map((u) => (
+                    <UnitLinkForm key={u.id} unit={u} bases={linkable.filter((b) => b.id !== u.id).map((b) => ({ id: b.id, label: b.label }))} />
+                  ))}
+              </div>
+            </Card>
+          )}
           {units.length > 0 && (
             <Card>
               <h2 className="mb-3 font-semibold">{t("Складская операция")}</h2>

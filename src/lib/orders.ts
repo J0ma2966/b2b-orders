@@ -218,9 +218,11 @@ export async function setCartQty(shopId: string, itemId: string, qty: number) {
 // Приводит корзину к актуальному состоянию каталога и остатков (ТЗ п. 22).
 // Возвращает список того, что изменилось; пустой список — корзину можно оформлять.
 async function refreshCart(tx: Tx, orderId: string) {
-  const items = await tx.orderItem.findMany({ where: { orderId }, include: { productUnit: { include: { product: true } } }, orderBy: { createdAt: "asc" } });
+  const items = await tx.orderItem.findMany({ where: { orderId }, include: { productUnit: { include: { product: true, baseUnit: true } } }, orderBy: { createdAt: "asc" } });
   const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
   const changes: string[] = [];
+  // Л4: штуки и коробки одного товара берутся из общего остатка — учитываем уже занятое корзиной
+  const used = new Map<string, number>();
   for (const item of items) {
     const u = item.productUnit;
     const name = `«${item.productName}» (${item.unitLabel})`;
@@ -238,8 +240,10 @@ async function refreshCart(tx: Tx, orderId: string) {
       data.productName = u.product.name;
       data.unitLabel = unitName(u);
     }
-    const available = num(u.physicalQty) - num(u.reservedQty);
-    const fit = validQty(u.kind, available) ? available : Math.floor(available);
+    const stock = u.baseUnit ?? u;
+    const ratio = u.baseUnit ? num(u.baseQty) : 1;
+    const available = (num(stock.physicalQty) - num(stock.reservedQty) - (used.get(stock.id) ?? 0)) / ratio;
+    const fit = u.baseUnit ? Math.floor(available + 1e-9) : validQty(u.kind, available) ? available : Math.floor(available);
     if (fit <= 0) {
       await tx.orderItem.delete({ where: { id: item.id } });
       changes.push(`${name} закончился и убран из корзины`);
@@ -249,6 +253,7 @@ async function refreshCart(tx: Tx, orderId: string) {
       data.qty = fit;
       changes.push(`${name}: осталось ${formatQty(fit)}, количество уменьшено`);
     }
+    used.set(stock.id, (used.get(stock.id) ?? 0) + Math.min(num(item.qty), fit) * ratio);
     if (Object.keys(data).length > 0) await tx.orderItem.update({ where: { id: item.id }, data });
   }
   await recalcTotal(tx, orderId);

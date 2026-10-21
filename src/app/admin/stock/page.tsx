@@ -21,7 +21,7 @@ export default async function AdminStockPage({ searchParams }: PageProps<"/admin
   };
   const [total, rows] = await Promise.all([
     db.productUnit.count({ where }),
-    db.productUnit.findMany({ where, include: { product: { include: { supplier: true } } }, orderBy: { updatedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    db.productUnit.findMany({ where, include: { product: { include: { supplier: true } }, baseUnit: true }, orderBy: { updatedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
   ]);
   return (
     <>
@@ -36,8 +36,14 @@ export default async function AdminStockPage({ searchParams }: PageProps<"/admin
                 <tr key={u.id}>
                   <td className="px-4 py-2">{u.product.name} · {t(unitName(u))}</td>
                   <td className="px-2">{u.product.supplier.displayName}</td>
-                  <td className="px-2 text-right">{formatQty(u.physicalQty)}</td>
-                  <td className="px-2 text-right">{formatQty(u.reservedQty)}</td>
+                  {u.baseUnit ? (
+                    <td colSpan={2} className="px-2 text-right text-xs text-gray-500">{t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })}</td>
+                  ) : (
+                    <>
+                      <td className="px-2 text-right">{formatQty(u.physicalQty)}</td>
+                      <td className="px-2 text-right">{formatQty(u.reservedQty)}</td>
+                    </>
+                  )}
                   <td className="px-4 text-right font-medium">{formatQty(Number(u.physicalQty) - Number(u.reservedQty))}</td>
                 </tr>
               ))}

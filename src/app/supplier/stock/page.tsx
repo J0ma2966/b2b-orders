@@ -28,7 +28,7 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
     db.productUnit.count({ where }),
     db.productUnit.findMany({
       where,
-      include: { product: true },
+      include: { product: true, baseUnit: true },
       orderBy: [{ product: { name: "asc" } }, { sortOrder: "asc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
@@ -61,8 +61,15 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
                       <Link href={`/supplier/catalog/${u.productId}`} className="hover:underline">{u.product.name}</Link>
                       <span className="text-gray-500"> · {t(unitName(u))}</span>
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.physicalQty)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.reservedQty)}</td>
+                    {u.baseUnit ? (
+                      // Л4: остаток этой единицы ведётся в базовой
+                      <td colSpan={2} className="px-4 py-2 text-right text-xs text-gray-500">{t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })}</td>
+                    ) : (
+                      <>
+                        <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.physicalQty)}</td>
+                        <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.reservedQty)}</td>
+                      </>
+                    )}
                     <td className={`px-4 py-2 text-right font-semibold tabular-nums ${avail <= 0 ? "text-red-600" : u.lowStockThreshold !== null && avail < Number(u.lowStockThreshold) ? "text-yellow-700" : ""}`}>
                       {formatQty(avail)}
                       {u.lowStockThreshold !== null && <span className="block text-xs font-normal text-gray-400">{t("порог {qty}", { qty: formatQty(u.lowStockThreshold) })}</span>}

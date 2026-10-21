@@ -1527,6 +1527,23 @@ const uz: Record<string, string> = {
   "Неподдерживаемое сжатие в файле Excel": "Excel faylida qoʻllab-quvvatlanmaydigan siqish",
   "Файл слишком большой": "Fayl juda katta",
   "В файле нет листа с данными": "Faylda maʼlumotli varaq yoʻq",
+  // Л4: соотношение единиц
+  "1 = {n} {unit}, остаток ведётся в «{unit}»": "1 = {n} {unit}, qoldiq «{unit}» da yuritiladi",
+  "Сколько": "Nechta",
+  "Единиц": "Birlik",
+  "— свой остаток": "— oʻz qoldigʻi",
+  "Соотношение единиц": "Birliklar nisbati",
+  "Например, коробка = 24 шт.: остаток ведётся в штуках, коробок доступно столько, сколько целых набирается из свободных штук.": "Masalan, quti = 24 dona: qoldiq donada yuritiladi, qutilar boʻsh donalardan nechta butun quti chiqsa, shuncha mavjud boʻladi.",
+  "Соотношение сохранено": "Nisbat saqlandi",
+  "1 {unit} = {n} {base}. Остаток ведётся в «{base}», доступно целых: {qty}.": "1 {unit} = {n} {base}. Qoldiq «{base}» da yuritiladi, butun holda mavjud: {qty}.",
+  "Сколько базовых единиц в одной — число больше нуля": "Bittasida nechta asosiy birlik — noldan katta son",
+  "Базовая единица должна быть другой единицей этого товара": "Asosiy birlik shu tovarning boshqa birligi boʻlishi kerak",
+  "Базовая единица сама считается в другой — выберите её основу": "Asosiy birlikning oʻzi boshqasida hisoblanadi — uning asosini tanlang",
+  "В этой единице уже считаются другие — сначала отвяжите их": "Bu birlikda boshqalar hisoblanadi — avval ularni ajrating",
+  "По этой единице есть заказы или замены в работе. Измените соотношение, когда они закроются": "Bu birlik boʻyicha jarayondagi buyurtmalar yoki almashtirishlar bor. Ular yopilgach nisbatni oʻzgartiring",
+  "Остаток переведён в базовую единицу: {0}": "Qoldiq asosiy birlikka oʻtkazildi: {0}",
+  "Остаток другой единицы: {0}": "Boshqa birlik qoldigʻi: {0}",
+  "{0} ({1} {2} × {3})": "{0} ({1} {2} × {3})",
 };
 
 export default uz;

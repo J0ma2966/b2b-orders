@@ -414,6 +414,12 @@ model ProductUnit {
   sortOrder   Int      @default(0)
   // П6: порог «мало на складе» по доступному остатку; уведомление — при переходе ниже порога
   lowStockThreshold Decimal? @db.Decimal(14, 3)
+  // Л4: «коробка = 24 шт.» — остаток ведётся в базовой единице (baseUnit), а у этой единицы
+  // physicalQty хранит готовое число целых коробок из доступного остатка (reservedQty = 0)
+  baseUnitId  String?
+  baseUnit    ProductUnit? @relation("UnitBase", fields: [baseUnitId], references: [id], onDelete: SetNull)
+  linkedUnits ProductUnit[] @relation("UnitBase")
+  baseQty     Decimal? @db.Decimal(14, 3)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -427,6 +433,7 @@ model ProductUnit {
   bonusGifts    BonusPromotion[] @relation("BonusGift")
 
   @@unique([productId, kind, customName])
+  @@index([baseUnitId])
 }
 
 model PriceHistory {

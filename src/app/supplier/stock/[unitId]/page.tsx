@@ -13,8 +13,22 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
   const t = await getT();
   const ctx = await requireActiveSupplier();
   const { unitId } = await params;
-  const unit = await db.productUnit.findUnique({ where: { id: unitId }, include: { product: true } });
+  const unit = await db.productUnit.findUnique({ where: { id: unitId }, include: { product: true, baseUnit: true } });
   if (!unit || unit.product.supplierId !== ctx.supplier.id) notFound();
+  // Л4: связанная единица своего журнала не ведёт — все операции в журнале базовой
+  if (unit.baseUnit) {
+    return (
+      <>
+        <PageHeader title={`${unit.product.name} · ${t(unitName(unit))}`} subtitle={<Link href={`/supplier/catalog/${unit.productId}`} className="text-brand-600">{t("← К товару")}</Link>} />
+        <Card>
+          <p className="text-sm">
+            {t("1 {unit} = {n} {base}. Остаток ведётся в «{base}», доступно целых: {qty}.", { unit: t(unitName(unit)), n: formatQty(unit.baseQty!), base: t(unitName(unit.baseUnit)), qty: formatQty(unit.physicalQty) })}
+          </p>
+          <Link href={`/supplier/stock/${unit.baseUnit.id}`} className="mt-2 inline-block text-sm text-brand-600">{t("Журнал склада →")}</Link>
+        </Card>
+      </>
+    );
+  }
   const moves = await db.stockMovement.findMany({ where: { productUnitId: unitId }, orderBy: { createdAt: "desc" }, take: 200 });
   const userIds = [...new Set(moves.flatMap((m) => [m.userId, m.onBehalfOfUserId]).filter((x): x is string => !!x))];
   const users = new Map((await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })).map((u) => [u.id, u.fullName]));
