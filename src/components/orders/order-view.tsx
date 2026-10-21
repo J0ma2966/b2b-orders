@@ -113,19 +113,38 @@ type OrderRow = {
 };
 
 // Список заказов для любой роли; party — кого показать в строке (магазин или поставщик).
-export async function OrdersList<R extends OrderRow>({ rows, href, party }: { rows: R[]; href: (id: string) => string; party: (row: R) => ReactNode }) {
+// selectForm — id формы массовых действий (П3): у каждой строки появляется галочка
+export async function OrdersList<R extends OrderRow>({
+  rows,
+  href,
+  party,
+  extra,
+  selectForm,
+}: {
+  rows: R[];
+  href: (id: string) => string;
+  party: (row: R) => ReactNode;
+  extra?: (row: R) => ReactNode;
+  selectForm?: string;
+}) {
   const t = await getT();
   return (
     <Card className="p-0 sm:p-0">
       <ul className="divide-y divide-gray-100">
         {rows.map((o) => (
-          <li key={o.id}>
-            <Link href={href(o.id)} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50">
+          <li key={o.id} className="flex items-stretch">
+            {selectForm && (
+              <label className="flex shrink-0 cursor-pointer items-center pl-4">
+                <input type="checkbox" form={selectForm} name="ids[]" value={o.id} className="size-4" aria-label={t("Заказ №{n}", { n: o.number })} />
+              </label>
+            )}
+            <Link href={href(o.id)} className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50">
               <div className="min-w-0">
                 <div className="font-medium">№{o.number} · {party(o)}</div>
                 <div className="text-xs text-gray-500">
                   {t.dateTime(o.placedAt)} · {t.money(o.total)}
                 </div>
+                {extra?.(o)}
               </div>
               <OrderStatusBadge status={o.status} />
             </Link>

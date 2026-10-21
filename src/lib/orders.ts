@@ -8,12 +8,15 @@ import { supplierForShop } from "@/lib/shop-catalog";
 import { formatQty, unitName } from "@/lib/catalog";
 import { formatMoney } from "@/lib/format";
 import { generateQrToken } from "@/lib/qr-token";
+import { paymentDue } from "@/lib/accounts";
+import { supplierTermsForShop } from "@/lib/supplier-terms";
 import {
   canAssignCourier,
   canEditForced,
   orderTotal,
   ORDER_STATUS_LABEL,
   planBonuses,
+  sameDay,
   shopCanCancel,
   supplierOrderTransition,
   validQty,
@@ -76,7 +79,8 @@ export async function releaseAll(tx: Tx, order: { id: string; items: { productUn
 async function recalcTotal(tx: Tx, orderId: string) {
   const items = await tx.orderItem.findMany({ where: { orderId } });
   const total = orderTotal(items.map((i) => ({ kind: i.kind, price: num(i.price), qty: num(i.qty) })));
-  await tx.order.update({ where: { id: orderId }, data: { total } });
+  // Изменённая корзина снова может получить напоминание (Л7)
+  await tx.order.update({ where: { id: orderId }, data: { total, cartRemindedAt: null } });
   return total;
 }
 
@@ -154,6 +158,47 @@ export async function addToCart(shop: { id: string; territoryId: string; isBlock
   }
   await db.$transaction((tx) => recalcTotal(tx, cart.id));
   return { cartId: cart.id, qty: newQty };
+}
+
+// М1: «Повторить заказ» — те же товары в корзину по текущим ценам; что недоступно, перечисляется
+export async function repeatOrder(shop: { id: string; territoryId: string; isBlocked: boolean }, orderId: string) {
+  const order = await db.order.findUnique({ where: { id: orderId }, include: { items: { include: { productUnit: true } } } });
+  if (!order || order.shopId !== shop.id || order.status === "DRAFT") throw new OrderError("Заказ не найден");
+  const wanted = new Map<string, { qty: number; name: string; unit: string }>();
+  for (const i of order.items) {
+    if (i.kind === "BONUS") continue;
+    const w = wanted.get(i.productUnitId) ?? { qty: 0, name: i.productName, unit: i.unitLabel };
+    w.qty += num(i.qty);
+    wanted.set(i.productUnitId, w);
+  }
+  const notes: string[] = [];
+  let added = 0;
+  for (const [unitId, w] of wanted) {
+    const unit = await orderableUnit(unitId, order.supplierId);
+    if (!unit) {
+      notes.push(`«${w.name}» больше не продаётся`);
+      continue;
+    }
+    const cart = await findCart(shop.id, order.supplierId);
+    const inCart = cart ? num((await db.orderItem.findFirst({ where: { orderId: cart.id, productUnitId: unitId } }))?.qty) : 0;
+    const available = num(unit.physicalQty) - num(unit.reservedQty) - inCart;
+    const raw = Math.min(w.qty, available);
+    const qty = validQty(unit.kind, raw) ? raw : Math.floor(raw);
+    if (qty <= 0) {
+      notes.push(`«${w.name}» нет в наличии`);
+      continue;
+    }
+    try {
+      await addToCart(shop, order.supplierId, unitId, qty);
+    } catch (e) {
+      if (!(e instanceof OrderError)) throw e;
+      notes.push(`«${w.name}»: ${e.message}`);
+      continue;
+    }
+    added++;
+    if (qty < w.qty) notes.push(`«${w.name}»: в наличии только ${formatQty(qty)} ${unitName(unit)}`);
+  }
+  return { supplierId: order.supplierId, added, notes };
 }
 
 export async function setCartQty(shopId: string, itemId: string, qty: number) {
@@ -256,6 +301,8 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
   const cart = await findCart(shop.id, supplierId);
   if (!cart) throw new OrderError("Корзина пуста");
   const actor = await currentActor();
+  // П5: условия поставщика читаются до транзакции — справочник территорий берётся из общего пула
+  const terms = await supplierTermsForShop(db, supplierId, shop.territoryId);
 
   // Две попытки: если остаток увели между проверкой и резервом, корзина обновится и вернётся магазину
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -303,6 +350,24 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
         const rate = sup.commissionRate !== null ? num(sup.commissionRate) : await defaultCommissionRate(tx);
         const shopRow = await tx.shop.findUniqueOrThrow({ where: { id: shop.id } });
         const total = await recalcTotal(tx, order.id);
+
+        // П5: минимальная сумма и доступные даты доставки
+        if (terms.minOrderTotal !== null && total < terms.minOrderTotal) {
+          throw new OrderError(`Минимальная сумма заказа у этого поставщика — ${formatMoney(terms.minOrderTotal)}`);
+        }
+        let deliveryDate = input.deliveryDate ?? null;
+        if (terms.restrictsDates) {
+          const dates = terms.dates(now);
+          if (!deliveryDate) deliveryDate = dates[0] ?? null;
+          else if (!dates.some((d) => sameDay(d, deliveryDate!))) throw new OrderError("На эту дату поставщик не доставляет, выберите дату из списка");
+        }
+        // Л1: заказ сверх доступного кредита поставщик может запретить
+        if (sup.creditOverLimitBlock) {
+          const due = await paymentDue(tx, { id: order.id, shopId: shop.id, supplierId, total });
+          if (due.overLimit > 0) {
+            throw new OrderError(`Заказ превышает доступный кредит на ${formatMoney(due.overLimit)}. Уменьшите заказ или погасите долг`);
+          }
+        }
         await tx.order.update({
           where: { id: order.id },
           data: {
@@ -316,7 +381,7 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
             deliveryLng: shopRow.lng,
             contactName: input.contactName,
             contactPhone: input.contactPhone,
-            deliveryDate: input.deliveryDate ?? null,
+            deliveryDate,
             commissionRate: rate,
             createdByUserId: actor.userId,
             qrToken: generateQrToken(),
@@ -409,6 +474,23 @@ export async function assignCourier(supplierId: string, orderId: string, courier
     if (order.courierId) await notifyUsers([order.courierId], { type: "order.unassigned", title: `Заказ №${order.number} передан другому доставщику`, link: "/courier", entity: "Order", entityId: order.id }, tx);
     if (order.status !== "ASSIGNED") await notifyShop(order.shopId, shopNote(order, "назначен доставщик", courier.user.fullName), tx);
   });
+}
+
+// П2, П3: довести принятый заказ до «Готов к доставке» (сборка проходит тем же шагом).
+export async function makeReady(supplierId: string, orderId: string, actorRole: string) {
+  const order = await db.order.findUnique({ where: { id: orderId }, select: { status: true, supplierId: true } });
+  if (!order || order.supplierId !== supplierId) throw new OrderError("Заказ не найден");
+  if (order.status === "READY" || order.status === "ASSIGNED") return;
+  if (order.status === "ACCEPTED") await supplierOrderAction(supplierId, orderId, "assemble", null, actorRole);
+  await supplierOrderAction(supplierId, orderId, "ready", null, actorRole);
+}
+
+// П8: доставщик, закреплённый за районом магазина (самая точная территория поставщика)
+export async function suggestedCourier(supplierId: string, shopTerritoryId: string) {
+  const terms = await supplierTermsForShop(db, supplierId, shopTerritoryId);
+  if (!terms.courierId) return null;
+  const member = await db.supplierMember.findFirst({ where: { supplierId, userId: terms.courierId, role: "COURIER", isActive: true } });
+  return member ? terms.courierId : null;
 }
 
 // Принудительная продажа (ТЗ п. 24): отдельная позиция, сразу резервируется.

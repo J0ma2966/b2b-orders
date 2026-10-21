@@ -25,7 +25,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/order
     <>
       <PageHeader title={`Заказ №${order.number}`} subtitle={<OrderStatusBadge status={order.status} />} actions={<Link href="/admin/orders" className="text-sm text-brand-600">{t("← Все заказы")}</Link>} />
       <div className="space-y-4">
-        {order.cancelReason && <Alert tone="error">{t(order.cancelledBy === "SHOP" ? "Отменён магазином {date}: {reason}" : "Отменён поставщиком {date}: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}</Alert>}
+        {order.cancelReason && <Alert tone="error">{t(order.cancelledBy === "SHOP" ? "Отменён магазином {date}: {reason}" : order.cancelledBy === "PLATFORM" ? "Отменён автоматически {date}: {reason}" : "Отменён поставщиком {date}: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}</Alert>}
         <div className="grid gap-4 lg:grid-cols-5">
           <div className="space-y-4 lg:col-span-3">
             <OrderItems items={order.items} total={order.total} />

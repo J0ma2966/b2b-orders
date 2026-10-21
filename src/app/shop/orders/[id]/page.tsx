@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import QRCode from "qrcode";
 import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
-import { CancelOrderForm, ConfirmReceiptQr, RequestCancelForm } from "@/components/orders/shop-forms";
+import { CancelOrderForm, ConfirmReceiptQr, RepeatOrderForm, RequestCancelForm } from "@/components/orders/shop-forms";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
-import { PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
+import { CLOSED, PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
 import { orderEvents } from "@/lib/orders";
 import { isTracked, OrderTracker } from "@/components/shop/order-tracker";
 
@@ -41,7 +41,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         {sp.placed && placedEvent?.comment && <Alert tone="warning">{placedEvent.comment}</Alert>}
         {order.cancelReason && (
           <Alert tone="error">
-            {t(order.cancelledBy === "SHOP" ? "Вы отменили заказ {date}. Причина: {reason}" : "Поставщик отменил заказ {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
+            {t(order.cancelledBy === "SHOP" ? "Вы отменили заказ {date}. Причина: {reason}" : order.cancelledBy === "PLATFORM" ? "Заказ отменён автоматически {date}. Причина: {reason}" : "Поставщик отменил заказ {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
           </Alert>
         )}
         {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">{t("Вы попросили отменить заказ: {reason}. Ждём решения поставщика.", { reason: order.cancelRequestReason })}</Alert>}
@@ -63,6 +63,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
             <Link className="rounded-full bg-surface px-4 py-2 text-sm font-medium ring-1 ring-black/10 hover:ring-brand-500" href={`/shop/replacements/new?order=${order.id}`}>{t("🔁 Заявка на замену")}</Link>
           </div>
         )}
+        {CLOSED.includes(order.status) && <RepeatOrderForm orderId={order.id} />}
         <div className="grid gap-4 lg:grid-cols-5">
           <div className="space-y-4 lg:col-span-3">
             <OrderItems items={order.items} total={order.total} />

@@ -172,7 +172,7 @@ await admin.waitForTimeout(800);
 await shot(admin, "08-impersonation");
 await admin.goto(`${BASE}/supplier/profile`);
 await admin.getByLabel("Сайт").fill("https://opt.uz");
-await admin.getByRole("button", { name: "Сохранить" }).click();
+await admin.getByRole("button", { name: "Сохранить" }).first().click();
 await admin.waitForTimeout(1500);
 await admin.getByRole("button", { name: "Вернуться в админку" }).click();
 await admin.waitForURL(/admin\/suppliers/);
@@ -312,7 +312,7 @@ await shot(shop, "17-shop-order-placed-mobile");
 // Поставщик: новый заказ, принять, собрать, принудительная продажа, готов, доставщик
 await sup.goto(`${BASE}/supplier`);
 await sup.waitForTimeout(800);
-log("плитка новых заказов:", (await sup.locator("a[href='/supplier/orders?status=PLACED']").innerText()).replace(/\n/g, " "));
+log("плитка новых заказов:", (await sup.locator("a[href='/supplier/orders?status=PLACED']").first().innerText()).replace(/\n/g, " "));
 await sup.goto(`${BASE}/supplier/orders/${orderId}`);
 await sup.waitForTimeout(1000);
 for (const b of ["Принять заказ", "Начать сборку"]) {

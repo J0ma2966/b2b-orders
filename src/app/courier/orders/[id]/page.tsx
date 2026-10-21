@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { allowsFraction, RECEIVED } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
+import { accountState } from "@/lib/accounts";
 
 export default async function CourierOrderPage({ params }: PageProps<"/courier/orders/[id]">) {
   const t = await getT();
@@ -19,8 +20,7 @@ export default async function CourierOrderPage({ params }: PageProps<"/courier/o
     include: { shop: true, items: { include: { productUnit: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!order || order.courierId !== ctx.auth.user.id || order.supplierId !== ctx.supplier.id) notFound();
-  const account = await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } });
-  const balance = Number(account?.balance ?? 0);
+  const { balance, terms } = await accountState(db, order.shopId, order.supplierId);
   return (
     <>
       <Link href="/courier" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-ink">{t("← Все доставки")}</Link>
@@ -55,6 +55,7 @@ export default async function CourierOrderPage({ params }: PageProps<"/courier/o
           <AcceptanceForm
             orderId={order.id}
             balanceBefore={balance}
+            terms={terms}
             items={order.items.map((i) => ({
               id: i.id,
               name: i.productName,

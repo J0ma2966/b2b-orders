@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { ActionForm } from "@/components/ui/action-form";
 import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addToCartAction, cancelOrderAction, checkoutAction, requestCancelAction, setCartQtyAction } from "@/app/shop/orders/actions";
+import { addToCartAction, cancelOrderAction, checkoutAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
 import { useT } from "@/lib/i18n/client";
 
 export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: string; unitId: string; step: string; max: number }) {
@@ -70,7 +71,7 @@ export function CartQtyForm({ itemId, qty, step }: { itemId: string; qty: string
 
 export type CheckoutDefaults = { address: string; contactName: string; contactPhone: string };
 
-export function CheckoutForm({ supplierId, defaults }: { supplierId: string; defaults: CheckoutDefaults }) {
+export function CheckoutForm({ supplierId, defaults, dates }: { supplierId: string; defaults: CheckoutDefaults; dates?: { value: string; label: string }[] }) {
   const t = useT();
   const [state, action, pending] = useActionState(checkoutAction, initialFormState);
   const v = state.values ?? {};
@@ -97,9 +98,19 @@ export function CheckoutForm({ supplierId, defaults }: { supplierId: string; def
           <Input name="contactPhone" type="tel" inputMode="tel" defaultValue={v.contactPhone ?? defaults.contactPhone} />
         </Field>
       </div>
-      <Field label="Желаемая дата доставки" name="deliveryDate" error={fe.deliveryDate} hint="Необязательно">
-        <Input name="deliveryDate" type="date" defaultValue={v.deliveryDate} />
-      </Field>
+      {dates ? (
+        <Field label="Дата доставки" name="deliveryDate" error={fe.deliveryDate} hint="Поставщик доставляет только в эти дни">
+          <Select name="deliveryDate" defaultValue={v.deliveryDate ?? dates[0]?.value}>
+            {dates.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </Select>
+        </Field>
+      ) : (
+        <Field label="Желаемая дата доставки" name="deliveryDate" error={fe.deliveryDate} hint="Необязательно">
+          <Input name="deliveryDate" type="date" defaultValue={v.deliveryDate} />
+        </Field>
+      )}
       <Field label="Комментарий" name="comment">
         <Textarea name="comment" defaultValue={v.comment} placeholder={t("Например: звонить за час, вход со двора")} />
       </Field>
@@ -153,5 +164,38 @@ export function ConfirmReceiptQr({ dataUrl, code }: { dataUrl: string; code: str
       <p className="font-mono text-lg tracking-widest">{code.replace(/(.{5})/, "$1 ")}</p>
       <button type="button" className="text-sm text-gray-600 underline" onClick={() => setOpen(false)}>{t("Скрыть")}</button>
     </div>
+  );
+}
+
+export function RepeatOrderForm({ orderId }: { orderId: string }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(repeatOrderAction, initialFormState);
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-2">
+      <FormMessage state={state} />
+      <input type="hidden" name="orderId" value={orderId} />
+      {state.ok && state.values?.supplierId ? (
+        <Link href={`/shop/cart/${state.values.supplierId}`} className="inline-flex min-h-10 items-center rounded-lg bg-brand-600 px-4 text-sm font-medium text-on-brand">{t("Перейти в корзину")}</Link>
+      ) : (
+        <SubmitButton variant="secondary" pendingText="Добавляю…">{t("Повторить заказ")}</SubmitButton>
+      )}
+    </ActionForm>
+  );
+}
+
+export function FavoriteButton({ productId, on, label }: { productId: string; on: boolean; label: string }) {
+  const t = useT();
+  return (
+    <form action={toggleFavoriteAction}>
+      <input type="hidden" name="productId" value={productId} />
+      <input type="hidden" name="on" value={on ? "0" : "1"} />
+      <button
+        aria-pressed={on}
+        aria-label={t(on ? "Убрать из моих товаров: {name}" : "В мои товары: {name}", { name: label })}
+        className={cn("grid size-8 place-items-center rounded-full bg-surface/90 text-lg shadow-sm ring-1 ring-black/5", on ? "text-amber-500" : "text-gray-400 hover:text-amber-500")}
+      >
+        <span aria-hidden>{on ? "★" : "☆"}</span>
+      </button>
+    </form>
   );
 }

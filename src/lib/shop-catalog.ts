@@ -18,9 +18,43 @@ export const shopVisibleProduct = (supplierId: string): Prisma.ProductWhereInput
 
 export const shopVisibleUnits = { where: { isActive: true, price: { not: null } }, orderBy: { sortOrder: "asc" as const } };
 
-export async function shopCatalog(supplierId: string, opts: { q?: string; categoryId?: string; skip: number; take: number }) {
+export type CatalogFilter = "" | "fav" | "often" | "promo";
+
+// Действующие акции поставщика по единице-условию (М3)
+export async function activePromotions(supplierId: string, now = new Date()) {
+  const rows = await db.bonusPromotion.findMany({ where: { supplierId, isActive: true, startsAt: { lte: now }, endsAt: { gt: now } }, orderBy: { createdAt: "asc" } });
+  const byUnit = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) if (!byUnit.has(r.triggerUnitId)) byUnit.set(r.triggerUnitId, r);
+  return byUnit;
+}
+
+// М4: «часто заказываю» — товары из полученных заказов магазина, по числу заказов
+export async function oftenOrdered(shopId: string, supplierId: string, take = 30) {
+  const rows = await db.orderItem.groupBy({
+    by: ["productUnitId"],
+    where: { kind: { not: "BONUS" }, order: { shopId, supplierId, status: { in: ["COMPLETED", "PARTIALLY_ACCEPTED"] } } },
+    _count: { _all: true },
+    orderBy: { _count: { productUnitId: "desc" } },
+    take: take * 2,
+  });
+  const units = await db.productUnit.findMany({ where: { id: { in: rows.map((r) => r.productUnitId) } }, select: { id: true, productId: true } });
+  const productOf = new Map(units.map((u) => [u.id, u.productId]));
+  return [...new Set(rows.map((r) => productOf.get(r.productUnitId)).filter((x): x is string => !!x))].slice(0, take);
+}
+
+export async function shopCatalog(
+  supplierId: string,
+  opts: { q?: string; categoryId?: string; skip: number; take: number; shopId?: string; filter?: CatalogFilter },
+) {
+  const now = new Date();
+  let only: Prisma.ProductWhereInput = {};
+  if (opts.filter === "fav" && opts.shopId) only = { favorites: { some: { shopId: opts.shopId } } };
+  if (opts.filter === "often" && opts.shopId) only = { id: { in: await oftenOrdered(opts.shopId, supplierId) } };
+  if (opts.filter === "promo") {
+    only = { units: { some: { isActive: true, price: { not: null }, bonusTriggers: { some: { isActive: true, startsAt: { lte: now }, endsAt: { gt: now } } } } } };
+  }
   const where: Prisma.ProductWhereInput = {
-    ...shopVisibleProduct(supplierId),
+    AND: [shopVisibleProduct(supplierId), only],
     ...(opts.categoryId && { categoryId: opts.categoryId }),
     ...(opts.q && {
       OR: [{ name: { contains: opts.q, mode: "insensitive" } }, { brand: { contains: opts.q, mode: "insensitive" } }],
@@ -35,4 +69,9 @@ export async function shopCatalog(supplierId: string, opts: { q?: string; catego
     }),
   ]);
   return { total, products, categories };
+}
+
+export async function favoriteIds(shopId: string, productIds: string[]) {
+  const rows = await db.favoriteProduct.findMany({ where: { shopId, productId: { in: productIds } }, select: { productId: true } });
+  return new Set(rows.map((r) => r.productId));
 }

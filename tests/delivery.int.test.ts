@@ -60,7 +60,7 @@ describe.skipIf(!enabled)("доставка, приёмка, оплата", () =
     await expect(confirmDelivery(courierId, a.order.id, { items, received: 1000, method: "CASH", qr: a.order.qrToken! })).rejects.toBeInstanceOf(OrderError);
     // Магазин после первой доставки — «Проверенный»
     expect((await db.shop.findUniqueOrThrow({ where: { id: a.shop.id } })).status).toBe("VERIFIED");
-    await markNotDelivered(courierId, b.order.id, "закрыто");
+    await markNotDelivered(courierId, b.order.id, { reason: "CLOSED", note: null });
     expect((await db.shop.findUniqueOrThrow({ where: { id: b.shop.id } })).status).toBe("FAILED_CHECK");
   });
 

@@ -18,6 +18,43 @@ function roleTag(role: string) {
   return role === "OWNER" ? "SUPPLIER_OWNER" : role === "ADMIN" ? "SUPPLIER_ADMIN" : "COURIER";
 }
 
+// ───────────── Условия заказа (П5, Л1, П2) ─────────────
+
+const toNum = (v: string) => Number(v.replace(/\s/g, "").replace(",", "."));
+const optNum = (msg: string, min: number, max: number, int = false) =>
+  opt()
+    .refine((v) => {
+      if (v === undefined) return true;
+      const n = toNum(v);
+      return Number.isFinite(n) && n >= min && n <= max && (!int || Number.isInteger(n));
+    }, msg)
+    .transform((v) => (v === undefined ? null : toNum(v)));
+
+const termsSchema = z.object({
+  minOrderTotal: optNum("Укажите сумму числом", 0, 1e12),
+  orderCutoffHour: optNum("Час от 1 до 23", 1, 23, true),
+});
+
+export async function updateOrderTermsAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireSupplier(["OWNER", "ADMIN"]);
+  const parsed = parseForm(termsSchema, formData);
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const s = ctx.supplier;
+  const data = {
+    minOrderTotal: parsed.data.minOrderTotal,
+    orderCutoffHour: parsed.data.orderCutoffHour,
+    creditOverLimitBlock: formData.get("creditOverLimitBlock") === "on",
+    skipAssembly: formData.get("skipAssembly") === "on",
+  };
+  const before = { ...s, minOrderTotal: s.minOrderTotal === null ? null : Number(s.minOrderTotal) };
+  const changes = diffFields(before, data, ["minOrderTotal", "orderCutoffHour", "creditOverLimitBlock", "skipAssembly"]);
+  if (changes.length === 0) return { ok: true, message: "Изменений нет" };
+  await db.supplier.update({ where: { id: s.id }, data });
+  await writeAudit({ entity: "Supplier", entityId: s.id, action: "terms.update", actorRole: roleTag(ctx.membership.role), supplierId: s.id, changes });
+  revalidatePath("/supplier", "layout");
+  return success("Условия заказа сохранены");
+}
+
 // ───────────── Профиль (ТЗ п. 9) ─────────────
 
 const profileSchema = z.object({
@@ -115,9 +152,12 @@ export async function updateTerritoryAction(_prev: FormState, formData: FormData
   const before = (await db.supplierTerritory.findMany({ where: { supplierId: ctx.supplier.id } })).map((t) => t.territoryId).sort();
   const after = [...ids].sort();
   if (JSON.stringify(before) === JSON.stringify(after)) return { ok: true, message: "Изменений нет" };
+  // Оставшиеся территории сохраняют дни доставки и закреплённого доставщика
+  const removed = before.filter((id) => !ids.includes(id));
+  const added = ids.filter((id) => !before.includes(id));
   await db.$transaction([
-    db.supplierTerritory.deleteMany({ where: { supplierId: ctx.supplier.id } }),
-    db.supplierTerritory.createMany({ data: ids.map((territoryId) => ({ supplierId: ctx.supplier.id, territoryId })) }),
+    db.supplierTerritory.deleteMany({ where: { supplierId: ctx.supplier.id, territoryId: { in: removed } } }),
+    db.supplierTerritory.createMany({ data: added.map((territoryId) => ({ supplierId: ctx.supplier.id, territoryId })) }),
   ]);
   await writeAudit({
     entity: "Supplier",
@@ -129,6 +169,33 @@ export async function updateTerritoryAction(_prev: FormState, formData: FormData
   });
   revalidatePath("/supplier/territory");
   return { ok: true, message: "Территория доставки сохранена" };
+}
+
+// П5, П8: дни доставки и закреплённый доставщик по каждой территории
+export async function updateTerritoryTermsAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireSupplier(["OWNER", "ADMIN"]);
+  const [rows, couriers] = await Promise.all([
+    db.supplierTerritory.findMany({ where: { supplierId: ctx.supplier.id } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, select: { userId: true } }),
+  ]);
+  const courierIds = new Set(couriers.map((c) => c.userId));
+  const changes = [];
+  const updates = [];
+  for (const r of rows) {
+    const weekdays = [...new Set(formData.getAll(`wd_${r.territoryId}`).map(Number))].filter((d) => d >= 1 && d <= 7).sort();
+    const c = String(formData.get(`courier_${r.territoryId}`) ?? "");
+    const courierId = c && courierIds.has(c) ? c : null;
+    // Все семь дней — то же, что «каждый день»
+    const days = weekdays.length === 7 ? [] : weekdays;
+    if (JSON.stringify(days) === JSON.stringify(r.deliveryWeekdays) && courierId === r.courierId) continue;
+    changes.push({ field: `territory.${r.territoryId}`, old: { weekdays: r.deliveryWeekdays, courierId: r.courierId }, new: { weekdays: days, courierId } });
+    updates.push(db.supplierTerritory.update({ where: { supplierId_territoryId: { supplierId: ctx.supplier.id, territoryId: r.territoryId } }, data: { deliveryWeekdays: days, courierId } }));
+  }
+  if (updates.length === 0) return { ok: true, message: "Изменений нет" };
+  await db.$transaction(updates);
+  await writeAudit({ entity: "Supplier", entityId: ctx.supplier.id, action: "territory.terms", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, changes });
+  revalidatePath("/supplier/territory");
+  return success("Дни доставки сохранены");
 }
 
 // ───────────── Команда: администраторы и доставщики (ТЗ п. 4–6) ─────────────

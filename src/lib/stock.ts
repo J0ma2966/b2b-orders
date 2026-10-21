@@ -4,6 +4,8 @@ import type { StockMovementType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { getAuth } from "@/lib/auth/current";
 import { movementDeltas } from "./stock-core";
+import { notifySupplierStaff } from "./notify";
+import { formatQty, unitName } from "./catalog";
 
 type Tx = Prisma.TransactionClient;
 
@@ -28,14 +30,14 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
   const d = movementDeltas(op.type, op.qty);
   const p = new Prisma.Decimal(d.physical);
   const r = new Prisma.Decimal(d.reserved);
-  const rows = await tx.$queryRaw<{ physicalQty: Prisma.Decimal; reservedQty: Prisma.Decimal }[]>`
+  const rows = await tx.$queryRaw<{ physicalQty: Prisma.Decimal; reservedQty: Prisma.Decimal; lowStockThreshold: Prisma.Decimal | null }[]>`
     UPDATE "ProductUnit"
        SET "physicalQty" = "physicalQty" + ${p}, "reservedQty" = "reservedQty" + ${r}, "updatedAt" = now()
      WHERE id = ${op.unitId}
        AND "physicalQty" + ${p} >= 0
        AND "reservedQty" + ${r} >= 0
        AND "physicalQty" + ${p} >= "reservedQty" + ${r}
-     RETURNING "physicalQty", "reservedQty"`;
+     RETURNING "physicalQty", "reservedQty", "lowStockThreshold"`;
   if (rows.length === 0) {
     const exists = await tx.productUnit.findUnique({ where: { id: op.unitId }, select: { id: true } });
     throw new StockError(exists ? "Недостаточно доступного остатка" : "Единица товара не найдена");
@@ -56,7 +58,22 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
       relatedId: op.relatedId,
     },
   });
-  return { physical: Number(rows[0].physicalQty), reserved: Number(rows[0].reservedQty) };
+  const physical = Number(rows[0].physicalQty);
+  const reserved = Number(rows[0].reservedQty);
+  // П6: доступный остаток опустился ниже порога — сообщаем поставщику один раз при пересечении
+  const threshold = rows[0].lowStockThreshold === null ? null : Number(rows[0].lowStockThreshold);
+  const after = physical - reserved;
+  const before = after - (d.physical - d.reserved);
+  if (threshold !== null && before >= threshold && after < threshold) {
+    const unit = await tx.productUnit.findUniqueOrThrow({ where: { id: op.unitId }, include: { product: true } });
+    await notifySupplierStaff(
+      unit.product.supplierId,
+      { type: "stock.low", title: `Мало на складе: ${unit.product.name}`, body: `${unitName(unit)}: доступно ${formatQty(Math.max(0, after))}`, link: `/supplier/stock/${unit.id}`, entity: "ProductUnit", entityId: unit.id },
+      ["OWNER", "ADMIN"],
+      tx,
+    );
+  }
+  return { physical, reserved };
 }
 
 export async function currentActor() {
@@ -69,4 +86,13 @@ export async function currentActor() {
 
 export function stockOperation(op: StockOperation) {
   return db.$transaction((tx) => applyStock(tx, op));
+}
+
+// П6: единицы поставщика, у которых доступный остаток ниже порога
+export async function lowStockUnitIds(supplierId: string) {
+  const rows = await db.$queryRaw<{ id: string }[]>`
+    SELECT u.id FROM "ProductUnit" u JOIN "Product" p ON p.id = u."productId"
+     WHERE p."supplierId" = ${supplierId} AND p."archivedAt" IS NULL AND u."isActive"
+       AND u."lowStockThreshold" IS NOT NULL AND u."physicalQty" - u."reservedQty" < u."lowStockThreshold"`;
+  return rows.map((r) => r.id);
 }

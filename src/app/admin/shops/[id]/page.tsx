@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { formatPhone } from "@/lib/phone";
+import { ResetPasswordForm } from "@/components/admin/reset-password-form";
 import { fileUrl } from "@/lib/storage";
 import { availableSuppliersForShop, loadTerritoryMap } from "@/lib/territory";
 import { territoryLabel } from "@/lib/territory-core";
@@ -62,7 +63,17 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
                   </a>,
                 ],
                 ["Зарегистрирован", t.dateTime(shop.createdAt)],
-                ["Пользователи", shop.members.map((m) => `${m.user.fullName} (${formatPhone(m.user.phone)})`).join(", ")],
+                [
+                  "Пользователи",
+                  <ul key="u" className="space-y-1">
+                    {shop.members.map((m) => (
+                      <li key={m.id} className="flex flex-wrap items-center gap-x-2">
+                        {m.user.fullName} ({formatPhone(m.user.phone)})
+                        {!m.user.isSuperAdmin && <ResetPasswordForm userId={m.userId} />}
+                      </li>
+                    ))}
+                  </ul>,
+                ],
                 ["Доступные поставщики", suppliers.length ? suppliers.map((s) => s.displayName).join(", ") : t("нет")],
               ]}
             />

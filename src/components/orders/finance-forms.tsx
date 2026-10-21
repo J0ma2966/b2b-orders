@@ -9,7 +9,7 @@ import { initialFormState } from "@/lib/forms";
 import { debtPaymentAction, setCreditAction } from "@/app/supplier/shops/actions";
 import { useT } from "@/lib/i18n/client";
 
-export function CreditForm({ shopId, creditAllowed, creditLimit }: { shopId: string; creditAllowed: boolean; creditLimit: string }) {
+export function CreditForm({ shopId, creditAllowed, creditLimit, paymentTermDays = "" }: { shopId: string; creditAllowed: boolean; creditLimit: string; paymentTermDays?: string }) {
   const t = useT();
   const [state, action, pending] = useActionState(setCreditAction, initialFormState);
   return (
@@ -21,6 +21,9 @@ export function CreditForm({ shopId, creditAllowed, creditLimit }: { shopId: str
       </label>
       <Field label="Лимит задолженности, сум" name="creditLimit" error={state.fieldErrors?.creditLimit} hint="Пусто — без лимита">
         <Input name="creditLimit" inputMode="decimal" defaultValue={state.values?.creditLimit ?? creditLimit} />
+      </Field>
+      <Field label="Отсрочка оплаты, дней" name="paymentTermDays" error={state.fieldErrors?.paymentTermDays} hint="Пусто — без срока. При просрочке новые заказы только с полной оплатой">
+        <Input name="paymentTermDays" type="number" min={1} max={365} defaultValue={state.values?.paymentTermDays ?? paymentTermDays} />
       </Field>
       <SubmitButton variant="secondary">{t("Сохранить")}</SubmitButton>
     </ActionForm>

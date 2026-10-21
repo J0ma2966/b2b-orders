@@ -5,7 +5,8 @@ import { requireActiveSupplier } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { parseAmount, parseSignedAmount } from "@/lib/catalog";
 import { correctBalance, decideCancelRequest, resolveProblem } from "@/lib/delivery";
-import { addForcedItem, assignCourier, OrderError, removeForcedItem, supplierOrderAction } from "@/lib/orders";
+import { addForcedItem, assignCourier, makeReady, OrderError, removeForcedItem, supplierOrderAction } from "@/lib/orders";
+import { db } from "@/lib/db";
 import { ORDER_STATUS_LABEL, SUPPLIER_ACTION_NEEDS_REASON, type SupplierOrderAction } from "@/lib/order-core";
 import { formValues, success, type FormState } from "@/lib/forms";
 
@@ -132,4 +133,53 @@ export async function orderCorrectionAction(_prev: FormState, formData: FormData
   await writeAudit({ entity: orderId ? "Order" : "ShopAccount", entityId: orderId || shopId, action: "correction", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, shopId, comment: reason, changes: [{ field: "amount", old: null, new: amount }] });
   revalidatePath("/supplier", "layout");
   return success("Корректирующая операция записана");
+}
+
+// П2: «Готов и назначить доставщика» одним шагом
+export async function readyAndAssignAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const orderId = String(formData.get("orderId") ?? "");
+  const courierId = String(formData.get("courierId") ?? "") || null;
+  const role = roleTag(ctx.membership.role);
+  try {
+    await makeReady(ctx.supplier.id, orderId, role);
+    if (courierId) await assignCourier(ctx.supplier.id, orderId, courierId, role);
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: "Order", entityId: orderId, action: "status.ready_assign", actorRole: role, supplierId: ctx.supplier.id, changes: [{ field: "courierId", old: null, new: courierId }] });
+  revalidatePath("/supplier", "layout");
+  return success(courierId ? "Заказ готов, доставщик назначен" : "Заказ готов к доставке");
+}
+
+// П3: одно действие для нескольких отмеченных заказов
+const BULK = ["accept", "ready", "assign"] as const;
+
+export async function bulkOrderAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const op = String(formData.get("op") ?? "") as (typeof BULK)[number];
+  if (!BULK.includes(op)) return { error: "Неизвестное действие" };
+  const ids = [...new Set(formData.getAll("ids[]").map(String).filter(Boolean))].slice(0, 100);
+  if (ids.length === 0) return { error: "Отметьте заказы в списке" };
+  const courierId = String(formData.get("courierId") ?? "") || null;
+  if (op === "assign" && !courierId) return { error: "Выберите доставщика" };
+  const role = roleTag(ctx.membership.role);
+  const orders = await db.order.findMany({ where: { id: { in: ids }, supplierId: ctx.supplier.id }, select: { id: true, number: true }, orderBy: { number: "asc" } });
+  let done = 0;
+  const errors: string[] = [];
+  for (const o of orders) {
+    try {
+      if (op === "accept") await supplierOrderAction(ctx.supplier.id, o.id, "accept", null, role);
+      if (op === "ready") await makeReady(ctx.supplier.id, o.id, role);
+      if (op === "assign") await assignCourier(ctx.supplier.id, o.id, courierId, role);
+      await writeAudit({ entity: "Order", entityId: o.id, action: `bulk.${op}`, actorRole: role, supplierId: ctx.supplier.id, changes: op === "assign" ? [{ field: "courierId", old: null, new: courierId }] : undefined });
+      done++;
+    } catch (e) {
+      if (!(e instanceof OrderError)) throw e;
+      errors.push(`Заказ №${o.number}: ${e.message}`);
+    }
+  }
+  revalidatePath("/supplier", "layout");
+  if (errors.length > 0) return { error: `Выполнено: ${done}, не удалось: ${errors.length}`, details: errors };
+  return success(`Выполнено для заказов: ${done}`);
 }

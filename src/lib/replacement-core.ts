@@ -15,6 +15,7 @@ export const REPLACEMENT_STATUS_LABEL: Record<ReplacementStatus, string> = {
   REJECTED: "Отклонена",
   ASSIGNED: "Передана доставщику",
   DONE: "Выполнена",
+  CREDITED: "Зачтена в баланс",
   CANCELLED: "Отменена",
 };
 
@@ -24,6 +25,7 @@ export const REPLACEMENT_STATUS_COLOR = {
   REJECTED: "red",
   ASSIGNED: "yellow",
   DONE: "green",
+  CREDITED: "green",
   CANCELLED: "gray",
 } as const satisfies Record<ReplacementStatus, string>;
 

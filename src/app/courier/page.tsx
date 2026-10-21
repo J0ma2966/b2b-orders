@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { DELIVERY_ACTIVE } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
+import Link from "next/link";
+import { courierCash } from "@/lib/cash";
 
 // Мои доставки: сегодня и предстоящие (ТЗ п. 74). Сверху — та, которой доставщик занят сейчас.
 export default async function CourierHome() {
@@ -20,6 +22,7 @@ export default async function CourierHome() {
     _count: true,
   });
   const repl = new Map(replacementsByShop.map((r) => [r.shopId, r._count]));
+  const cash = await courierCash(ctx.supplier.id, ctx.auth.user.id);
   const today = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }) + "T00:00:00Z");
   const now = orders.filter((o) => !o.deliveryDate || o.deliveryDate <= today);
   const later = orders.filter((o) => o.deliveryDate && o.deliveryDate > today);
@@ -33,6 +36,10 @@ export default async function CourierHome() {
         {t("Сегодня")} · {now.length}
         {later.length > 0 && ` · ${t("Предстоящие")} · ${later.length}`}
       </p>
+      <Link href="/courier/cash" className="mb-4 flex items-center justify-between rounded-xl bg-surface px-4 py-3 ring-1 ring-gray-200">
+        <span className="text-sm text-gray-500">💵 {t("Наличные на руках")}</span>
+        <b className="tabular-nums">{t.money(cash.onHand)}</b>
+      </Link>
       {orders.length === 0 && <EmptyState>{t("Назначенных доставок пока нет")}</EmptyState>}
       {current && <DeliveryHero o={current} replacements={repl.get(current.shopId)} />}
       {queue.length > 0 && (

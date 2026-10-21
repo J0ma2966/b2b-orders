@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireShop } from "@/lib/auth/current";
+import { db } from "@/lib/db";
+import { supplierForShop } from "@/lib/shop-catalog";
 import { writeAudit } from "@/lib/audit";
-import { addToCart, cancelByShop, checkout, OrderError, setCartQty } from "@/lib/orders";
+import { addToCart, cancelByShop, checkout, OrderError, repeatOrder, setCartQty } from "@/lib/orders";
 import { requestCancel } from "@/lib/delivery";
 import { parseAmount } from "@/lib/catalog";
 import { normalizePhone } from "@/lib/phone";
@@ -125,4 +127,35 @@ export async function requestCancelAction(_prev: FormState, formData: FormData):
   await writeAudit({ entity: "Order", entityId: orderId, action: "cancel.request", actorRole: "SHOP", shopId: ctx.shop.id, comment: reason });
   revalidatePath("/shop", "layout");
   return success("Запрос отправлен поставщику");
+}
+
+// М1: повторить заказ — товары в корзину по текущим ценам
+export async function repeatOrderAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  const orderId = String(formData.get("orderId") ?? "");
+  let r;
+  try {
+    r = await repeatOrder(ctx.shop, orderId);
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/shop", "layout");
+  if (r.added > 0 && r.notes.length === 0) redirect(`/shop/cart/${r.supplierId}`);
+  if (r.added === 0) return { error: "Ни один товар из заказа сейчас нельзя добавить:", details: r.notes };
+  return { ok: true, message: `В корзину добавлено позиций: ${r.added}. Не всё получилось:`, details: r.notes, values: { supplierId: r.supplierId } };
+}
+
+// М4: звёздочка «Мои товары»
+export async function toggleFavoriteAction(formData: FormData) {
+  const ctx = await requireShop();
+  const productId = String(formData.get("productId") ?? "");
+  const on = formData.get("on") === "1";
+  const product = await db.product.findUnique({ where: { id: productId }, select: { supplierId: true } });
+  if (!product || !(await supplierForShop(ctx.shop.territoryId, product.supplierId))) return;
+  if (on) {
+    await db.favoriteProduct.upsert({ where: { shopId_productId: { shopId: ctx.shop.id, productId } }, update: {}, create: { shopId: ctx.shop.id, productId } });
+  } else {
+    await db.favoriteProduct.deleteMany({ where: { shopId: ctx.shop.id, productId } });
+  }
+  revalidatePath(`/shop/suppliers/${product.supplierId}`, "layout");
 }

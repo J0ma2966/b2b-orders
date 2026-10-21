@@ -321,3 +321,18 @@ export async function stockOperationAction(_prev: FormState, formData: FormData)
   revalidatePath(`/supplier/catalog/${unit.productId}`);
   return success("Остаток обновлён");
 }
+
+// П6: порог «мало на складе» по единице
+export async function lowStockThresholdAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const unitId = String(formData.get("unitId") ?? "");
+  const raw = String(formData.get("threshold") ?? "").trim();
+  const threshold = raw ? parseAmount(raw) : null;
+  if (raw && (threshold === null || threshold < 0)) return { fieldErrors: { threshold: ["Число от 0"] }, values: formValues(formData) };
+  const unit = await db.productUnit.findUnique({ where: { id: unitId }, include: { product: true } });
+  if (!unit || unit.product.supplierId !== ctx.supplier.id) return { error: "Товар не найден" };
+  await db.productUnit.update({ where: { id: unitId }, data: { lowStockThreshold: threshold } });
+  await writeAudit({ entity: "ProductUnit", entityId: unitId, action: "stock.threshold", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, changes: [{ field: "lowStockThreshold", old: unit.lowStockThreshold?.toString() ?? null, new: threshold }] });
+  revalidatePath("/supplier/stock", "layout");
+  return success(threshold === null ? "Порог убран" : "Порог сохранён");
+}

@@ -3,13 +3,15 @@ import { notFound } from "next/navigation";
 import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
-import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedItemForm, OrderStatusForm, ResolveProblemForm } from "@/components/orders/supplier-forms";
+import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedItemForm, OrderStatusForm, ReadyAndAssignForm, ResolveProblemForm } from "@/components/orders/supplier-forms";
+import { paymentDue } from "@/lib/accounts";
+import { fileUrl } from "@/lib/storage";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import { formatPhone } from "@/lib/phone";
 import { availableSupplierOrderActions, canAssignCourier, canEditForced, CLOSED, PAYMENT_LABEL, RECEIVED } from "@/lib/order-core";
-import { orderEvents } from "@/lib/orders";
+import { orderEvents, suggestedCourier } from "@/lib/orders";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { Badge } from "@/components/ui";
 import { removeForcedAction } from "../actions";
@@ -26,9 +28,10 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
   if (!order || order.supplierId !== ctx.supplier.id || order.status === "DRAFT") notFound();
   const editable = canEditForced(order.status);
   const assignable = canAssignCourier(order.status);
+  const quickReady = ctx.supplier.skipAssembly && (order.status === "ACCEPTED" || order.status === "ASSEMBLING");
   const [events, couriers, units] = await Promise.all([
     orderEvents(order.id),
-    assignable
+    assignable || quickReady
       ? db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: { include: { _count: { select: { courierOrders: { where: { status: { in: ["ASSIGNED", "IN_TRANSIT"] } } } } } } } } })
       : [],
     editable
@@ -42,6 +45,12 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
   const actions = availableSupplierOrderActions(order.status);
   const received = RECEIVED.includes(order.status);
   const account = await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } });
+  const open = !CLOSED.includes(order.status);
+  const [due, suggested] = await Promise.all([
+    open ? paymentDue(db, { id: order.id, shopId: order.shopId, supplierId: order.supplierId, total: Number(order.total), placedAt: order.placedAt }) : null,
+    assignable || quickReady ? suggestedCourier(ctx.supplier.id, order.shop.territoryId) : null,
+  ]);
+  const courierOptions = couriers.map((c) => ({ id: c.userId, name: c.user.fullName, active: c.user._count.courierOrders }));
   return (
     <>
       <PageHeader
@@ -57,14 +66,29 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
       <div className="space-y-4">
         {order.cancelReason && (
           <Alert tone="error">
-            {t(order.cancelledBy === "SHOP" ? "Магазин отменил заказ {date}. Причина: {reason}" : "Заказ отменён поставщиком {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
+            {t(order.cancelledBy === "SHOP" ? "Магазин отменил заказ {date}. Причина: {reason}" : order.cancelledBy === "PLATFORM" ? "Заказ отменён автоматически {date}. Причина: {reason}" : "Заказ отменён поставщиком {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
           </Alert>
         )}
         {order.status === "NEEDS_CONFIRMATION" && (
           <Card><CancelRequestDecisionForm orderId={order.id} reason={order.cancelRequestReason ?? ""} /></Card>
         )}
+        {due && due.overLimit > 0 && (
+          <Alert tone="warning">{t("Заказ выше кредитного лимита магазина на {sum}. При доставке нужно получить не менее {required}.", { sum: t.money(due.overLimit), required: t.money(due.required) })}</Alert>
+        )}
+        {due && due.aging && due.aging.overdueAmount > 0 && (
+          <Alert tone="error">{t("У магазина просрочен долг {sum} ({days} дн.). Заказ нужно получить полностью: {required}.", { sum: t.money(due.aging.overdueAmount), days: due.aging.overdueDays, required: t.money(due.required) })}</Alert>
+        )}
         {order.status === "DELIVERY_PROBLEM" && (
           <Card><ResolveProblemForm orderId={order.id} note={order.problemNote ?? ""} /></Card>
+        )}
+        {order.problemPhotoPaths.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {order.problemPhotoPaths.map((p) => (
+              <a key={p} href={fileUrl(p) ?? "#"} target="_blank" rel="noreferrer">
+                <img src={fileUrl(p) ?? ""} alt="" className="size-24 rounded-lg object-cover ring-1 ring-gray-200" />
+              </a>
+            ))}
+          </div>
         )}
         {order.status === "NOT_DELIVERED" && order.problemNote && <Alert tone="error">{t("Не доставлен: {note}", { note: order.problemNote })}</Alert>}
         {received && (
@@ -74,8 +98,9 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
             <Link className="rounded-lg bg-surface px-3 py-2 text-sm ring-1 ring-gray-300" href={`/supplier/shops/${order.shopId}`}>{t("💰 Счёт магазина")}</Link>
           </div>
         )}
-        {!CLOSED.includes(order.status) && actions.length > 0 && (
-          <Card>
+        {open && actions.length > 0 && (
+          <Card className="space-y-3">
+            {quickReady && <ReadyAndAssignForm orderId={order.id} couriers={courierOptions} suggested={suggested} />}
             <OrderStatusForm orderId={order.id} actions={actions} />
           </Card>
         )}
@@ -131,7 +156,8 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                 items={[
                   ["Адрес", order.deliveryAddress],
                   ["Контакт", order.contactName && <>{order.contactName}, <a className="text-brand-600" href={`tel:${order.contactPhone}`}>{formatPhone(order.contactPhone ?? "")}</a></>],
-                  ["Желаемая дата", order.deliveryDate ? t.date(order.deliveryDate) : null],
+                  ["Дата доставки", order.deliveryDate ? t.date(order.deliveryDate) : null],
+                  ["К оплате при получении", due ? t.money(due.required) : null],
                   ["Оплата", order.paymentMethod ? t(PAYMENT_LABEL[order.paymentMethod]) : null],
                   ["Комментарий", order.comment],
                   ["Комиссия платформы", order.commissionRate !== null ? `${order.commissionRate.toString()}%` : null],
@@ -147,11 +173,7 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
               <Card>
                 <h2 className="mb-3 font-semibold">{t("Доставка")}</h2>
                 {assignable ? (
-                  <AssignCourierForm
-                    orderId={order.id}
-                    current={order.courierId}
-                    couriers={couriers.map((c) => ({ id: c.userId, name: c.user.fullName, active: c.user._count.courierOrders }))}
-                  />
+                  <AssignCourierForm orderId={order.id} current={order.courierId} suggested={suggested} couriers={courierOptions} />
                 ) : (
                   <p className="text-sm">{order.courier!.fullName}, {formatPhone(order.courier!.phone)}</p>
                 )}

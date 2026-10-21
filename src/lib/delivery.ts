@@ -8,7 +8,8 @@ import { formatMoney } from "@/lib/format";
 import { addEvent, lockOrder, notifyShop, OrderError, releaseAll, shopNote } from "@/lib/orders";
 import { normalizeQrInput, sameToken } from "@/lib/qr-token";
 import { creditCheck, distributePayment } from "./finance-core";
-import { orderTotal, validQty } from "./order-core";
+import { accountState } from "./accounts";
+import { failsShopCheck, orderTotal, problemText, validQty, type ProblemReason } from "./order-core";
 
 type Tx = Prisma.TransactionClient;
 type Actor = { userId: string | null; onBehalfOfUserId: string | null };
@@ -67,34 +68,43 @@ export async function startDelivery(courierId: string, orderId: string) {
   });
 }
 
-export async function reportProblem(courierId: string, orderId: string, note: string) {
+export type ProblemInput = { reason: ProblemReason; note: string | null; photoPaths?: string[] };
+
+// Д3: причина из списка, пояснение и фото; поставщик решает, что делать дальше
+export async function reportProblem(courierId: string, orderId: string, p: ProblemInput) {
   const actor = await currentActor();
+  const text = problemText(p.reason, p.note);
   await db.$transaction(async (tx) => {
     const order = await courierOrder(tx, orderId, courierId);
     if (order.status !== "IN_TRANSIT") throw new OrderError("Сообщить о проблеме можно, когда заказ в пути");
-    await tx.order.update({ where: { id: order.id }, data: { status: "DELIVERY_PROBLEM", problemNote: note } });
-    await addEvent(tx, order.id, { type: "delivery.problem", from: order.status, to: "DELIVERY_PROBLEM", comment: note, actorRole: "COURIER" }, actor);
-    await notifySupplierStaff(order.supplierId, { type: "order.problem", title: `Проблема с доставкой №${order.number}`, body: note, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: "DELIVERY_PROBLEM", problemNote: text, problemReason: p.reason, problemPhotoPaths: p.photoPaths ?? [], problemAt: new Date(), staleRemindedAt: null },
+    });
+    await addEvent(tx, order.id, { type: "delivery.problem", from: order.status, to: "DELIVERY_PROBLEM", comment: text, actorRole: "COURIER" }, actor);
+    await notifySupplierStaff(order.supplierId, { type: "order.problem", title: `Проблема с доставкой №${order.number}`, body: text, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
   });
 }
 
 // Магазина нет на месте или заказ невозможно передать: резерв освобождается (ТЗ п. 13, 26).
-export async function markNotDelivered(courierId: string, orderId: string, reason: string) {
+export async function markNotDelivered(courierId: string, orderId: string, p: ProblemInput) {
   const actor = await currentActor();
+  const text = problemText(p.reason, p.note);
   await db.$transaction(async (tx) => {
     const order = await courierOrder(tx, orderId, courierId);
     if (order.status !== "IN_TRANSIT" && order.status !== "DELIVERY_PROBLEM") throw new OrderError("Действие недоступно");
     await releaseAll(tx, order, actor, "Заказ не доставлен");
-    await tx.order.update({ where: { id: order.id }, data: { status: "NOT_DELIVERED", problemNote: reason, qrToken: null } });
-    await addEvent(tx, order.id, { type: "delivery.not_delivered", from: order.status, to: "NOT_DELIVERED", comment: reason, actorRole: "COURIER" }, actor);
-    // Новый магазин, которого не оказалось на месте, получает статус «Не прошёл проверку» (решение этапа 1)
+    const photos = p.photoPaths?.length ? p.photoPaths : order.problemPhotoPaths;
+    await tx.order.update({ where: { id: order.id }, data: { status: "NOT_DELIVERED", problemNote: text, problemReason: p.reason, problemPhotoPaths: photos, qrToken: null } });
+    await addEvent(tx, order.id, { type: "delivery.not_delivered", from: order.status, to: "NOT_DELIVERED", comment: text, actorRole: "COURIER" }, actor);
+    // Л6: «Не прошёл проверку» — только новый магазин, которого не было на месте или который отказался
     const shop = await tx.shop.findUniqueOrThrow({ where: { id: order.shopId } });
-    if (shop.status === "NEW") {
+    if (shop.status === "NEW" && failsShopCheck(p.reason)) {
       await tx.shop.update({ where: { id: shop.id }, data: { status: "FAILED_CHECK" } });
-      await tx.shopStatusHistory.create({ data: { shopId: shop.id, fromStatus: "NEW", toStatus: "FAILED_CHECK", reason: `Заказ №${order.number} не доставлен: ${reason}`, userId: actor.userId } });
+      await tx.shopStatusHistory.create({ data: { shopId: shop.id, fromStatus: "NEW", toStatus: "FAILED_CHECK", reason: `Заказ №${order.number} не доставлен: ${text}`, userId: actor.userId } });
     }
-    await notifySupplierStaff(order.supplierId, { type: "order.not_delivered", title: `Заказ №${order.number} не доставлен`, body: reason, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
-    await notifyShop(order.shopId, shopNote(order, "не доставлен", reason), tx);
+    await notifySupplierStaff(order.supplierId, { type: "order.not_delivered", title: `Заказ №${order.number} не доставлен`, body: text, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
+    await notifyShop(order.shopId, shopNote(order, "не доставлен", text), tx);
   });
 }
 
@@ -146,7 +156,8 @@ export async function confirmDelivery(courierId: string, orderId: string, input:
     const account = await lockAccount(tx, order.shopId, order.supplierId);
     const before = num(account.balance);
     const dist = distributePayment(total, input.received, before);
-    const creditError = creditCheck({ creditAllowed: account.creditAllowed, creditLimit: account.creditLimit === null ? null : num(account.creditLimit) }, before, dist.balanceAfter);
+    const { terms } = await accountState(tx, order.shopId, order.supplierId);
+    const creditError = creditCheck(terms, before, dist.balanceAfter);
     if (creditError) throw new OrderError(creditError);
 
     const label = `Заказ №${order.number}`;
@@ -310,12 +321,12 @@ export async function correctBalance(supplierId: string, shopId: string, amount:
   });
 }
 
-export async function setCredit(supplierId: string, shopId: string, creditAllowed: boolean, creditLimit: number | null) {
+export async function setCredit(supplierId: string, shopId: string, creditAllowed: boolean, creditLimit: number | null, paymentTermDays: number | null = null) {
   return db.$transaction(async (tx) => {
     if (!(await supplierServesShop(tx, supplierId, shopId))) throw new OrderError("Магазин не найден");
     const account = await lockAccount(tx, shopId, supplierId);
-    await tx.shopAccount.update({ where: { id: account.id }, data: { creditAllowed, creditLimit } });
-    return { before: { creditAllowed: account.creditAllowed, creditLimit: account.creditLimit?.toString() ?? null } };
+    await tx.shopAccount.update({ where: { id: account.id }, data: { creditAllowed, creditLimit, paymentTermDays } });
+    return { before: { creditAllowed: account.creditAllowed, creditLimit: account.creditLimit?.toString() ?? null, paymentTermDays: account.paymentTermDays } };
   });
 }
 

@@ -7,7 +7,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { SUPPLIER_ACTION_LABEL, SUPPLIER_ACTION_NEEDS_REASON, type SupplierOrderAction } from "@/lib/order-core";
-import { addForcedAction, assignCourierAction, cancelRequestDecisionAction, orderCorrectionAction, orderStatusAction, resolveProblemAction } from "@/app/supplier/orders/actions";
+import { addForcedAction, assignCourierAction, cancelRequestDecisionAction, orderCorrectionAction, orderStatusAction, readyAndAssignAction, resolveProblemAction } from "@/app/supplier/orders/actions";
 import { useT } from "@/lib/i18n/client";
 
 export function OrderStatusForm({ orderId, actions }: { orderId: string; actions: SupplierOrderAction[] }) {
@@ -55,7 +55,30 @@ export function OrderStatusForm({ orderId, actions }: { orderId: string; actions
   );
 }
 
-export function AssignCourierForm({ orderId, couriers, current }: { orderId: string; couriers: { id: string; name: string; active: number }[]; current: string | null }) {
+// П2: принятый заказ сразу готов и уходит доставщику
+export function ReadyAndAssignForm({ orderId, couriers, suggested }: { orderId: string; couriers: { id: string; name: string; active: number }[]; suggested: string | null }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(readyAndAssignAction, initialFormState);
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <input type="hidden" name="orderId" value={orderId} />
+      <div className="flex flex-wrap items-end gap-2">
+        {couriers.length > 0 && (
+          <Select name="courierId" defaultValue={suggested ?? ""} className="w-auto" aria-label={t("Доставщик")}>
+            <option value="">{t("— без доставщика —")}</option>
+            {couriers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
+            ))}
+          </Select>
+        )}
+        <SubmitButton pendingText="…">{t("Готов и назначить доставщика")}</SubmitButton>
+      </div>
+    </ActionForm>
+  );
+}
+
+export function AssignCourierForm({ orderId, couriers, current, suggested = null }: { orderId: string; couriers: { id: string; name: string; active: number }[]; current: string | null; suggested?: string | null }) {
   const t = useT();
   const [state, action, pending] = useActionState(assignCourierAction, initialFormState);
   return (
@@ -67,10 +90,10 @@ export function AssignCourierForm({ orderId, couriers, current }: { orderId: str
       ) : (
         <>
           <Field label="Доставщик" name="courierId">
-            <Select name="courierId" defaultValue={current ?? ""}>
+            <Select name="courierId" defaultValue={current ?? suggested ?? ""}>
               <option value="">{t("— не назначен —")}</option>
               {couriers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}</option>
+                <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
               ))}
             </Select>
           </Field>

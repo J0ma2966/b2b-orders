@@ -5,6 +5,8 @@ import { requireSuperAdmin } from "@/lib/auth/current";
 import { defaultCommissionRate } from "@/lib/orders";
 import { parsePeriod, periodRange, toLocalDateInput } from "@/lib/report-core";
 import { getT } from "@/lib/i18n/server";
+import { InvoiceList } from "@/components/commission/invoice-list";
+import { InvoiceStatusForm, IssueInvoicesForm } from "@/components/commission/invoice-forms";
 
 // Расчётная комиссия по поставщикам за период (ТЗ п. 52–53): ставка берётся из заказа
 export default async function CommissionsPage({ searchParams }: PageProps<"/admin/commissions">) {
@@ -13,10 +15,12 @@ export default async function CommissionsPage({ searchParams }: PageProps<"/admi
   const sp = await searchParams;
   const period = parsePeriod(sp.period);
   const range = periodRange(period, new Date(), { from: typeof sp.from === "string" ? sp.from : undefined, to: typeof sp.to === "string" ? sp.to : undefined });
-  const [orders, suppliers, def] = await Promise.all([
+  const [orders, suppliers, def, invoices, unpaid] = await Promise.all([
     db.order.findMany({ where: { status: { in: ["COMPLETED", "PARTIALLY_ACCEPTED"] }, completedAt: { gte: range.from, lt: range.to } }, select: { supplierId: true, total: true, correctionTotal: true, commissionRate: true } }),
     db.supplier.findMany({ where: { status: { in: ["ACTIVE", "BLOCKED"] } }, select: { id: true, displayName: true, commissionRate: true } }),
     defaultCommissionRate(),
+    db.commissionInvoice.findMany({ include: { supplier: { select: { displayName: true } } }, orderBy: [{ period: "desc" }, { number: "desc" }], take: 100 }),
+    db.commissionInvoice.aggregate({ where: { status: "ISSUED" }, _sum: { amount: true } }),
   ]);
   const rows = suppliers.map((s) => {
     const mine = orders.filter((o) => o.supplierId === s.id);
@@ -42,6 +46,16 @@ export default async function CommissionsPage({ searchParams }: PageProps<"/admi
           </table>
         </Card>
       )}
+      <section className="mt-8 space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">{t("Счета на комиссию")}</h2>
+            <p className="text-sm text-gray-500">{t("Выставляются автоматически 1-го числа за прошлый месяц. Не оплачено: {sum}", { sum: t.money(unpaid._sum.amount ?? 0) })}</p>
+          </div>
+          <IssueInvoicesForm />
+        </div>
+        {invoices.length === 0 ? <EmptyState>{t("Счетов пока нет")}</EmptyState> : <InvoiceList rows={invoices} action={(r) => <InvoiceStatusForm invoiceId={r.id} />} />}
+      </section>
     </>
   );
 }

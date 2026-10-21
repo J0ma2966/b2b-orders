@@ -4,9 +4,13 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
-import { writeAudit } from "@/lib/audit";
+import { diffFields, writeAudit } from "@/lib/audit";
+import { generateTempPassword, hashPassword } from "@/lib/auth/password";
+import { destroyAllUserSessions } from "@/lib/auth/session";
+import { JOB_DEFAULTS, JOB_SETTINGS_KEY, jobSettings } from "@/lib/jobs";
+import { issueCommissionInvoices } from "@/lib/commission-invoices";
 import { notifySupplierStaff, notifyUsers } from "@/lib/notify";
-import { invalid, opt, parseForm, req, type FormState } from "@/lib/forms";
+import { formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
 import {
   SUPPLIER_ACTION_NEEDS_COMMENT,
   SUPPLIER_STATUS_LABEL,
@@ -130,6 +134,66 @@ export async function setDefaultCommissionAction(_prev: FormState, formData: For
   });
   revalidatePath("/admin/settings");
   return { ok: true, message: `Стандартная комиссия: ${r.data}%` };
+}
+
+// Сроки фоновых правил (Л2, Л7): 0 — правило выключено
+export async function setJobSettingsAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireSuperAdmin();
+  const next = { ...JOB_DEFAULTS };
+  const fieldErrors: Record<string, string[]> = {};
+  for (const k of Object.keys(JOB_DEFAULTS) as (keyof typeof JOB_DEFAULTS)[]) {
+    const n = Number(String(formData.get(k) ?? "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0 || n > 24 * 30) fieldErrors[k] = ["Часы от 0 до 720"];
+    else next[k] = n;
+  }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, values: formValues(formData) };
+  if (next.placedAutoCancelHours > 0 && next.placedRemindHours >= next.placedAutoCancelHours) {
+    return { fieldErrors: { placedRemindHours: ["Напоминание должно быть раньше автоотмены"] }, values: formValues(formData) };
+  }
+  const prev = await jobSettings();
+  await db.platformSetting.upsert({ where: { key: JOB_SETTINGS_KEY }, update: { value: next }, create: { key: JOB_SETTINGS_KEY, value: next } });
+  await writeAudit({ entity: "PlatformSetting", entityId: JOB_SETTINGS_KEY, action: "update", actorRole: "SUPER_ADMIN", changes: diffFields(prev, next, Object.keys(next) as (keyof typeof next)[]) });
+  revalidatePath("/admin/settings");
+  return success("Сроки сохранены");
+}
+
+// А1: счета на комиссию
+export async function issueInvoicesAction(_prev: FormState): Promise<FormState> {
+  await requireSuperAdmin();
+  const n = await issueCommissionInvoices();
+  await writeAudit({ entity: "CommissionInvoice", entityId: "-", action: "issue", actorRole: "SUPER_ADMIN", comment: `issued ${n}` });
+  revalidatePath("/admin/commissions");
+  return success(n > 0 ? `Выставлено счетов: ${n}` : "Новых счетов нет: за прошлый месяц всё выставлено");
+}
+
+export async function invoiceStatusAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireSuperAdmin();
+  const id = String(formData.get("invoiceId") ?? "");
+  const to = String(formData.get("status") ?? "");
+  if (to !== "PAID" && to !== "CANCELLED") return { error: "Неизвестное действие" };
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  const { count } = await db.commissionInvoice.updateMany({ where: { id, status: "ISSUED" }, data: { status: to, paidAt: to === "PAID" ? new Date() : null, comment } });
+  if (count === 0) return { error: "Счёт уже закрыт" };
+  const inv = await db.commissionInvoice.findUniqueOrThrow({ where: { id } });
+  await writeAudit({ entity: "CommissionInvoice", entityId: id, action: `status.${to}`, actorRole: "SUPER_ADMIN", supplierId: inv.supplierId, comment, changes: [{ field: "status", old: "ISSUED", new: to }] });
+  if (to === "PAID") {
+    await notifySupplierStaff(inv.supplierId, { type: "commission.paid", title: `Счёт на комиссию №${inv.number} отмечен оплаченным`, link: "/supplier/commission", entity: "CommissionInvoice", entityId: id }, ["OWNER"]);
+  }
+  revalidatePath("/admin/commissions");
+  return success(to === "PAID" ? "Счёт отмечен оплаченным" : "Счёт аннулирован");
+}
+
+// М7: сброс пароля пользователю — временный пароль, при входе система попросит задать свой
+export async function adminResetPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireSuperAdmin();
+  const user = await db.user.findUnique({ where: { id: String(formData.get("userId") ?? "") } });
+  if (!user) return { error: "Пользователь не найден" };
+  if (user.isSuperAdmin) return { error: "Пароль супер-администратора меняется только им самим" };
+  const tempPassword = generateTempPassword();
+  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(tempPassword), mustChangePassword: true } });
+  await destroyAllUserSessions(user.id);
+  await writeAudit({ entity: "User", entityId: user.id, action: "password.reset", actorRole: "SUPER_ADMIN" });
+  return { ok: true, message: `Временный пароль для ${user.fullName}: ${tempPassword}. Передайте его пользователю — при входе он задаст свой.` };
 }
 
 // ───────────── Магазины (ТЗ п. 13) ─────────────

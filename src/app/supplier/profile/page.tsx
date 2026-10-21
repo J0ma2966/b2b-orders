@@ -3,6 +3,8 @@ import { requireSupplier } from "@/lib/auth/current";
 import { getTerritoryOptions } from "@/lib/territory";
 import { fileUrl } from "@/lib/storage";
 import { ProfileForm } from "./form";
+import { OrderTermsForm } from "./terms-form";
+import { Tr } from "@/components/ui/tr";
 
 export default async function SupplierProfilePage() {
   const ctx = await requireSupplier(["OWNER", "ADMIN"]);
@@ -30,6 +32,18 @@ export default async function SupplierProfilePage() {
             officeAddress: s.officeAddress,
             officeLat: s.officeLat?.toString() ?? "",
             officeLng: s.officeLng?.toString() ?? "",
+          }}
+        />
+      </Card>
+      <Card className="mt-6 max-w-3xl">
+        <h2 className="mb-1 text-base font-semibold"><Tr>Условия заказа</Tr></h2>
+        <p className="mb-4 text-sm text-gray-500"><Tr>Дни доставки задаются по районам на странице «Территория доставки».</Tr></p>
+        <OrderTermsForm
+          defaults={{
+            minOrderTotal: s.minOrderTotal?.toString() ?? "",
+            orderCutoffHour: s.orderCutoffHour?.toString() ?? "",
+            creditOverLimitBlock: s.creditOverLimitBlock,
+            skipAssembly: s.skipAssembly,
           }}
         />
       </Card>

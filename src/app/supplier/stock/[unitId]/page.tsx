@@ -6,6 +6,7 @@ import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import { MOVEMENT_LABEL } from "@/lib/stock-core";
 import { getT } from "@/lib/i18n/server";
+import { ThresholdForm } from "./threshold-form";
 
 // Журнал складских операций по единице товара (ТЗ п. 20)
 export default async function StockJournalPage({ params }: PageProps<"/supplier/stock/[unitId]">) {
@@ -27,6 +28,12 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
         title={`${unit.product.name} · ${t(unitName(unit))}`}
         subtitle={<Link href={`/supplier/catalog/${unit.productId}`} className="text-brand-600">{t("← К товару")}</Link>}
       />
+      <Card className="mb-4">
+        <p className="mb-3 text-sm">
+          {t("Доступно {qty}", { qty: formatQty(Number(unit.physicalQty) - Number(unit.reservedQty)) })} · {t("на складе {qty}", { qty: formatQty(unit.physicalQty) })} · {t("в резерве {qty}", { qty: formatQty(unit.reservedQty) })}
+        </p>
+        <ThresholdForm unitId={unit.id} current={unit.lowStockThreshold?.toString() ?? ""} />
+      </Card>
       <Card className="overflow-x-auto p-0 sm:p-0">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-gray-200 text-left text-xs text-gray-500">

@@ -4,6 +4,7 @@ import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { formatPhone } from "@/lib/phone";
+import { ResetPasswordForm } from "@/components/admin/reset-password-form";
 import { fileUrl } from "@/lib/storage";
 import { loadTerritoryMap } from "@/lib/territory";
 import { territoryLabel } from "@/lib/territory-core";
@@ -86,12 +87,15 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
                       {t(SUPPLIER_ROLE_LABEL[m.role])} · {formatPhone(m.user.phone)}{!m.isActive && ` · ${t("отключён")}`}
                     </div>
                   </div>
-                  {m.isActive && (
-                    <form action={startImpersonationAction}>
-                      <input type="hidden" name="memberId" value={m.id} />
-                      <button className="text-sm text-brand-600 hover:underline">{t("Действовать от имени")}</button>
-                    </form>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {m.isActive && (
+                      <form action={startImpersonationAction}>
+                        <input type="hidden" name="memberId" value={m.id} />
+                        <button className="text-sm text-brand-600 hover:underline">{t("Действовать от имени")}</button>
+                      </form>
+                    )}
+                    {!m.user.isSuperAdmin && <ResetPasswordForm userId={m.userId} />}
+                  </div>
                 </li>
               ))}
             </ul>

@@ -22,10 +22,15 @@ export async function setCreditAction(_prev: FormState, formData: FormData): Pro
   const limitRaw = String(formData.get("creditLimit") ?? "").trim();
   const creditLimit = limitRaw ? parseAmount(limitRaw) : null;
   if (limitRaw && (creditLimit === null || creditLimit < 0)) return { fieldErrors: { creditLimit: ["Неверная сумма"] }, values: formValues(formData) };
-  const r = await setCredit(ctx.supplier.id, shopId, creditAllowed, creditLimit);
+  const termRaw = String(formData.get("paymentTermDays") ?? "").trim();
+  const paymentTermDays = termRaw ? Number(termRaw) : null;
+  if (paymentTermDays !== null && (!Number.isInteger(paymentTermDays) || paymentTermDays < 1 || paymentTermDays > 365)) {
+    return { fieldErrors: { paymentTermDays: ["Число дней от 1 до 365"] }, values: formValues(formData) };
+  }
+  const r = await setCredit(ctx.supplier.id, shopId, creditAllowed, creditLimit, paymentTermDays);
   await writeAudit({
     entity: "ShopAccount", entityId: shopId, action: "credit.update", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, shopId,
-    changes: [{ field: "creditAllowed", old: r.before.creditAllowed, new: creditAllowed }, { field: "creditLimit", old: r.before.creditLimit, new: creditLimit }],
+    changes: [{ field: "creditAllowed", old: r.before.creditAllowed, new: creditAllowed }, { field: "creditLimit", old: r.before.creditLimit, new: creditLimit }, { field: "paymentTermDays", old: r.before.paymentTermDays, new: paymentTermDays }],
   });
   revalidatePath("/supplier/shops", "layout");
   return success(creditAllowed ? `Работа в долг разрешена${creditLimit !== null ? `, лимит ${formatMoney(creditLimit)}` : ""}` : "Работа в долг запрещена");

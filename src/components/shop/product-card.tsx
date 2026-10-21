@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { QuickAddButton } from "@/components/orders/shop-forms";
+import { FavoriteButton, QuickAddButton } from "@/components/orders/shop-forms";
 import { formatQty, unitName } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
 import { fileUrl } from "@/lib/storage-url";
@@ -9,11 +9,43 @@ type Unit = { id: string; kind: UnitKind; customName: string; price: { toString(
 type Product = { id: string; name: string; photoPaths: string[]; units: Unit[] };
 
 // Карточка товара на витрине: фото, цена за каждую единицу продажи и кнопка «+» в корзину
-export async function ProductCard({ p, supplierId, href, canOrder = true }: { p: Product; supplierId: string; href: string; canOrder?: boolean }) {
+export type PromoBadge = { name: string; triggerQty: { toString(): string }; giftQty: { toString(): string }; giftUnitId: string; triggerUnitId: string };
+
+// Короткая надпись акции: «10+1», если подарок — тот же товар, иначе «подарок»
+export function promoLabel(p: PromoBadge) {
+  return p.giftUnitId === p.triggerUnitId ? `${formatQty(p.triggerQty)}+${formatQty(p.giftQty)}` : null;
+}
+
+export async function ProductCard({
+  p,
+  supplierId,
+  href,
+  canOrder = true,
+  promos,
+  favorite,
+}: {
+  p: Product;
+  supplierId: string;
+  href: string;
+  canOrder?: boolean;
+  promos?: Map<string, PromoBadge>;
+  favorite?: boolean;
+}) {
   const t = await getT();
   const photo = fileUrl(p.photoPaths[0]);
+  const promo = p.units.map((u) => promos?.get(u.id)).find(Boolean);
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl bg-surface ring-1 ring-black/5">
+    <div className="relative flex flex-col overflow-hidden rounded-2xl bg-surface ring-1 ring-black/5">
+      {promo && (
+        <span title={promo.name} className="absolute top-2 left-2 z-[1] rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-on-accent shadow-sm">
+          🎁 {promoLabel(promo) ? t("Акция {n}", { n: promoLabel(promo) }) : t("Подарок")}
+        </span>
+      )}
+      {favorite !== undefined && (
+        <div className="absolute top-2 right-2 z-[1]">
+          <FavoriteButton productId={p.id} on={favorite} label={p.name} />
+        </div>
+      )}
       <Link href={href} className="group block">
         {photo ? (
           <img src={photo} alt="" className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]" />

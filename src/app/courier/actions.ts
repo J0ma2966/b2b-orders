@@ -9,6 +9,8 @@ import { OrderError } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { formValues, success, type FormState } from "@/lib/forms";
 import { StockError } from "@/lib/stock";
+import { isProblemReason, problemText } from "@/lib/order-core";
+import { realFiles, saveImage, UploadError } from "@/lib/storage";
 
 function fail(e: unknown, formData: FormData): FormState {
   if (e instanceof OrderError || e instanceof StockError) return { error: e.message, values: formValues(formData) };
@@ -37,15 +39,25 @@ export async function problemAction(_prev: FormState, formData: FormData): Promi
   const { ctx, courierId } = await courier();
   const orderId = String(formData.get("orderId") ?? "");
   const kind = String(formData.get("kind") ?? "problem");
-  const note = String(formData.get("note") ?? "").trim();
-  if (!note) return { fieldErrors: { note: ["Опишите, что случилось"] }, values: formValues(formData) };
+  const reason = String(formData.get("reason") ?? "");
+  const note = String(formData.get("note") ?? "").trim() || null;
+  if (!isProblemReason(reason)) return { fieldErrors: { reason: ["Выберите причину"] }, values: formValues(formData) };
+  if (reason === "OTHER" && !note) return { fieldErrors: { note: ["Опишите, что случилось"] }, values: formValues(formData) };
+  let photoPaths: string[];
   try {
-    if (kind === "not_delivered") await markNotDelivered(courierId, orderId, note);
-    else await reportProblem(courierId, orderId, note);
+    photoPaths = await Promise.all(realFiles(formData, "photos", 3).map((f) => saveImage(f, "problems")));
+  } catch (e) {
+    if (e instanceof UploadError) return { fieldErrors: { photos: [e.message] }, values: formValues(formData) };
+    throw e;
+  }
+  try {
+    if (kind === "not_delivered") await markNotDelivered(courierId, orderId, { reason, note, photoPaths });
+    else await reportProblem(courierId, orderId, { reason, note, photoPaths });
   } catch (e) {
     return fail(e, formData);
   }
-  await writeAudit({ entity: "Order", entityId: orderId, action: kind === "not_delivered" ? "delivery.not_delivered" : "delivery.problem", actorRole: "COURIER", supplierId: ctx.supplier.id, comment: note });
+  const text = problemText(reason, note);
+  await writeAudit({ entity: "Order", entityId: orderId, action: kind === "not_delivered" ? "delivery.not_delivered" : "delivery.problem", actorRole: "COURIER", supplierId: ctx.supplier.id, comment: text });
   revalidatePath("/courier", "layout");
   return success(kind === "not_delivered" ? "Заказ отмечен как недоставленный, товар вернётся на склад" : "Поставщик получил сообщение о проблеме");
 }

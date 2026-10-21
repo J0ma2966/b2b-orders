@@ -238,3 +238,63 @@ export function orderStatusFilter(value: string): { not: OrderStatus } | { in: O
   if (value in ORDER_STATUS_LABEL && value !== "DRAFT") return value as OrderStatus;
   return { not: "DRAFT" };
 }
+
+// ───────────── Условия заказа поставщика (П5) ─────────────
+
+const TZ_OFFSET_MS = 5 * 3_600_000; // Ташкент, UTC+5 без перехода на летнее время
+
+// Календарная дата в Ташкенте как UTC-полночь (так хранится deliveryDate).
+export function tashkentDay(at: Date, plusDays = 0) {
+  const local = new Date(at.getTime() + TZ_OFFSET_MS);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + plusDays));
+}
+
+// 1 — понедельник … 7 — воскресенье
+export function isoWeekday(day: Date) {
+  return day.getUTCDay() === 0 ? 7 : day.getUTCDay();
+}
+
+export const WEEKDAY_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+// Даты, на которые можно заказать доставку. До часа приёма — со следующего дня, после — через день;
+// без часа приёма — с сегодняшнего дня. weekdays пусто — доставка каждый день.
+export function deliveryDateOptions(now: Date, rules: { cutoffHour: number | null; weekdays: number[] }, horizonDays = 14) {
+  const localHour = new Date(now.getTime() + TZ_OFFSET_MS).getUTCHours();
+  const first = rules.cutoffHour === null ? 0 : localHour < rules.cutoffHour ? 1 : 2;
+  const out: Date[] = [];
+  for (let d = first; d < first + horizonDays; d++) {
+    const day = tashkentDay(now, d);
+    if (rules.weekdays.length === 0 || rules.weekdays.includes(isoWeekday(day))) out.push(day);
+  }
+  return out;
+}
+
+export function sameDay(a: Date, b: Date) {
+  return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+}
+
+// ───────────── Причины проблем доставки (Д3, Л6) ─────────────
+
+export const PROBLEM_REASONS = {
+  CLOSED: "Магазин закрыт / нет на месте",
+  NO_MONEY: "Нет денег",
+  REFUSED: "Отказ от заказа",
+  ADDRESS: "Не нашёл адрес",
+  OTHER: "Другое",
+} as const;
+
+export type ProblemReason = keyof typeof PROBLEM_REASONS;
+
+export function isProblemReason(v: string): v is ProblemReason {
+  return v in PROBLEM_REASONS;
+}
+
+// Л6: новый магазин «не прошёл проверку», только если его не было на месте или он отказался
+export function failsShopCheck(reason: ProblemReason) {
+  return reason === "CLOSED" || reason === "REFUSED";
+}
+
+// Текст для журнала и уведомлений: причина и пояснение доставщика
+export function problemText(reason: ProblemReason, note: string | null) {
+  return note ? `${PROBLEM_REASONS[reason]}: ${note}` : PROBLEM_REASONS[reason];
+}

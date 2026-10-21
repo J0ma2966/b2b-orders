@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { balanceLabel, OrdersList } from "@/components/orders/order-view";
 import { DebtHistory } from "@/components/orders/debt-history";
 import { CreditForm, DebtPaymentForm } from "@/components/orders/finance-forms";
@@ -11,6 +11,7 @@ import { debtEntries } from "@/lib/delivery";
 import { formatPhone } from "@/lib/phone";
 import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { getT } from "@/lib/i18n/server";
+import { accountState } from "@/lib/accounts";
 
 export default async function SupplierShopPage({ params }: PageProps<"/supplier/shops/[shopId]">) {
   const t = await getT();
@@ -25,6 +26,7 @@ export default async function SupplierShopPage({ params }: PageProps<"/supplier/
   if (!shop || (orders.length === 0 && !account)) notFound();
   const entries = account ? await debtEntries(account.id) : [];
   const balance = Number(account?.balance ?? 0);
+  const { aging } = await accountState(db, shopId, ctx.supplier.id);
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" });
   return (
     <>
@@ -40,6 +42,10 @@ export default async function SupplierShopPage({ params }: PageProps<"/supplier/
             <Card><div className="text-xl font-semibold">{stats._count}</div><div className="text-sm text-gray-500">{t("Получено заказов")}</div></Card>
             <Card><div className="text-xl font-semibold">{t.money(stats._sum.total ?? 0)}</div><div className="text-sm text-gray-500">{t("Оборот")}</div></Card>
           </div>
+          {aging && aging.overdueAmount > 0 && (
+            <Alert tone="error">{t("Просрочено {sum} на {days} дн. Новые заказы магазин получает только с полной оплатой.", { sum: t.money(aging.overdueAmount), days: aging.overdueDays })}</Alert>
+          )}
+          {aging && aging.overdueAmount === 0 && <p className="text-sm text-gray-500">{t("Долг нужно оплатить до {date}", { date: t.date(aging.dueDate) })}</p>}
           <h2 className="font-semibold">{t("История задолженности")}</h2>
           <DebtHistory entries={entries} orderHref={(id) => `/supplier/orders/${id}`} />
           <h2 className="font-semibold">{t("Заказы")}</h2>
@@ -59,7 +65,7 @@ export default async function SupplierShopPage({ params }: PageProps<"/supplier/
           </Card>
           <Card>
             <h2 className="mb-3 font-semibold">{t("Работа в долг")}</h2>
-            <CreditForm shopId={shop.id} creditAllowed={account?.creditAllowed ?? false} creditLimit={account?.creditLimit?.toString() ?? ""} />
+            <CreditForm shopId={shop.id} creditAllowed={account?.creditAllowed ?? false} creditLimit={account?.creditLimit?.toString() ?? ""} paymentTermDays={account?.paymentTermDays?.toString() ?? ""} />
           </Card>
           <Card>
             <h2 className="mb-3 font-semibold">{t("Погашение задолженности")}</h2>

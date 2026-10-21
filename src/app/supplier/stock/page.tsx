@@ -7,6 +7,7 @@ import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import type { Prisma } from "@/generated/prisma/client";
 import { getT } from "@/lib/i18n/server";
+import { lowStockUnitIds } from "@/lib/stock";
 
 // Остатки: физический, резерв, доступный (ТЗ п. 18)
 export default async function StockPage({ searchParams }: PageProps<"/supplier/stock">) {
@@ -16,7 +17,9 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const filter = typeof sp.status === "string" ? sp.status : "";
   const page = pageFrom(sp);
+  const low = filter === "low" ? await lowStockUnitIds(ctx.supplier.id) : [];
   const where: Prisma.ProductUnitWhereInput = {
+    ...(filter === "low" && { id: { in: low } }),
     product: { supplierId: ctx.supplier.id, archivedAt: null, ...(q && { name: { contains: q, mode: "insensitive" } }) },
     ...(filter === "empty" && { physicalQty: { lte: 0 } }),
     ...(filter === "reserved" && { reservedQty: { gt: 0 } }),
@@ -34,7 +37,7 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
   return (
     <>
       <PageHeader title="Остатки" subtitle="Доступный остаток = физический − зарезервированный" />
-      <FilterBar q={q} status={filter} allLabel="Все" statuses={[["empty", "Закончились"], ["reserved", "Есть резерв"]]} placeholder="Товар" />
+      <FilterBar q={q} status={filter} allLabel="Все" statuses={[["low", "Мало на складе"], ["empty", "Закончились"], ["reserved", "Есть резерв"]]} placeholder="Товар" />
       {units.length === 0 ? (
         <EmptyState>{t("Нет товаров")}</EmptyState>
       ) : (
@@ -60,7 +63,10 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.physicalQty)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.reservedQty)}</td>
-                    <td className={`px-4 py-2 text-right font-semibold tabular-nums ${avail <= 0 ? "text-red-600" : ""}`}>{formatQty(avail)}</td>
+                    <td className={`px-4 py-2 text-right font-semibold tabular-nums ${avail <= 0 ? "text-red-600" : u.lowStockThreshold !== null && avail < Number(u.lowStockThreshold) ? "text-yellow-700" : ""}`}>
+                      {formatQty(avail)}
+                      {u.lowStockThreshold !== null && <span className="block text-xs font-normal text-gray-400">{t("порог {qty}", { qty: formatQty(u.lowStockThreshold) })}</span>}
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <Link href={`/supplier/stock/${u.id}`} className="text-xs text-brand-600">{t("Журнал")}</Link>
                     </td>

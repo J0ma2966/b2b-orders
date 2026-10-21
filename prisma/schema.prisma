@@ -43,6 +43,8 @@ model User {
   courierOrders     Order[]          @relation("OrderCourier")
   courierReplacements Replacement[]  @relation("ReplacementCourier")
   pushSubscriptions PushSubscription[]
+  courierTerritories SupplierTerritory[] @relation("TerritoryCourier")
+  cashHandovers      CashHandover[]      @relation("HandoverCourier")
 }
 
 model Session {
@@ -141,6 +143,14 @@ model Supplier {
   hiddenFromShops   Boolean        @default(false)
   ordersDisabled    Boolean        @default(false)
 
+  // Условия заказа (П5): минимальная сумма и приём заказов до часа H (доставка — со следующего дня)
+  minOrderTotal     Decimal?       @db.Decimal(14, 2)
+  orderCutoffHour   Int?
+  // Л1: заказ сверх доступного кредита — запрещать (true) или только предупреждать
+  creditOverLimitBlock Boolean     @default(false)
+  // П2: без отдельной сборки — «Принят» сразу переходит в «Готов к доставке»
+  skipAssembly      Boolean        @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   approvedAt DateTime?
@@ -156,6 +166,8 @@ model Supplier {
   shopAccounts ShopAccount[]
   replacements Replacement[]
   returnedItems ReturnedItem[]
+  cashHandovers CashHandover[]
+  commissionInvoices CommissionInvoice[]
 }
 
 enum SupplierRole {
@@ -183,6 +195,11 @@ model SupplierTerritory {
   supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   territoryId String
   territory   Territory @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  // П5: дни доставки, 1 — понедельник … 7 — воскресенье; пусто — каждый день
+  deliveryWeekdays Int[] @default([])
+  // П8: доставщик, закреплённый за территорией
+  courierId   String?
+  courier     User?     @relation("TerritoryCourier", fields: [courierId], references: [id], onDelete: SetNull)
 
   @@id([supplierId, territoryId])
   @@index([territoryId])
@@ -234,6 +251,7 @@ model Shop {
   accounts      ShopAccount[]
   replacements  Replacement[]
   returnedItems ReturnedItem[]
+  favorites     FavoriteProduct[]
 
   @@index([territoryId])
 }
@@ -363,6 +381,7 @@ model Product {
   updatedAt   DateTime  @updatedAt
 
   units ProductUnit[]
+  favorites FavoriteProduct[]
 
   @@index([supplierId, archivedAt])
   @@index([categoryId])
@@ -393,6 +412,8 @@ model ProductUnit {
   reservedQty Decimal  @default(0) @db.Decimal(14, 3)
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
+  // П6: порог «мало на складе» по доступному остатку; уведомление — при переходе ниже порога
+  lowStockThreshold Decimal? @db.Decimal(14, 3)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -591,6 +612,16 @@ model Order {
   statusBeforeRequest   OrderStatus?
   // Проблема при доставке / причина недоставки
   problemNote String?
+  // Д3: причина из списка (PROBLEM_REASONS) и фото с места
+  problemReason String?
+  problemPhotoPaths String[]
+  problemAt   DateTime?
+  // Л2: напоминание поставщику о заказе без ответа или о нерешённой проблеме уже отправлено
+  staleRemindedAt DateTime?
+  // Л7: напоминание о забытой корзине
+  cartRemindedAt DateTime?
+  // Д2: порядок в маршруте дня доставщика
+  routeOrder  Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -687,6 +718,11 @@ model ShopAccount {
   // Работа в долг разрешается поставщиком (ТЗ п. 39); лимит необязателен (п. 90.15)
   creditAllowed Boolean  @default(false)
   creditLimit   Decimal? @db.Decimal(14, 2)
+  // Л3: отсрочка оплаты в днях; null — без срока
+  paymentTermDays Int?
+  // Срок, о котором уже напомнили магазину, и срок, просрочку которого уже отметили
+  dueRemindedFor  DateTime?
+  overdueNotifiedFor DateTime?
   // > 0 — долг магазина, < 0 — переплата (п. 42)
   balance       Decimal  @default(0) @db.Decimal(14, 2)
   createdAt     DateTime @default(now())
@@ -736,6 +772,7 @@ enum ReplacementStatus {
   ASSIGNED  // передана доставщику
   DONE      // выполнена
   CANCELLED // отменена магазином
+  CREDITED  // Л5: стоимость зачтена в баланс магазина вместо замены
 }
 
 model Replacement {
@@ -760,6 +797,8 @@ model Replacement {
   videoPaths    String[]
   status        ReplacementStatus @default(NEW)
   decisionComment String?
+  // Л5: сумма, зачтённая в баланс магазина
+  creditedAmount Decimal?         @db.Decimal(14, 2)
   courierId     String?
   courier       User?             @relation("ReplacementCourier", fields: [courierId], references: [id])
   // Вариант «привязать к новому заказу» (ТЗ п. 46)
@@ -828,4 +867,65 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ───────────── Касса доставщика (Д1) ─────────────
+
+// Поставщик принял наличные у доставщика. На руках = наличные, полученные по заказам, минус сданное.
+model CashHandover {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  courierId  String
+  courier    User     @relation("HandoverCourier", fields: [courierId], references: [id])
+  amount     Decimal  @db.Decimal(14, 2)
+  // Сколько было на руках в момент приёма: расхождение = onHand − amount
+  onHand     Decimal  @db.Decimal(14, 2)
+  comment    String?
+  acceptedByUserId String?
+  createdAt  DateTime @default(now())
+
+  @@index([supplierId, courierId, createdAt])
+}
+
+// ───────────── Избранное магазина (М4) ─────────────
+
+model FavoriteProduct {
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([shopId, productId])
+}
+
+// ───────────── Счета на комиссию платформы (А1) ─────────────
+
+enum CommissionInvoiceStatus {
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+model CommissionInvoice {
+  id         String   @id @default(cuid())
+  number     Int      @unique @default(autoincrement())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  // Первый день месяца (Ташкент), за который выставлен счёт
+  period     DateTime @db.Date
+  orders     Int
+  turnover   Decimal  @db.Decimal(14, 2)
+  amount     Decimal  @db.Decimal(14, 2)
+  dueDate    DateTime @db.Date
+  status     CommissionInvoiceStatus @default(ISSUED)
+  paidAt     DateTime?
+  comment    String?
+  remindedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([supplierId, period])
+  @@index([status, dueDate])
 }
