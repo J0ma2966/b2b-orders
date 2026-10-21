@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { BULK_FORM, BulkBar } from "@/components/orders/bulk-bar";
@@ -41,7 +42,7 @@ export default async function SupplierOrdersPage({ searchParams }: PageProps<"/s
   );
   return (
     <>
-      <PageHeader title="Заказы" actions={<Link href="/documents/supplier/picking" className="text-sm text-brand-600">{t("Лист сборки")}</Link>} />
+      <PageHeader title="Заказы" actions={<><Link href="/documents/supplier/picking" className="text-sm text-brand-600">{t("Лист сборки")}</Link><ExportLink href={`/api/export/supplier/orders?status=${status}`} /></>} />
       <FilterBar q={q} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" placeholder="Номер или магазин" />
       {rows.length === 0 ? (
         <EmptyState>{t("Заказов не найдено")}</EmptyState>

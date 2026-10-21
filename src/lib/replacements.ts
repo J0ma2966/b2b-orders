@@ -4,12 +4,14 @@ import { db } from "@/lib/db";
 import { applyStock, currentActor, StockError } from "@/lib/stock";
 import { notifySupplierStaff, notifyUsers } from "@/lib/notify";
 import { formatQty } from "@/lib/catalog";
-import { notifyShop, OrderError } from "@/lib/orders";
-import { validQty, RECEIVED } from "./order-core";
+import { formatMoney } from "@/lib/format";
+import { addEvent, notifyShop, OrderError } from "@/lib/orders";
+import { addDebtEntry, lockAccount } from "@/lib/delivery";
+import { lineTotal, validQty, RECEIVED } from "./order-core";
 import { RETURNED_FINAL, RETURNED_STATUS_LABEL } from "./replacement-core";
 
 const num = (v: { toString(): string } | null | undefined) => (v == null ? 0 : Number(v.toString()));
-const ACTIVE: ReplacementStatus[] = ["NEW", "APPROVED", "ASSIGNED", "DONE"];
+const ACTIVE: ReplacementStatus[] = ["NEW", "APPROVED", "ASSIGNED", "DONE", "CREDITED"];
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
@@ -100,6 +102,30 @@ export async function decideReplacement(supplierId: string, id: string, approve:
     if (e instanceof StockError) throw new OrderError("Недостаточно товара на складе для замены");
     throw e;
   }
+}
+
+// Л5: вместо замены — зачесть стоимость в баланс магазина. Сумма — по цене из заказа,
+// долг уменьшается корректирующей записью; товар не возвращается, резерв (если был) снимается.
+export async function creditReplacement(supplierId: string, id: string, comment: string | null, actorRole: string) {
+  const actor = await currentActor();
+  return db.$transaction(async (tx) => {
+    const r = await lockReplacement(tx, id);
+    if (r.supplierId !== supplierId) throw new OrderError("Заявка не найдена");
+    if (!["NEW", "APPROVED", "ASSIGNED"].includes(r.status)) throw new OrderError("Зачесть можно только невыполненную заявку");
+    const item = await tx.orderItem.findUniqueOrThrow({ where: { id: r.orderItemId } });
+    const amount = lineTotal(num(item.price), num(r.qty));
+    if (r.status !== "NEW") {
+      await applyStock(tx, { unitId: r.productUnitId, type: "RELEASE", qty: num(r.qty), reason: `Замена №${r.number} зачтена в баланс`, relatedEntity: "Replacement", relatedId: r.id }, actor);
+    }
+    const text = `Замена №${r.number} зачтена в баланс: ${r.productName} — ${formatQty(num(r.qty))} ${r.unitLabel}`;
+    await tx.order.update({ where: { id: r.orderId }, data: { correctionTotal: { increment: -amount } } });
+    await addEvent(tx, r.orderId, { type: "correction", comment: text, actorRole, data: { amount: formatMoney(-amount) } }, actor);
+    const account = await lockAccount(tx, r.shopId, supplierId);
+    await addDebtEntry(tx, account, { type: "CORRECTION", amount: -amount, orderId: r.orderId, comment: comment ? `${text}. ${comment}` : text }, actor);
+    await tx.replacement.update({ where: { id }, data: { status: "CREDITED", creditedAmount: amount, decisionComment: comment ?? r.decisionComment, decidedAt: r.decidedAt ?? new Date(), courierId: null, newOrderId: null } });
+    await notifyShop(r.shopId, { type: "replacement.credited", title: `Замена №${r.number} зачтена в баланс на ${formatMoney(amount)}`, body: comment ?? undefined, link: "/shop/replacements", entity: "Replacement", entityId: r.id }, tx);
+    return { amount };
+  });
 }
 
 // Отдельное задание доставщику или привязка к новому заказу магазина

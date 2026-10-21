@@ -294,7 +294,7 @@ export async function registerDebtPayment(supplierId: string, shopId: string, am
     if (!(await supplierServesShop(tx, supplierId, shopId))) throw new OrderError("Магазин не найден");
     const account = await lockAccount(tx, shopId, supplierId);
     const entry = await addDebtEntry(tx, account, { type: "DEBT_PAYMENT", amount: -amount, paymentMethod: method, occurredAt, comment }, actor);
-    await notifyShop(shopId, { type: "debt.payment", title: `Зарегистрировано погашение ${formatMoney(amount)}`, body: `Остаток: ${formatMoney(entry!.balanceAfter)}`, link: "/shop/debts", entity: "ShopAccount", entityId: account.id }, tx);
+    await notifyShop(shopId, { type: "debt.payment", title: `Зарегистрировано погашение ${formatMoney(amount)}`, body: `Остаток: ${formatMoney(entry!.balanceAfter)}`, link: "/shop/debts", entity: "ShopAccount", entityId: account.id }, tx, true);
     return entry!;
   });
 }
@@ -316,7 +316,7 @@ export async function correctBalance(supplierId: string, shopId: string, amount:
     }
     const account = await lockAccount(tx, shopId, supplierId);
     const entry = await addDebtEntry(tx, account, { type: "CORRECTION", amount, orderId, comment: reason }, actor);
-    await notifyShop(shopId, { type: "debt.correction", title: `Корректировка задолженности ${amount > 0 ? "+" : ""}${formatMoney(amount)}`, body: reason, link: "/shop/debts", entity: "ShopAccount", entityId: account.id }, tx);
+    await notifyShop(shopId, { type: "debt.correction", title: `Корректировка задолженности ${amount > 0 ? "+" : ""}${formatMoney(amount)}`, body: reason, link: "/shop/debts", entity: "ShopAccount", entityId: account.id }, tx, true);
     return entry!;
   });
 }

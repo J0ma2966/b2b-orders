@@ -9,13 +9,15 @@ export default async function ShopProfilePage() {
   const t = await getT();
   const ctx = await requireShop();
   const s = ctx.shop;
+  const owner = ctx.membership.role === "OWNER";
   const territories = await getTerritoryOptions();
   return (
     <>
       <PageHeader title="Профиль магазина" actions={<>
         <ButtonLink href="/shop/points" variant="secondary">{t("📍 Мои точки")}</ButtonLink>
         <ButtonLink href="/shop/replacements" variant="secondary">{t("🔁 Замены")}</ButtonLink>
-        <ButtonLink href="/shop/debts" variant="secondary">{t("💰 Задолженность")}</ButtonLink>
+        {owner && <ButtonLink href="/shop/debts" variant="secondary">{t("💰 Задолженность")}</ButtonLink>}
+        {owner && <ButtonLink href="/shop/team" variant="secondary">{t("👥 Сотрудники")}</ButtonLink>}
         <ButtonLink href="/shop/documents" variant="secondary">{t("🧾 Документы")}</ButtonLink>
         <ButtonLink href="/account" variant="secondary">{t("⚙️ Настройки")}</ButtonLink>
       </>} />
@@ -27,7 +29,13 @@ export default async function ShopProfilePage() {
             ))}
           </div>
         )}
-        <ShopProfileForm
+        {!owner ? (
+          <div className="space-y-1 text-sm">
+            <p className="font-medium">{s.name}</p>
+            <p className="text-gray-600">{s.address}</p>
+            <p className="pt-2 text-gray-500">{t("Изменить профиль может только владелец магазина")}</p>
+          </div>
+        ) : <ShopProfileForm
           territories={territories}
           defaults={{
             name: s.name,
@@ -40,7 +48,7 @@ export default async function ShopProfilePage() {
             lat: String(s.lat),
             lng: String(s.lng),
           }}
-        />
+        />}
       </Card>
     </>
   );

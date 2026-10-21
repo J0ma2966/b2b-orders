@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import { PageHeader } from "@/components/ui";
 import { PeriodTabs, ReportView } from "@/components/reports/report-view";
 import { db } from "@/lib/db";
@@ -37,7 +38,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
   const to = toLocalDateInput(new Date(range.to.getTime() - 1));
   return (
     <>
-      <PageHeader title="Отчёты платформы" subtitle={`${toLocalDateInput(range.from)} — ${to}`} />
+      <PageHeader title="Отчёты платформы" subtitle={`${toLocalDateInput(range.from)} — ${to}`} actions={<ExportLink href={`/api/export/admin/report?${new URLSearchParams({ ...params, from: toLocalDateInput(range.from), to, period: "custom" })}`} />} />
       <form className="mb-3 flex flex-wrap gap-2">
         <input type="hidden" name="period" value={period} />
         {period === "custom" && <><input type="hidden" name="from" value={toLocalDateInput(range.from)} /><input type="hidden" name="to" value={to} /></>}

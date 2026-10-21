@@ -24,7 +24,9 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
   const events = await orderEvents(order.id);
   const placedEvent = events.find((e) => e.fromStatus === "DRAFT");
   const qr = order.status === "IN_TRANSIT" && order.qrToken && !order.qrUsedAt ? await QRCode.toDataURL(`B2B-ORDER:${order.qrToken}`, { width: 512, margin: 1 }) : null;
-  const account = RECEIVED.includes(order.status) ? await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } }) : null;
+  const owner = ctx.membership.role === "OWNER";
+  // Общий долг перед поставщиком сотруднику не показываем (М6)
+  const account = owner && RECEIVED.includes(order.status) ? await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } }) : null;
   return (
     <>
       <PageHeader
@@ -87,13 +89,13 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
                 ]}
               />
             </Card>
-            {shopCanRequestCancel(order.status) && (
+            {owner && shopCanRequestCancel(order.status) && (
               <Card>
                 <h2 className="mb-3 font-semibold">{t("Отмена заказа")}</h2>
                 <RequestCancelForm orderId={order.id} />
               </Card>
             )}
-            {shopCanCancel(order.status) && (
+            {owner && shopCanCancel(order.status) && (
               <Card>
                 <h2 className="mb-3 font-semibold">{t("Отмена заказа")}</h2>
                 <CancelOrderForm

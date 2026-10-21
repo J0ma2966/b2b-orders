@@ -25,6 +25,7 @@ export default async function ShopReplacementsPage({ searchParams }: PageProps<"
               <div className="mt-1 text-xs text-gray-600">
                 {full.supplier.displayName}
                 {full.decisionComment && <div>{t("Ответ поставщика: {text}", { text: full.decisionComment })}</div>}
+                {full.creditedAmount && <div>{t("Зачтено в баланс: {sum}", { sum: t.money(full.creditedAmount) })}</div>}
 
                 {full.status === "NEW" && (
                   <form action={cancelReplacementAction} className="mt-1">

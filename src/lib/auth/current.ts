@@ -96,6 +96,14 @@ export async function requireShop() {
   return ctx;
 }
 
+// М6: сотрудник магазина собирает корзину и принимает товар; оформление, отмена, долги,
+// профиль и сотрудники — только владелец.
+export async function requireShopOwner() {
+  const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") redirect("/shop");
+  return ctx;
+}
+
 // Куда отправить пользователя после входа.
 export async function homePathFor(auth: { isSuperAdmin: boolean; user: { id: string } }) {
   if (auth.isSuperAdmin) return "/admin";

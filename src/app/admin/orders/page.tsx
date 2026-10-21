@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
@@ -32,7 +33,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
   ]);
   return (
     <>
-      <PageHeader title="Заказы" />
+      <PageHeader title="Заказы" actions={<ExportLink href={`/api/export/admin/orders?status=${status}`} />} />
       <FilterBar q={q} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" placeholder="Номер, магазин, поставщик" />
       {rows.length === 0 ? (
         <EmptyState>{t("Заказов не найдено")}</EmptyState>

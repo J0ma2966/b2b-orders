@@ -112,12 +112,12 @@ async function debtDue(now: Date) {
     if (aging.overdueAmount > 0) {
       if (sameMark(a.overdueNotifiedFor)) continue;
       await db.shopAccount.update({ where: { id: a.id }, data: { overdueNotifiedFor: due } });
-      await notifyShop(a.shopId, { type: "debt.overdue", title: `Долг ${a.supplier.displayName} просрочен`, body: `Просрочено ${formatMoney(aging.overdueAmount)}. Пока долг не погашен, заказы нужно оплачивать полностью при получении.`, link: "/shop/debts", entity: "ShopAccount", entityId: a.id });
+      await notifyShop(a.shopId, { type: "debt.overdue", title: `Долг ${a.supplier.displayName} просрочен`, body: `Просрочено ${formatMoney(aging.overdueAmount)}. Пока долг не погашен, заказы нужно оплачивать полностью при получении.`, link: "/shop/debts", entity: "ShopAccount", entityId: a.id }, db, true);
       await notifySupplierStaff(a.supplierId, { type: "debt.overdue", title: `Просрочен долг: ${a.shop.name}`, body: `Просрочено ${formatMoney(aging.overdueAmount)}`, link: `/supplier/shops/${a.shopId}`, entity: "ShopAccount", entityId: a.id });
       overdue++;
     } else if (due.getTime() - now.getTime() <= 24 * HOUR && !sameMark(a.dueRemindedFor)) {
       await db.shopAccount.update({ where: { id: a.id }, data: { dueRemindedFor: due } });
-      await notifyShop(a.shopId, { type: "debt.due", title: `Завтра срок оплаты долга ${a.supplier.displayName}`, body: `Долг ${formatMoney(Number(a.balance))}`, link: "/shop/debts", entity: "ShopAccount", entityId: a.id });
+      await notifyShop(a.shopId, { type: "debt.due", title: `Завтра срок оплаты долга ${a.supplier.displayName}`, body: `Долг ${formatMoney(Number(a.balance))}`, link: "/shop/debts", entity: "ShopAccount", entityId: a.id }, db, true);
       reminded++;
     }
   }

@@ -7,7 +7,7 @@ import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addToCartAction, cancelOrderAction, checkoutAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
+import { addToCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
 import { useT } from "@/lib/i18n/client";
 
 export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: string; unitId: string; step: string; max: number }) {
@@ -197,5 +197,53 @@ export function FavoriteButton({ productId, on, label }: { productId: string; on
         <span aria-hidden>{on ? "★" : "☆"}</span>
       </button>
     </form>
+  );
+}
+
+// М6: сотрудник магазина просит владельца оформить корзину
+export function AskOwnerForm({ supplierId }: { supplierId: string }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(askOwnerAction, initialFormState);
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-2">
+      <FormMessage state={state} />
+      <input type="hidden" name="supplierId" value={supplierId} />
+      <SubmitButton className="w-full">{t("Сообщить владельцу")}</SubmitButton>
+    </ActionForm>
+  );
+}
+
+// М5: одна форма на все корзины; дата доставки — ближайшая доступная у каждого поставщика
+export function CheckoutAllForm({ count, total, defaults }: { count: number; total: string; defaults: CheckoutDefaults }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(checkoutAllAction, initialFormState);
+  const v = state.values ?? {};
+  const fe = state.fieldErrors ?? {};
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-4">
+      <FormMessage state={state} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Способ оплаты" name="paymentMethod" error={fe.paymentMethod}>
+          <Select name="paymentMethod" defaultValue={v.paymentMethod ?? "CASH"}>
+            <option value="CASH">{t("Наличные")}</option>
+            <option value="CARD">{t("Карта")}</option>
+            <option value="TRANSFER">{t("Безналичный расчёт")}</option>
+          </Select>
+        </Field>
+        <Field label="Адрес доставки" name="deliveryAddress" error={fe.deliveryAddress}>
+          <Input name="deliveryAddress" defaultValue={v.deliveryAddress ?? defaults.address} />
+        </Field>
+        <Field label="Контактное лицо" name="contactName" error={fe.contactName}>
+          <Input name="contactName" defaultValue={v.contactName ?? defaults.contactName} />
+        </Field>
+        <Field label="Телефон" name="contactPhone" error={fe.contactPhone}>
+          <Input name="contactPhone" type="tel" inputMode="tel" defaultValue={v.contactPhone ?? defaults.contactPhone} />
+        </Field>
+      </div>
+      <Field label="Комментарий" name="comment" hint="Дата доставки у каждого поставщика — ближайшая доступная">
+        <Textarea name="comment" defaultValue={v.comment} />
+      </Field>
+      <SubmitButton pendingText="Оформляю…" className="w-full sm:w-auto">{t("Оформить все ({n}) на {sum}", { n: count, sum: total })}</SubmitButton>
+    </ActionForm>
   );
 }

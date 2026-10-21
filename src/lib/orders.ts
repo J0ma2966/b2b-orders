@@ -64,8 +64,8 @@ export async function addEvent(
   });
 }
 
-export async function notifyShop(shopId: string, n: NotificationInput, tx: Tx | typeof db = db) {
-  const members = await tx.shopMember.findMany({ where: { shopId, isActive: true }, select: { userId: true } });
+export async function notifyShop(shopId: string, n: NotificationInput, tx: Tx | typeof db = db, ownersOnly = false) {
+  const members = await tx.shopMember.findMany({ where: { shopId, isActive: true, ...(ownersOnly ? { role: "OWNER" as const } : {}) }, select: { userId: true } });
   await notifyUsers(members.map((m) => m.userId), n, tx);
 }
 
@@ -293,6 +293,29 @@ export async function previewBonuses(supplierId: string, items: { productUnitId:
 }
 
 // Оформление: повторная проверка, резерв, бонусы, фиксация цены и комиссии (ТЗ п. 19, 22, 25, 51, 53).
+// М5: «Оформить все» — каждая корзина становится отдельным заказом со своей проверкой
+// (минимальная сумма, кредит, дата доставки берётся первая доступная); неудача одной не мешает остальным.
+export async function checkoutAll(shop: { id: string; territoryId: string; isBlocked: boolean }, input: Omit<CheckoutInput, "deliveryDate">) {
+  const carts = await db.order.findMany({
+    where: { shopId: shop.id, status: "DRAFT", items: { some: {} } },
+    include: { supplier: { select: { displayName: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  const placed: string[] = [];
+  const problems: string[] = [];
+  for (const c of carts) {
+    try {
+      const r = await checkout(shop, c.supplierId, { ...input, deliveryDate: null });
+      if (r.placed) placed.push(r.orderId);
+      else problems.push(`Не оформлен заказ ${c.supplier.displayName}: корзина изменилась, проверьте её`);
+    } catch (e) {
+      if (!(e instanceof OrderError)) throw e;
+      problems.push(`Не оформлен заказ ${c.supplier.displayName}: ${e.message}`);
+    }
+  }
+  return { placed, problems };
+}
+
 export async function checkout(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, input: CheckoutInput): Promise<CheckoutResult> {
   if (shop.isBlocked) throw new OrderError("Магазин заблокирован, заказы недоступны");
   const supplier = await supplierForShop(shop.territoryId, supplierId);

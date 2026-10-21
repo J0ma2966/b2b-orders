@@ -14,3 +14,7 @@ export const SHOP_NAV: NavItem[] = [
 
 // В нижнем меню телефона — пять главных разделов; остальное собрано в профиле
 export const SHOP_MOBILE_NAV = SHOP_NAV.filter((i) => ["/shop", "/shop/suppliers", "/shop/cart", "/shop/orders", "/shop/profile"].includes(i.href));
+
+// М6: эти разделы видит только владелец магазина
+export const SHOP_OWNER_ONLY = ["/shop/debts", "/shop/team"];
+export const navForRole = (items: NavItem[], role: string | undefined) => (role === "STAFF" ? items.filter((i) => !SHOP_OWNER_ONLY.includes(i.href)) : items);

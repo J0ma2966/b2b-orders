@@ -1,15 +1,16 @@
+import { ExportLink } from "@/components/ui/export-link";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { balanceLabel } from "@/components/orders/order-view";
 import { DebtHistory } from "@/components/orders/debt-history";
 import { db } from "@/lib/db";
-import { requireShop } from "@/lib/auth/current";
+import { requireShopOwner } from "@/lib/auth/current";
 import { debtEntries } from "@/lib/delivery";
 import { getT } from "@/lib/i18n/server";
 import { accountState } from "@/lib/accounts";
 
 // Задолженность магазина по каждому поставщику (ТЗ п. 75)
 export default async function ShopDebtsPage() {
-  const [ctx, t] = await Promise.all([requireShop(), getT()]);
+  const [ctx, t] = await Promise.all([requireShopOwner(), getT()]);
   const accounts = await db.shopAccount.findMany({ where: { shopId: ctx.shop.id }, include: { supplier: true }, orderBy: { balance: "desc" } });
   const [histories, states] = await Promise.all([
     Promise.all(accounts.map((a) => debtEntries(a.id, 50))),
@@ -18,7 +19,7 @@ export default async function ShopDebtsPage() {
   const total = accounts.reduce((s, a) => s + Math.max(0, Number(a.balance)), 0);
   return (
     <>
-      <PageHeader title="Задолженность" subtitle={t("Всего долг: {sum}", { sum: t.money(total) })} />
+      <PageHeader title="Задолженность" subtitle={t("Всего долг: {sum}", { sum: t.money(total) })} actions={<ExportLink href="/api/export/shop/debts" />} />
       {accounts.length === 0 && <EmptyState>{t("Задолженности нет")}</EmptyState>}
       <div className="space-y-6">
         {accounts.map((a, i) => (

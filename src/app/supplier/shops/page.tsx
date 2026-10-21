@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import Link from "next/link";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -31,7 +32,7 @@ export default async function SupplierShopsPage({ searchParams }: PageProps<"/su
   const totalDebt = shops.reduce((s, sh) => s + Math.max(0, Number(sh.accounts[0]?.balance ?? 0)), 0);
   return (
     <>
-      <PageHeader title="Магазины и задолженность" subtitle={`Общий долг магазинов: ${t.money(totalDebt)}`} />
+      <PageHeader title="Магазины и задолженность" subtitle={`Общий долг магазинов: ${t.money(totalDebt)}`} actions={<ExportLink href="/api/export/supplier/debts" />} />
       <FilterBar q={q} status={filter} statuses={[["debt", "С долгом"], ["credit", "Работают в долг"]]} allLabel="Все магазины" placeholder="Название магазина" />
       {shops.length === 0 ? (
         <EmptyState>{t("Магазины появятся после первых заказов")}</EmptyState>

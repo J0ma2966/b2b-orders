@@ -38,6 +38,7 @@ const profileSchema = z.object({
 
 export async function updateShopProfileAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") return { error: "Изменить профиль может только владелец магазина" };
   const parsed = parseForm(profileSchema, formData);
   if (!parsed.success) return invalid(parsed.error, formData);
   const d = parsed.data;

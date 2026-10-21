@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import { PageHeader } from "@/components/ui";
 import { PeriodTabs, ReportView } from "@/components/reports/report-view";
 import { requireActiveSupplier } from "@/lib/auth/current";
@@ -12,7 +13,7 @@ export default async function SupplierReportsPage({ searchParams }: PageProps<"/
   const report = await buildReport({ ...range, supplierId: ctx.supplier.id });
   return (
     <>
-      <PageHeader title="Отчёты" subtitle={`${toLocalDateInput(range.from)} — ${toLocalDateInput(new Date(range.to.getTime() - 1))}`} />
+      <PageHeader title="Отчёты" subtitle={`${toLocalDateInput(range.from)} — ${toLocalDateInput(new Date(range.to.getTime() - 1))}`} actions={<ExportLink href={`/api/export/supplier/report?period=custom&from=${toLocalDateInput(range.from)}&to=${toLocalDateInput(new Date(range.to.getTime() - 1))}`} />} />
       <PeriodTabs base="/supplier/reports" period={period} params={{}} from={toLocalDateInput(range.from)} to={toLocalDateInput(new Date(range.to.getTime() - 1))} />
       <ReportView r={report} scope="supplier" />
     </>

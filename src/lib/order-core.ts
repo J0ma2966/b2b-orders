@@ -298,3 +298,49 @@ export function failsShopCheck(reason: ProblemReason) {
 export function problemText(reason: ProblemReason, note: string | null) {
   return note ? `${PROBLEM_REASONS[reason]}: ${note}` : PROBLEM_REASONS[reason];
 }
+
+// ───────────── Маршрут дня доставщика (Д2) ─────────────
+
+type Point = { lat: number; lng: number };
+
+export function distanceKm(a: Point, b: Point) {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 12_742 * Math.asin(Math.sqrt(h));
+}
+
+type Stop = { id: string; routeOrder: number | null; deliveryLat: number | null; deliveryLng: number | null };
+const pointOf = (s: Stop): Point | null => (s.deliveryLat != null && s.deliveryLng != null ? { lat: s.deliveryLat, lng: s.deliveryLng } : null);
+
+// Сначала точки, расставленные доставщиком вручную, затем остальные — каждый раз ближайшая
+// к предыдущей (старт — склад поставщика). Точки без координат — в конце.
+export function planRoute<T extends Stop>(stops: T[], start: Point | null): T[] {
+  const manual = stops.filter((s) => s.routeOrder !== null).sort((a, b) => a.routeOrder! - b.routeOrder!);
+  const rest = stops.filter((s) => s.routeOrder === null && pointOf(s));
+  const noPoint = stops.filter((s) => s.routeOrder === null && !pointOf(s));
+  const out = [...manual];
+  let at = [...manual].reverse().map(pointOf).find((p) => p) ?? start;
+  while (rest.length) {
+    let best = 0;
+    if (at) {
+      let bestD = Infinity;
+      rest.forEach((s, i) => {
+        const d = distanceKm(at!, pointOf(s)!);
+        if (d < bestD) [best, bestD] = [i, d];
+      });
+    }
+    const [next] = rest.splice(best, 1);
+    out.push(next);
+    at = pointOf(next);
+  }
+  return [...out, ...noPoint];
+}
+
+// Весь маршрут одной ссылкой: от текущего места доставщика через все точки по порядку
+export function yandexRouteUrl(stops: Stop[]) {
+  const pts = stops.map(pointOf).filter((p): p is Point => !!p);
+  if (pts.length === 0) return null;
+  return `https://yandex.ru/maps/?rtext=~${pts.map((p) => `${p.lat},${p.lng}`).join("~")}&rtt=auto`;
+}

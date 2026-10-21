@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, Card, EmptyState, PageHeader } from "@/components/ui";
-import { CartQtyForm, CheckoutForm } from "@/components/orders/shop-forms";
+import { AskOwnerForm, CartQtyForm, CheckoutForm } from "@/components/orders/shop-forms";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty } from "@/lib/catalog";
@@ -26,6 +26,7 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
   const bonuses = items.length > 0 ? await previewBonuses(supplierId, items) : [];
   const owner = await db.user.findFirst({ where: { shopMembers: { some: { shopId: ctx.shop.id, role: "OWNER" } } } });
   const blocked = ctx.shop.isBlocked || supplier.ordersDisabled;
+  const isOwner = ctx.membership.role === "OWNER";
   const total = items.reduce((s, i) => s + lineTotal(Number(i.productUnit.price ?? i.price), Number(i.qty)), 0);
   const [due, terms, sup] = await Promise.all([
     paymentDue(db, { shopId: ctx.shop.id, supplierId, total }),
@@ -96,11 +97,16 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
                 <span>{t("Итого")}</span>
                 <span>{t.money(total)}</span>
               </div>
-              <PaymentSummary due={due} t={t} />
+              {isOwner && <PaymentSummary due={due} t={t} />}
               {belowMin && <div className="mb-4"><Alert tone="warning">{t("Минимальная сумма заказа у этого поставщика — {sum}", { sum: t.money(terms.minOrderTotal) })}</Alert></div>}
-              {overBlocked && <div className="mb-4"><Alert tone="error">{t("Заказ превышает доступный кредит на {sum}. Уменьшите заказ или погасите долг", { sum: t.money(due.overLimit) })}</Alert></div>}
+              {isOwner && overBlocked && <div className="mb-4"><Alert tone="error">{t("Заказ превышает доступный кредит на {sum}. Уменьшите заказ или погасите долг", { sum: t.money(due.overLimit) })}</Alert></div>}
               {blocked ? (
                 <Alert tone="warning">{ctx.shop.isBlocked ? t("Магазин заблокирован, оформление заказов недоступно.") : t("Поставщик временно не принимает заказы.")}</Alert>
+              ) : !isOwner ? (
+                <div className="space-y-3">
+                  <Alert tone="info">{t("Оформить заказ может только владелец магазина. Сообщите ему, что корзина готова.")}</Alert>
+                  <AskOwnerForm supplierId={supplier.id} />
+                </div>
               ) : (
                 <CheckoutForm
                   supplierId={supplier.id}

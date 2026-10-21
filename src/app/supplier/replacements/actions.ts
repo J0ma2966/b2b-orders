@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { OrderError } from "@/lib/orders";
-import { assignReplacement, decideReplacement, setReturnedStatus } from "@/lib/replacements";
+import { assignReplacement, creditReplacement, decideReplacement, setReturnedStatus } from "@/lib/replacements";
 import { RETURNED_STATUS_LABEL } from "@/lib/replacement-core";
 import { formValues, success, type FormState } from "@/lib/forms";
 import { StockError } from "@/lib/stock";
@@ -33,6 +33,23 @@ export async function decideReplacementAction(_prev: FormState, formData: FormDa
   await writeAudit({ entity: "Replacement", entityId: id, action: approve ? "approve" : "reject", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, comment });
   revalidatePath("/supplier/replacements", "layout");
   return success(approve ? "Замена согласована, товар зарезервирован" : "Заявка отклонена");
+}
+
+// Л5: зачесть стоимость в баланс магазина вместо замены
+export async function creditReplacementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireActiveSupplier();
+  const id = String(formData.get("id") ?? "");
+  const comment = String(formData.get("comment") ?? "").trim() || null;
+  let r;
+  try {
+    r = await creditReplacement(ctx.supplier.id, id, comment, roleTag(ctx.membership.role));
+  } catch (e) {
+    return fail(e, formData);
+  }
+  await writeAudit({ entity: "Replacement", entityId: id, action: "credit", actorRole: roleTag(ctx.membership.role), supplierId: ctx.supplier.id, comment, changes: [{ field: "creditedAmount", old: null, new: r.amount }] });
+  revalidatePath("/supplier/replacements", "layout");
+  revalidatePath("/supplier/shops", "layout");
+  return success("Стоимость зачтена в баланс магазина");
 }
 
 export async function assignReplacementAction(_prev: FormState, formData: FormData): Promise<FormState> {

@@ -9,6 +9,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, TabNav, TabNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
+import { navForRole } from "./shop-nav";
 
 // Витрина магазина: цветная шапка с поиском по всем поставщикам и корзиной, вкладки сверху,
 // на телефоне — нижнее меню как в приложении. Данные магазина подгружаются потоком.
@@ -47,7 +48,7 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
         </div>
         <div className="mx-auto hidden max-w-6xl px-2 md:block">
           <Suspense fallback={<TabNavView items={nav} root="/shop" />}>
-            <TabNav items={nav} root="/shop" />
+            <ShopTabNav items={nav} />
           </Suspense>
         </div>
       </header>
@@ -129,8 +130,13 @@ async function ShopActions() {
   );
 }
 
+async function ShopTabNav({ items }: { items: NavItem[] }) {
+  const ctx = await getShopContext();
+  return <TabNav items={navForRole(items, ctx?.membership.role)} root="/shop" />;
+}
+
 async function ShopBottomNav({ items }: { items: NavItem[] }) {
   const ctx = await getShopContext();
   const cart = ctx ? await cartSummary(ctx.shop.id) : null;
-  return <BottomNav items={items} root="/shop" badges={cart ? { "/shop/cart": cart.items } : undefined} />;
+  return <BottomNav items={navForRole(items, ctx?.membership.role)} root="/shop" badges={cart ? { "/shop/cart": cart.items } : undefined} />;
 }

@@ -8,7 +8,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { REPLACEMENT_REASONS, RETURNED_STATUS_LABEL } from "@/lib/replacement-core";
 import { createReplacementAction } from "@/app/shop/replacements/actions";
-import { assignReplacementAction, decideReplacementAction, returnedStatusAction } from "@/app/supplier/replacements/actions";
+import { assignReplacementAction, creditReplacementAction, decideReplacementAction, returnedStatusAction } from "@/app/supplier/replacements/actions";
 import { completeReplacementAction } from "@/app/courier/replacements/actions";
 import type { ReturnedStatus } from "@/generated/prisma/enums";
 import { useT } from "@/lib/i18n/client";
@@ -67,6 +67,24 @@ export function DecideReplacementForm({ id }: { id: string }) {
         <SubmitButton name="decision" value="approve" pendingText="…">{t("Согласовать и зарезервировать")}</SubmitButton>
         <SubmitButton name="decision" value="reject" variant="danger" pendingText="…">{t("Отклонить")}</SubmitButton>
       </div>
+    </ActionForm>
+  );
+}
+
+// Л5: вместо замены уменьшить долг магазина на стоимость товара
+export function CreditReplacementForm({ id, amount }: { id: string; amount: string }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(creditReplacementAction, initialFormState);
+  if (state.ok) return <FormMessage state={state} />;
+  return (
+    <ActionForm action={action} pending={pending} className="space-y-3">
+      <FormMessage state={state} />
+      <input type="hidden" name="id" value={id} />
+      <p className="text-sm text-gray-600">{t("Товар не меняется: долг магазина уменьшится на {sum} по цене из заказа.", { sum: amount })}</p>
+      <Field label="Комментарий магазину" name="comment">
+        <Input name="comment" defaultValue={state.values?.comment} />
+      </Field>
+      <SubmitButton variant="secondary" pendingText="…" confirm="Зачесть стоимость в баланс магазина?">{t("Зачесть в баланс")}</SubmitButton>
     </ActionForm>
   );
 }

@@ -11,6 +11,7 @@ import { formValues, success, type FormState } from "@/lib/forms";
 import { StockError } from "@/lib/stock";
 import { isProblemReason, problemText } from "@/lib/order-core";
 import { realFiles, saveImage, UploadError } from "@/lib/storage";
+import { moveInRoute, resetRoute } from "@/lib/route";
 
 function fail(e: unknown, formData: FormData): FormState {
   if (e instanceof OrderError || e instanceof StockError) return { error: e.message, values: formValues(formData) };
@@ -86,4 +87,22 @@ export async function confirmDeliveryAction(_prev: FormState, formData: FormData
   await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.confirm", actorRole: "COURIER", supplierId: ctx.supplier.id, changes: [{ field: "status", old: "IN_TRANSIT", new: r.status }, { field: "receivedAmount", old: null, new: received }] });
   revalidatePath("/courier", "layout");
   return success(`Получение подтверждено. Сумма заказа ${formatMoney(r.total)}${r.orderDebt > 0 ? `, долг по заказу ${formatMoney(r.orderDebt)}` : ""}`);
+}
+
+// Д2: порядок объезда на сегодня
+export async function moveRouteAction(formData: FormData) {
+  const { ctx, courierId } = await courier();
+  const dir = formData.get("dir") === "up" ? -1 : 1;
+  try {
+    await moveInRoute(ctx.supplier.id, courierId, String(formData.get("orderId") ?? ""), dir);
+  } catch (e) {
+    if (!(e instanceof OrderError)) throw e;
+  }
+  revalidatePath("/courier");
+}
+
+export async function resetRouteAction() {
+  const { ctx, courierId } = await courier();
+  await resetRoute(ctx.supplier.id, courierId);
+  revalidatePath("/courier");
 }

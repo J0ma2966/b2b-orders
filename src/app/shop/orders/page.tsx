@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/ui/export-link";
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -20,7 +21,7 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
   ]);
   return (
     <>
-      <PageHeader title="Заказы" />
+      <PageHeader title="Заказы" actions={<ExportLink href={`/api/export/shop/orders?status=${status}`} />} />
       <FilterBar search={false} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" />
       {rows.length === 0 ? (
         <EmptyState>

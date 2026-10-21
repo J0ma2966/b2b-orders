@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { CheckoutAllForm } from "@/components/orders/shop-forms";
+import { formatPhone } from "@/lib/phone";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
@@ -29,10 +31,21 @@ export default async function CartsPage() {
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="text-lg font-bold tabular-nums">{t.money(c.total)}</span>
-                <span className="rounded-full bg-accent px-3 py-1 text-sm font-semibold text-on-accent">{t("Оформить")}</span>
+                <span className="rounded-full bg-accent px-3 py-1 text-sm font-semibold text-on-accent">{t(ctx.membership.role === "OWNER" ? "Оформить" : "Открыть")}</span>
               </div>
             </Link>
           ))}
+          {carts.length > 1 && ctx.membership.role === "OWNER" && !ctx.shop.isBlocked && (
+            <Card className="mt-6">
+              <h2 className="mb-1 font-display text-lg font-semibold">{t("Оформить все корзины сразу")}</h2>
+              <p className="mb-4 text-sm text-gray-500">{t("У каждого поставщика будет свой заказ. Если какой-то не получится оформить, он останется в корзине.")}</p>
+              <CheckoutAllForm
+                count={carts.length}
+                total={t.money(carts.reduce((s, c) => s + Number(c.total), 0))}
+                defaults={{ address: ctx.shop.address, contactName: ctx.shop.contactName, contactPhone: formatPhone(ctx.shop.phone) }}
+              />
+            </Card>
+          )}
         </div>
       )}
     </>

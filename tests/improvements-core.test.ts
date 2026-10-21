@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { creditLeft, debtAging, requiredPayment } from "@/lib/finance-core";
-import { deliveryDateOptions, isoWeekday, tashkentDay } from "@/lib/order-core";
+import { deliveryDateOptions, isoWeekday, planRoute, tashkentDay, yandexRouteUrl } from "@/lib/order-core";
+import { buildXlsx, readXlsx } from "@/lib/xlsx";
 
 describe("оплата при получении (Л1)", () => {
   it("без кредита — вся сумма, с учётом переплаты", () => {
@@ -61,5 +62,31 @@ describe("даты доставки (П5)", () => {
   });
   it("полночь по Ташкенту", () => {
     expect(tashkentDay(new Date("2026-10-21T20:00:00Z")).toISOString().slice(0, 10)).toBe("2026-10-22");
+  });
+});
+
+describe("Д2: маршрут дня", () => {
+  const stop = (id: string, lat: number | null, routeOrder: number | null = null) => ({ id, deliveryLat: lat, deliveryLng: lat === null ? null : 69, routeOrder });
+  it("ближайшая точка за ближайшей от склада, без координат — в конце", () => {
+    const r = planRoute([stop("far", 41.3), stop("none", null), stop("near", 41.1), stop("mid", 41.2)], { lat: 41, lng: 69 });
+    expect(r.map((s) => s.id)).toEqual(["near", "mid", "far", "none"]);
+  });
+  it("ручной порядок первым, остальные продолжают от последней ручной точки", () => {
+    const r = planRoute([stop("a", 41.1), stop("b", 41.3, 1), stop("c", 41.2), stop("d", 41.38)], { lat: 41, lng: 69 });
+    expect(r.map((s) => s.id)).toEqual(["b", "d", "c", "a"]);
+  });
+  it("ссылка на весь маршрут в Яндекс Картах", () => {
+    expect(yandexRouteUrl([stop("a", 41.1), stop("x", null), stop("b", 41.2)])).toBe("https://yandex.ru/maps/?rtext=~41.1,69~41.2,69&rtt=auto");
+    expect(yandexRouteUrl([stop("x", null)])).toBeNull();
+  });
+});
+
+describe("П7: Excel", () => {
+  it("записанный файл читается обратно: строки, числа, спецсимволы", () => {
+    const buf = buildXlsx([{ name: "Заказы/2026", rows: [["№", "Магазин", "Сумма"], [1, "«Ромашка» & <Ко>", 12500.5], [2, null, 100]] }]);
+    expect(readXlsx(buf)).toEqual([["№", "Магазин", "Сумма"], [1, "«Ромашка» & <Ко>", 12500.5], [2, null, 100]]);
+  });
+  it("не-Excel файл — понятная ошибка", () => {
+    expect(() => readXlsx(Buffer.from("name;price\nЧай;1000"))).toThrow("не похож на Excel");
   });
 });

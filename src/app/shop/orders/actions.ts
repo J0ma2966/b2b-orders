@@ -7,8 +7,9 @@ import { requireShop } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { supplierForShop } from "@/lib/shop-catalog";
 import { writeAudit } from "@/lib/audit";
-import { addToCart, cancelByShop, checkout, OrderError, repeatOrder, setCartQty } from "@/lib/orders";
+import { addToCart, cancelByShop, checkout, checkoutAll, OrderError, repeatOrder, setCartQty } from "@/lib/orders";
 import { requestCancel } from "@/lib/delivery";
+import { askOwnerToCheckout } from "@/lib/shop-team";
 import { parseAmount } from "@/lib/catalog";
 import { normalizePhone } from "@/lib/phone";
 import { formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
@@ -61,6 +62,7 @@ const checkoutSchema = z.object({
 
 export async function checkoutAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") return { error: "Оформить заказ может только владелец магазина" };
   const parsed = parseForm(checkoutSchema, formData);
   if (!parsed.success) return invalid(parsed.error, formData);
   const d = parsed.data;
@@ -101,6 +103,7 @@ export async function checkoutAction(_prev: FormState, formData: FormData): Prom
 
 export async function cancelOrderAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") return { error: "Отменить заказ может только владелец магазина" };
   const orderId = String(formData.get("orderId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { fieldErrors: { reason: ["Укажите причину отмены"] } };
@@ -116,6 +119,7 @@ export async function cancelOrderAction(_prev: FormState, formData: FormData): P
 
 export async function requestCancelAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") return { error: "Отменить заказ может только владелец магазина" };
   const orderId = String(formData.get("orderId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { fieldErrors: { reason: ["Укажите причину"] } };
@@ -158,4 +162,35 @@ export async function toggleFavoriteAction(formData: FormData) {
     await db.favoriteProduct.deleteMany({ where: { shopId: ctx.shop.id, productId } });
   }
   revalidatePath(`/shop/suppliers/${product.supplierId}`, "layout");
+}
+
+// М6: сотрудник просит владельца оформить собранную корзину
+export async function askOwnerAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  let r;
+  try {
+    r = await askOwnerToCheckout(ctx.shop.id, String(formData.get("supplierId") ?? ""), ctx.auth.user.fullName);
+  } catch (e) {
+    return fail(e);
+  }
+  return success(r.sent ? "Владелец получил уведомление" : "Владелец уже получил уведомление, напомнить снова можно через 10 минут");
+}
+
+const checkoutAllSchema = checkoutSchema.omit({ supplierId: true, deliveryDate: true });
+
+// М5: оформить все корзины одной формой
+export async function checkoutAllAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  if (ctx.membership.role !== "OWNER") return { error: "Оформить заказ может только владелец магазина" };
+  const parsed = parseForm(checkoutAllSchema, formData);
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const d = parsed.data;
+  const phone = normalizePhone(d.contactPhone);
+  if (!phone) return { fieldErrors: { contactPhone: ["Неверный номер телефона"] }, values: formValues(formData) };
+  const r = await checkoutAll(ctx.shop, { paymentMethod: d.paymentMethod, comment: d.comment, deliveryAddress: d.deliveryAddress, contactName: d.contactName, contactPhone: phone });
+  for (const id of r.placed) await writeAudit({ entity: "Order", entityId: id, action: "place", actorRole: "SHOP", shopId: ctx.shop.id });
+  revalidatePath("/shop", "layout");
+  if (r.problems.length === 0) redirect("/shop/orders");
+  if (r.placed.length === 0) return { error: "Ни один заказ не оформлен:", details: r.problems, values: formValues(formData) };
+  return { ok: true, message: `Оформлено заказов: ${r.placed.length}. Остальные остались в корзине:`, details: r.problems };
 }

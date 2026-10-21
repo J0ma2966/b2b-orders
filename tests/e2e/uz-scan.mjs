@@ -81,7 +81,7 @@ for (const role of roles) {
       const clean = href.split("#")[0];
       // Похожие страницы (другие фильтры и страницы списка) не нужны
       const key = clean.replace(/\?.*$/, "");
-      if (!seen.has(key) && !queue.includes(key) && !/logout|\.(png|jpg|webp|mp4)$/.test(key)) queue.push(key);
+      if (!seen.has(key) && !queue.includes(key) && !/logout|^\/api\/|\.(png|jpg|webp|mp4)$/.test(key)) queue.push(key);
     }
   }
   await page.goto(BASE + role.start);
