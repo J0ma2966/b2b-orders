@@ -84,6 +84,7 @@ export async function confirmDeliveryAction(_prev: FormState, formData: FormData
   } catch (e) {
     return fail(e, formData);
   }
+  if (r.already) return success("Эта приёмка уже была отправлена и проведена");
   await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.confirm", actorRole: "COURIER", supplierId: ctx.supplier.id, changes: [{ field: "status", old: "IN_TRANSIT", new: r.status }, { field: "receivedAmount", old: null, new: received }] });
   revalidatePath("/courier", "layout");
   return success(`Получение подтверждено. Сумма заказа ${formatMoney(r.total)}${r.orderDebt > 0 ? `, долг по заказу ${formatMoney(r.orderDebt)}` : ""}`);

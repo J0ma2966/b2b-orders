@@ -121,6 +121,10 @@ export async function confirmDelivery(courierId: string, orderId: string, input:
   if (!Number.isFinite(input.received) || input.received < 0) throw new OrderError("Неверная полученная сумма");
   return db.$transaction(async (tx) => {
     const order = await courierOrder(tx, orderId, courierId);
+    // Д4: повтор той же приёмки (ответ потерялся в дороге, телефон отправил её ещё раз) — уже проведена
+    if (order.qrUsedAt && order.qrToken && sameToken(normalizeQrInput(input.qr), order.qrToken)) {
+      return { already: true as const, status: order.status, total: num(order.total), orderDebt: num(order.orderDebt) };
+    }
     // Код проверяется до всего остального: чужой, отменённый, использованный — отказ
     if (order.status !== "IN_TRANSIT") {
       throw new OrderError(order.status === "NEEDS_CONFIRMATION" ? "Магазин запросил отмену, дождитесь решения поставщика" : "Заказ нельзя подтвердить в текущем статусе");
@@ -208,7 +212,7 @@ export async function confirmDelivery(courierId: string, orderId: string, input:
         : `Сумма ${formatMoney(total)}, получено ${formatMoney(input.received)}`;
     await notifyShop(order.shopId, shopNote(order, "получение подтверждено", body), tx);
     await notifySupplierStaff(order.supplierId, { type: "order.delivered", title: `Доставка №${order.number} подтверждена`, body, link: `/supplier/orders/${order.id}`, entity: "Order", entityId: order.id }, ["OWNER", "ADMIN"], tx);
-    return { status, total, ...dist };
+    return { already: false as const, status, total, ...dist };
   });
 }
 

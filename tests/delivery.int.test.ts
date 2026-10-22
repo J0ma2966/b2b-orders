@@ -56,8 +56,13 @@ describe.skipIf(!enabled)("доставка, приёмка, оплата", () =
     await expect(confirmDelivery("someone", a.order.id, { items, received: 1000, method: "CASH", qr: a.order.qrToken! })).rejects.toBeInstanceOf(OrderError);
     const ok = await confirmDelivery(courierId, a.order.id, { items, received: 1000, method: "CASH", qr: `B2B-ORDER:${a.order.qrToken}` });
     expect(ok.status).toBe("COMPLETED");
-    // Повторно тот же QR не принимается
-    await expect(confirmDelivery(courierId, a.order.id, { items, received: 1000, method: "CASH", qr: a.order.qrToken! })).rejects.toBeInstanceOf(OrderError);
+    // Повтор той же приёмки (Д4: телефон отправил её второй раз) ничего не проводит заново
+    const entries = await db.debtEntry.count({ where: { orderId: a.order.id } });
+    const again = await confirmDelivery(courierId, a.order.id, { items, received: 5000, method: "CASH", qr: a.order.qrToken! });
+    expect(again).toMatchObject({ already: true, status: "COMPLETED" });
+    expect(await db.debtEntry.count({ where: { orderId: a.order.id } })).toBe(entries);
+    // Чужой код к проведённому заказу по-прежнему отказ
+    await expect(confirmDelivery(courierId, a.order.id, { items, received: 1000, method: "CASH", qr: b.order.qrToken! })).rejects.toBeInstanceOf(OrderError);
     // Магазин после первой доставки — «Проверенный»
     expect((await db.shop.findUniqueOrThrow({ where: { id: a.shop.id } })).status).toBe("VERIFIED");
     await markNotDelivered(courierId, b.order.id, { reason: "CLOSED", note: null });

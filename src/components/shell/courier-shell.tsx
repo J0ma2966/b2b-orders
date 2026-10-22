@@ -9,6 +9,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
+import { OfflineSync } from "@/components/orders/offline-sync";
 
 export const COURIER_NAV: NavItem[] = [
   { href: "/courier", label: "Доставки", icon: "🚚", also: ["/courier/orders/"] },
@@ -45,6 +46,9 @@ export function CourierShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-28">
+        <Suspense>
+          <CourierOfflineSync />
+        </Suspense>
         <Suspense fallback={<Spinner />}>{children}</Suspense>
       </main>
       <Suspense fallback={<BottomNavView items={COURIER_NAV} root="/courier" app />}>
@@ -80,4 +84,10 @@ async function CourierActions() {
       </form>
     </div>
   );
+}
+
+async function CourierOfflineSync() {
+  const auth = await getAuth();
+  if (!auth) return null;
+  return <OfflineSync userId={auth.user.id} />;
 }

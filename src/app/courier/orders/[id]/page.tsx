@@ -54,6 +54,8 @@ export default async function CourierOrderPage({ params }: PageProps<"/courier/o
         {order.status === "IN_TRANSIT" ? (
           <AcceptanceForm
             orderId={order.id}
+            userId={ctx.auth.user.id}
+            title={`№${order.number}, ${order.shop.name}`}
             balanceBefore={balance}
             terms={terms}
             items={order.items.map((i) => ({

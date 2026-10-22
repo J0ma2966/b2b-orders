@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/ui";
 import { DeliveryHero, DeliveryRow } from "@/components/orders/delivery-card";
 import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
+import { WarmPages } from "@/components/orders/offline-sync";
 import { yandexRouteUrl } from "@/lib/order-core";
 import { courierRoute } from "@/lib/route";
 import { getT } from "@/lib/i18n/server";
@@ -30,6 +31,7 @@ export default async function CourierHome() {
   const manual = route.some((o) => o.routeOrder !== null);
   return (
     <>
+      <WarmPages urls={[...route, ...later].map((o) => `/courier/orders/${o.id}`)} />
       <h1 className="mb-1 text-2xl font-bold">{t("Мои доставки")}</h1>
       <p className="mb-4 text-sm text-gray-500">
         {t("Сегодня")} · {route.length}

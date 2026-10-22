@@ -1582,6 +1582,18 @@ const uz: Record<string, string> = {
   "Строка {0}: приход — число не меньше нуля": "{0}-qator: kirim — noldan kichik boʻlmagan son",
   "Строка {0}: повтор строки {1}": "{0}-qator: {1}-qatorning takrori",
   "Загрузка из Excel: {0}": "Excelʼdan yuklash: {0}",
+  // Д4: работа доставщика без сети
+  "Эта приёмка уже была отправлена и проведена": "Bu qabul qilish allaqachon yuborilgan va oʻtkazilgan",
+  "Нет сети, а сохранить приёмку на телефоне не удалось. Попробуйте ещё раз, когда появится связь": "Tarmoq yoʻq, qabul qilishni telefonga saqlab boʻlmadi. Aloqa paydo boʻlganda qayta urinib koʻring",
+  "Нет сети. Приёмка сохранена на телефоне и отправится, когда появится связь": "Tarmoq yoʻq. Qabul qilish telefonga saqlandi va aloqa paydo boʻlganda yuboriladi",
+  "Исправить приёмку": "Qabul qilishni tuzatish",
+  "Не удалось отправить приёмку. Откройте заказ и отправьте ещё раз": "Qabul qilishni yuborib boʻlmadi. Buyurtmani oching va qayta yuboring",
+  "Нет сети. Доставки открываются из сохранённых на телефоне": "Tarmoq yoʻq. Yetkazishlar telefonda saqlanganidan ochiladi",
+  "Ждут отправки: {n}": "Yuborilishini kutmoqda: {n}",
+  "Отправляю сохранённые приёмки…": "Saqlangan qabul qilishlar yuborilmoqda…",
+  "Приёмки отправятся сами, когда появится связь": "Aloqa paydo boʻlganda qabul qilishlar oʻzi yuboriladi",
+  "Не отправлена приёмка {title}": "{title} qabul qilish yuborilmadi",
+  "Нет сети. Попробуйте ещё раз, когда появится связь": "Tarmoq yoʻq. Aloqa paydo boʻlganda qayta urinib koʻring",
 };
 
 export default uz;

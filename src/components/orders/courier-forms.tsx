@@ -1,20 +1,51 @@
 "use client";
 
-import { useActionState, useCallback, useMemo, useState, type ReactNode } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionForm } from "@/components/ui/action-form";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
-import { initialFormState } from "@/lib/forms";
+import { formValues, initialFormState, type FormState } from "@/lib/forms";
 import { PROBLEM_REASONS } from "@/lib/order-core";
 import { distributePayment, requiredPayment, type CreditTerms } from "@/lib/finance-core";
 import { confirmDeliveryAction, problemAction, startDeliveryAction } from "@/app/courier/actions";
 import { QrScanner } from "./qr-scanner";
 import { useT } from "@/lib/i18n/client";
+import {
+  announceQueue,
+  browserStore,
+  clearDraft,
+  enqueue,
+  formFields,
+  isNetworkError,
+  NO_NETWORK,
+  QUEUE_EVENT,
+  queuedFor,
+  readDraft,
+  removeQueued,
+  saveDraft,
+  warmPages,
+  type QueuedAcceptance,
+} from "@/lib/offline-queue";
+
+// Без сети действие не дойдёт до сервера: говорим об этом, а не показываем сбой страницы
+function offlineAware(action: (prev: FormState, fd: FormData) => Promise<FormState>) {
+  return async (prev: FormState, fd: FormData): Promise<FormState> => {
+    if (!navigator.onLine) return { error: NO_NETWORK, values: formValues(fd) };
+    try {
+      return (await action(prev, fd)) ?? prev;
+    } catch (e) {
+      if (isNetworkError(e, navigator.onLine)) return { error: NO_NETWORK, values: formValues(fd) };
+      throw e;
+    }
+  };
+}
+const startDeliveryOffline = offlineAware(startDeliveryAction);
+const problemOffline = offlineAware(problemAction);
 
 export function StartDeliveryForm({ orderId }: { orderId: string }) {
   const t = useT();
-  const [state, action, pending] = useActionState(startDeliveryAction, initialFormState);
+  const [state, action, pending] = useActionState(startDeliveryOffline, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-2">
       <FormMessage state={state} />
@@ -26,7 +57,7 @@ export function StartDeliveryForm({ orderId }: { orderId: string }) {
 
 export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; allowNotDelivered: boolean }) {
   const t = useT();
-  const [state, action, pending] = useActionState(problemAction, initialFormState);
+  const [state, action, pending] = useActionState(problemOffline, initialFormState);
   const [open, setOpen] = useState(false);
   if (state.ok) return <FormMessage state={state} />;
   if (!open) {
@@ -74,9 +105,41 @@ export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; a
 
 export type AcceptItem = { id: string; name: string; unitLabel: string; kind: "REGULAR" | "FORCED" | "BONUS"; qty: number; price: number; step: string };
 
-export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { orderId: string; items: AcceptItem[]; balanceBefore: number; terms: CreditTerms }) {
+export function AcceptanceForm({ orderId, userId, title, items, balanceBefore, terms }: { orderId: string; userId: string; title: string; items: AcceptItem[]; balanceBefore: number; terms: CreditTerms }) {
   const t = useT();
-  const [state, action, pending] = useActionState(confirmDeliveryAction, initialFormState);
+  // Д4: без сети приёмка сохраняется на телефоне, OfflineSync отправит её, когда связь вернётся
+  const [queued, setQueued] = useState<QueuedAcceptance | null>(null);
+  const [editing, setEditing] = useState(false);
+  const submit = useCallback(
+    async (prev: FormState, fd: FormData): Promise<FormState> => {
+      const store = browserStore();
+      const keep = (): FormState => {
+        if (!store) return { error: "Нет сети, а сохранить приёмку на телефоне не удалось. Попробуйте ещё раз, когда появится связь", values: formValues(fd) };
+        setQueued(enqueue(store, { userId, orderId, title, fields: formFields(fd) }));
+        setEditing(false);
+        clearDraft(store, orderId);
+        announceQueue();
+        return {};
+      };
+      if (!navigator.onLine) return keep();
+      try {
+        const r = (await confirmDeliveryAction(prev, fd)) ?? prev;
+        if (r.ok && store) {
+          clearDraft(store, orderId);
+          const q = queuedFor(store, userId, orderId);
+          if (q) removeQueued(store, q.id);
+          announceQueue();
+          warmPages([`/courier/orders/${orderId}`, "/courier"], { force: true });
+        }
+        return r;
+      } catch (e) {
+        if (isNetworkError(e, navigator.onLine)) return keep();
+        throw e;
+      }
+    },
+    [userId, orderId, title],
+  );
+  const [state, action, pending] = useActionState(submit, initialFormState);
   const [accepted, setAccepted] = useState<Record<string, number>>(() => Object.fromEntries(items.map((i) => [i.id, i.qty])));
   const [received, setReceived] = useState<string>("");
   const [qr, setQr] = useState("");
@@ -85,6 +148,40 @@ export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { order
     setQr(text);
     setScanning(false);
   }, []);
+
+  // Введённое не теряется, если страницу закрыли или телефон перезагрузился
+  const [restored, setRestored] = useState<{ round: number; values: Record<string, string> } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    const items = itemsRef.current;
+    const store = browserStore();
+    if (!store) return;
+    const load = () => {
+      const q = queuedFor(store, userId, orderId);
+      setQueued(q);
+      const fields = q?.fields ?? readDraft(store, orderId);
+      if (!fields) return;
+      const values = Object.fromEntries(fields);
+      setRestored((r) => ({ round: (r?.round ?? 0) + 1, values }));
+      setAccepted(Object.fromEntries(items.map((i) => [i.id, Number(values[`accepted_${i.id}`] ?? i.qty) || 0])));
+      setReceived(values.received ?? "");
+      setQr(values.qr ?? "");
+    };
+    load();
+    const onQueue = () => setQueued(queuedFor(store, userId, orderId));
+    window.addEventListener(QUEUE_EVENT, onQueue);
+    return () => window.removeEventListener(QUEUE_EVENT, onQueue);
+  }, [userId, orderId]);
+  const saveNow = useCallback(() => {
+    const store = browserStore();
+    if (store && formRef.current) saveDraft(store, orderId, formFields(new FormData(formRef.current)));
+  }, [orderId]);
+  useEffect(() => {
+    if (qr) saveNow();
+  }, [qr, saveNow]);
+  const values = state.values ?? restored?.values;
+  const shown: FormState = state.error ? state : queued?.error ? { error: queued.error } : state;
 
   const total = useMemo(
     () => Math.round(items.reduce((s, i) => s + (i.kind === "BONUS" ? 0 : i.price * (accepted[i.id] ?? 0)), 0) * 100) / 100,
@@ -97,9 +194,19 @@ export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { order
   const dist = Number.isFinite(receivedNum) ? distributePayment(total, receivedNum, balanceBefore) : null;
 
   if (state.ok) return <FormMessage state={state} />;
+  if (queued && !queued.error && !editing) {
+    return (
+      <section className="space-y-3 rounded-2xl bg-surface p-4 ring-1 ring-gray-200">
+        <p className="font-semibold">{t("Нет сети. Приёмка сохранена на телефоне и отправится, когда появится связь")}</p>
+        <Button type="button" variant="secondary" className="min-h-12 w-full rounded-xl" onClick={() => setEditing(true)}>
+          {t("Исправить приёмку")}
+        </Button>
+      </section>
+    );
+  }
   return (
-    <ActionForm action={action} pending={pending} className="space-y-4">
-      <FormMessage state={state} />
+    <ActionForm ref={formRef} key={restored?.round ?? 0} action={action} pending={pending} className="space-y-4" onChange={saveNow}>
+      <FormMessage state={shown} />
       <input type="hidden" name="orderId" value={orderId} />
 
       <Step n={1} title={t("Проверьте товар")}>
@@ -115,7 +222,7 @@ export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { order
               <div className="text-sm text-gray-500">{t("заказано {qty} {unit}", { qty: i.qty, unit: t(i.unitLabel) })}</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <Field label="Доставлено" name={`delivered_${i.id}`}>
-                  <Input className="text-lg font-semibold" name={`delivered_${i.id}`} type="number" inputMode="decimal" min="0" max={i.qty} step={i.step} defaultValue={state.values?.[`delivered_${i.id}`] ?? String(i.qty)} />
+                  <Input className="text-lg font-semibold" name={`delivered_${i.id}`} type="number" inputMode="decimal" min="0" max={i.qty} step={i.step} defaultValue={values?.[`delivered_${i.id}`] ?? String(i.qty)} />
                 </Field>
                 <Field label="Принято" name={`accepted_${i.id}`}>
                   <Input
@@ -126,7 +233,7 @@ export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { order
                     min="0"
                     max={i.qty}
                     step={i.step}
-                    defaultValue={state.values?.[`accepted_${i.id}`] ?? String(i.qty)}
+                    defaultValue={values?.[`accepted_${i.id}`] ?? String(i.qty)}
                     onChange={(e) => setAccepted((a) => ({ ...a, [i.id]: Number(e.target.value) || 0 }))}
                   />
                 </Field>
@@ -162,7 +269,7 @@ export function AcceptanceForm({ orderId, items, balanceBefore, terms }: { order
             <div className="grid grid-cols-3 gap-2">
               {(["CASH", "CARD", "TRANSFER"] as const).map((m) => (
                 <label key={m} className="cursor-pointer">
-                  <input type="radio" name="method" value={m} defaultChecked={(state.values?.method ?? "CASH") === m} className="peer sr-only" />
+                  <input type="radio" name="method" value={m} defaultChecked={(values?.method ?? "CASH") === m} className="peer sr-only" />
                   <span className="flex min-h-12 items-center justify-center rounded-xl bg-gray-100 px-2 text-center text-sm font-semibold peer-checked:bg-brand-600 peer-checked:text-on-brand peer-focus-visible:outline-2 peer-focus-visible:outline-brand-500">
                     {t(METHOD_LABEL[m])}
                   </span>

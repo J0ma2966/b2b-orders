@@ -1,15 +1,18 @@
 "use client";
 
 import { ActionForm } from "@/components/ui/action-form";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Alert, Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { initialFormState } from "@/lib/forms";
 import { loginAction } from "../actions";
 import { useT } from "@/lib/i18n/client";
+import { forgetOfflinePages } from "@/lib/offline-queue";
 
 export function LoginForm() {
   const t = useT();
+  // Д4: после выхода сохранённые для работы без сети страницы доставщика удаляются с телефона
+  useEffect(() => forgetOfflinePages(), []);
   const [state, action, pending] = useActionState(loginAction, initialFormState);
   return (
     <ActionForm action={action} pending={pending} className="space-y-4">
