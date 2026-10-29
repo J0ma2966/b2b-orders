@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ru</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ru</string>
+		<string>uz</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Оптовые заказы</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array>
+        <dict>
+            <key>UISceneConfigurationName</key>
+            <string>Default Configuration</string>
+            <key>UISceneDelegateClassName</key>
+            <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+            <key>UISceneStoryboardFile</key>
+            <string>Main</string>
+        </dict>
+      </array>
+    </dict>
+	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+	<!-- Шифрование только стандартное (HTTPS) — экспортная декларация не нужна -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Разрешения: iOS показывает эти тексты при первом запросе -->
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна, чтобы сканировать QR-код при приёмке заказа и снимать фото и видео брака для заявки на замену. / Kamera buyurtmani qabul qilishda QR-kodni skanerlash va almashtirish arizasi uchun nuqson rasmini olish uchun kerak.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Микрофон нужен только для звука в видео брака, которое вы прикладываете к заявке на замену. / Mikrofon faqat almashtirish arizasiga ilova qilinadigan videoning ovozi uchun kerak.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к фото нужен, чтобы приложить снимки товара, логотип или фото брака. / Rasmlarga kirish mahsulot, logotip yoki nuqson rasmini ilova qilish uchun kerak.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Местоположение нужно, чтобы отметить точку магазина на карте для доставки. Оно не отслеживается в фоне. / Joylashuv yetkazib berish uchun do‘kon nuqtasini xaritada belgilashga kerak. Fonda kuzatilmaydi.</string>
+	<!-- Только эти домены открываются внутри приложения; на них работает service worker (офлайн доставщика) -->
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>app.example.uz</string>
+	</array>
+</dict>
+</plist>

@@ -21,6 +21,9 @@ export default async function LoginPage() {
         <p>
           {t("Вы поставщик?")} <Link className="text-brand-600 hover:underline" href="/register/supplier">{t("Подать заявку")}</Link>
         </p>
+        <p className="pt-3 text-xs">
+          <Link className="text-gray-500 hover:underline" href="/privacy">{t("Политика конфиденциальности")}</Link>
+        </p>
       </div>
     </Card>
   );

@@ -27,7 +27,7 @@ async function main() {
   });
 
   const phone = process.env.SUPERADMIN_PHONE ?? "+998900000000";
-  const password = process.env.SUPERADMIN_PASSWORD ?? "admin12345";
+  const password = process.env.SUPERADMIN_PASSWORD || "admin12345";
   const admin = await db.user.findUnique({ where: { phone } });
   if (!admin) {
     await db.user.create({

@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { useActionState } from "react";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { PrivacyNote } from "@/components/forms/privacy-note";
 import { AccountFields } from "@/components/forms/account-fields";
 import { SupplierFields } from "@/components/forms/supplier-fields";
 import type { TerritoryOption } from "@/components/territory/types";
@@ -19,6 +20,7 @@ export function SupplierRegisterForm({ territories, loggedIn }: { territories: T
       {state.error && <Alert tone="error">{state.error}</Alert>}
       {!loggedIn && <AccountFields state={state} />}
       <SupplierFields state={state} territories={territories} />
+      <PrivacyNote />
       <SubmitButton className="w-full sm:w-auto" pendingText="Отправляем…">{t("Отправить заявку")}</SubmitButton>
     </ActionForm>
   );

@@ -9,7 +9,8 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const SRC = path.join(ROOT, "src");
-const SKIP = [/generated/, /lib\/i18n\//, /\.test\./];
+// Юридические страницы написаны на двух языках целиком, без словаря
+const SKIP = [/generated/, /lib\/i18n\//, /\.test\./, /\(public\)\//, /lib\/legal\.ts/, /lib\/native-push\.ts/];
 const SELF_TRANSLATING = new Set(["Tr", "Button", "ButtonLink", "Badge", "Alert", "EmptyState", "SubmitButton"]);
 const CYR = /[А-Яа-яЁё]/;
 
