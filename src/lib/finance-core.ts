@@ -101,3 +101,21 @@ export function debtAging(balance: number, charges: { amount: number; at: Date }
   const overdueDays = overdueAmount > 0 ? Math.max(1, Math.floor((now.getTime() - dueDate.getTime()) / DAY)) : 0;
   return { dueDate, overdueAmount, overdueDays };
 }
+
+// А3: магазины, у которых долг просрочен сразу у нескольких поставщиков. Видит только админ:
+// поставщику чужие долги магазина не раскрываются.
+export type OverdueAccount = { shopId: string; supplierId: string; overdueAmount: number; overdueDays: number };
+
+export function groupMultiOverdue<T extends OverdueAccount>(accounts: T[], minSuppliers = 2) {
+  const byShop = new Map<string, T[]>();
+  for (const a of accounts) if (a.overdueAmount > 0) byShop.set(a.shopId, [...(byShop.get(a.shopId) ?? []), a]);
+  return [...byShop.entries()]
+    .filter(([, list]) => new Set(list.map((a) => a.supplierId)).size >= minSuppliers)
+    .map(([shopId, list]) => ({
+      shopId,
+      accounts: [...list].sort((a, b) => b.overdueAmount - a.overdueAmount),
+      overdueTotal: r2(list.reduce((s, a) => s + a.overdueAmount, 0)),
+      maxDays: Math.max(...list.map((a) => a.overdueDays)),
+    }))
+    .sort((a, b) => b.overdueTotal - a.overdueTotal || b.maxDays - a.maxDays);
+}

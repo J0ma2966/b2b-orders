@@ -44,7 +44,7 @@ export async function acceptHandover(supplierId: string, courierId: string, amou
   if (!(amount > 0)) throw new CashError("Укажите принятую сумму");
   return db.$transaction(async (tx) => {
     // Блокировка доставщика: две сдачи подряд не посчитают один и тот же остаток
-    const member = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "SupplierMember" WHERE "supplierId" = ${supplierId} AND "userId" = ${courierId} AND role = 'COURIER' FOR UPDATE`;
+    const member = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "SupplierMember" WHERE "supplierId" = ${supplierId} AND "userId" = ${courierId} AND role IN ('COURIER', 'ADMIN') FOR UPDATE`;
     if (member.length === 0) throw new CashError("Доставщик не найден");
     const [got, handed] = await Promise.all([
       tx.order.aggregate({ where: { supplierId, courierId, receivedMethod: "CASH" }, _sum: { receivedAmount: true } }),

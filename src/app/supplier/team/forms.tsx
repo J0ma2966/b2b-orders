@@ -6,7 +6,7 @@ import { Alert, Field, Input, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addMemberAction, resetMemberPasswordAction } from "../actions";
+import { addMemberAction, resetMemberPasswordAction, setDeliversAction } from "../actions";
 import { useT } from "@/lib/i18n/client";
 
 export function AddMemberForm({ roles }: { roles: [string, string][] }) {
@@ -43,6 +43,26 @@ export function ResetPasswordButton({ memberId }: { memberId: string }) {
         {t("Сбросить пароль")}
       </SubmitButton>
       {(state.message || state.error) && (
+        <div className="w-full basis-full">
+          <Alert tone={state.error ? "error" : "success"}>{state.error ?? state.message}</Alert>
+        </div>
+      )}
+    </ActionForm>
+  );
+}
+
+// «Сам развожу заказы» у владельца или администратора
+export function DeliversToggle({ memberId, delivers, className, big = false }: { memberId: string; delivers: boolean; className?: string; big?: boolean }) {
+  const t = useT();
+  const [state, action, pending] = useActionState(setDeliversAction, initialFormState);
+  return (
+    <ActionForm action={action} pending={pending} className={className ?? "contents"}>
+      <input type="hidden" name="memberId" value={memberId} />
+      <input type="hidden" name="delivers" value={delivers ? "0" : "1"} />
+      <SubmitButton variant={big ? (delivers ? "secondary" : "primary") : "ghost"} className={big ? undefined : "min-h-0 px-2 py-1 text-xs"}>
+        {delivers ? t("Не развожу сам") : t("Сам развожу заказы")}
+      </SubmitButton>
+      {(state.error || (big && state.message)) && (
         <div className="w-full basis-full">
           <Alert tone={state.error ? "error" : "success"}>{state.error ?? state.message}</Alert>
         </div>

@@ -8,6 +8,7 @@ const NAV = [
   { href: "/supplier/stock", label: "Остатки", icon: "🏬" },
   { href: "/supplier/bonuses", label: "Бонусы", icon: "🎁" },
   { href: "/supplier/shops", label: "Магазины и долги", icon: "🏪" },
+  { href: "/supplier/delivery", label: "Доставка", icon: "🚚" },
   { href: "/supplier/cash", label: "Касса доставщиков", icon: "💵" },
   { href: "/supplier/replacements", label: "Замены", icon: "🔁" },
   { href: "/supplier/returned", label: "Возвращённые товары", icon: "↩️" },

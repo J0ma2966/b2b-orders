@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { creditLeft, debtAging, requiredPayment, type CreditTerms } from "./finance-core";
+import { creditLeft, debtAging, groupMultiOverdue, requiredPayment, type CreditTerms } from "./finance-core";
 import { DELIVERY_ACTIVE, PRE_DELIVERY } from "./order-core";
 
 type Client = Prisma.TransactionClient | typeof db;
@@ -57,4 +57,38 @@ export async function paymentDue(client: Client, o: { id?: string; shopId: strin
   // Заказ выходит за доступный кредит: магазин в долг работает, но этой суммы не хватает
   const overLimit = state.terms.creditAllowed && !state.terms.overdue ? required : 0;
   return { ...state, ahead, required, overLimit };
+}
+
+// А3: просрочка магазинов у нескольких поставщиков, по срокам оплаты из Л3. Только для админа.
+// shopId — проверить один магазин (его карточка у админа).
+export async function multiOverdueShops(opts: { shopId?: string; now?: Date } = {}) {
+  const now = opts.now ?? new Date();
+  // Просрочка возможна только при долге и заданном сроке оплаты; один такой счёт — ещё не «у нескольких»
+  const candidates = await db.shopAccount.findMany({
+    where: { balance: { gt: 0 }, paymentTermDays: { not: null }, ...(opts.shopId && { shopId: opts.shopId }) },
+    select: { shopId: true, supplierId: true },
+  });
+  const perShop = new Map<string, number>();
+  for (const c of candidates) perShop.set(c.shopId, (perShop.get(c.shopId) ?? 0) + 1);
+  const states = await Promise.all(
+    candidates
+      .filter((c) => (perShop.get(c.shopId) ?? 0) >= 2)
+      .map(async (c) => {
+        const s = await accountState(db, c.shopId, c.supplierId, now);
+        return { ...c, balance: s.balance, overdueAmount: s.aging?.overdueAmount ?? 0, overdueDays: s.aging?.overdueDays ?? 0, dueDate: s.aging?.dueDate ?? null };
+      }),
+  );
+  const groups = groupMultiOverdue(states);
+  if (!groups.length) return [];
+  const [shops, suppliers] = await Promise.all([
+    db.shop.findMany({ where: { id: { in: groups.map((g) => g.shopId) } }, select: { id: true, name: true, phone: true, status: true } }),
+    db.supplier.findMany({ where: { id: { in: [...new Set(groups.flatMap((g) => g.accounts.map((a) => a.supplierId)))] } }, select: { id: true, displayName: true } }),
+  ]);
+  const shopById = new Map(shops.map((s) => [s.id, s]));
+  const supplierById = new Map(suppliers.map((s) => [s.id, s]));
+  return groups.map((g) => ({
+    ...g,
+    shop: shopById.get(g.shopId)!,
+    accounts: g.accounts.map((a) => ({ ...a, supplier: supplierById.get(a.supplierId)! })),
+  }));
 }
