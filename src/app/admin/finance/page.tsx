@@ -8,6 +8,8 @@ import { requireSuperAdmin } from "@/lib/auth/current";
 import { PAYMENT_LABEL } from "@/lib/order-core";
 import type { DebtEntryType } from "@/generated/prisma/enums";
 import { getT } from "@/lib/i18n/server";
+import { multiOverdueShops } from "@/lib/accounts";
+import { MultiOverdueList } from "@/components/admin/multi-overdue";
 
 // Финансы платформы: задолженности и финансовые операции (ТЗ п. 72, 79)
 export default async function AdminFinancePage({ searchParams }: PageProps<"/admin/finance">) {
@@ -17,7 +19,8 @@ export default async function AdminFinancePage({ searchParams }: PageProps<"/adm
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const type = typeof sp.status === "string" && sp.status in DEBT_TYPE_LABEL ? (sp.status as DebtEntryType) : undefined;
   const nameFilter = q ? { OR: [{ shop: { name: { contains: q, mode: "insensitive" as const } } }, { supplier: { displayName: { contains: q, mode: "insensitive" as const } } }] } : {};
-  const [accounts, entries] = await Promise.all([
+  const [risky, accounts, entries] = await Promise.all([
+    multiOverdueShops(),
     db.shopAccount.findMany({ where: { balance: { not: 0 }, ...nameFilter }, include: { shop: true, supplier: true }, orderBy: { balance: "desc" }, take: 100 }),
     db.debtEntry.findMany({ where: { ...(type && { type }), account: nameFilter }, include: { account: { include: { shop: true, supplier: true } }, order: true }, orderBy: { createdAt: "desc" }, take: 100 }),
   ]);
@@ -25,6 +28,11 @@ export default async function AdminFinancePage({ searchParams }: PageProps<"/adm
     <>
       <PageHeader title="Финансы" subtitle="Платформа ведёт учёт, деньги не проходят через неё" />
       <FilterBar q={q} status={type} statuses={Object.entries(DEBT_TYPE_LABEL)} allLabel="Все операции" placeholder="Магазин или поставщик" />
+      <section id="risk" className="mb-6">
+        <h2 className="font-semibold">{t("Просрочка у нескольких поставщиков")}</h2>
+        <p className="mb-2 text-sm text-gray-500">{t("По срокам оплаты, которые задали поставщики. Видно только администратору")}</p>
+        <MultiOverdueList rows={q ? risky.filter((r) => r.shop.name.toLowerCase().includes(q.toLowerCase())) : risky} />
+      </section>
       <h2 className="mb-2 font-semibold">{t("Задолженности")}</h2>
       {accounts.length === 0 ? <EmptyState>{t("Задолженностей нет")}</EmptyState> : (
         <Card className="mb-6 p-0 sm:p-0">

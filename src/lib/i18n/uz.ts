@@ -1620,6 +1620,17 @@ const uz: Record<string, string> = {
   "Готовы к доставке и ждут назначения: {n} →": "Yetkazishga tayyor va belgilanishni kutmoqda: {n} →",
   "Наличными сегодня": "Bugun naqd pulda",
   "Готовы к доставке, доставщик не назначен": "Yetkazishga tayyor, kuryer belgilanmagan",
+  // А3: просрочка у нескольких поставщиков (только админ)
+  "Просрочка у нескольких поставщиков": "Bir nechta yetkazib beruvchida muddati oʻtgan qarz",
+  "По срокам оплаты, которые задали поставщики. Видно только администратору": "Yetkazib beruvchilar belgilagan toʻlov muddatlari boʻyicha. Faqat administrator koʻradi",
+  "Магазины с просрочкой у нескольких поставщиков": "Bir nechta yetkazib beruvchida muddati oʻtgan qarzi bor doʻkonlar",
+  "Просрочка у {n} поставщиков, всего {sum}": "{n} ta yetkazib beruvchida muddati oʻtgan, jami {sum}",
+  "Магазинов с просрочкой у нескольких поставщиков нет": "Bir nechta yetkazib beruvchida muddati oʻtgan qarzi bor doʻkonlar yoʻq",
+  "просрочено {sum}": "muddati oʻtgan {sum}",
+  // Доставка силами поставщика
+  "Сначала завершите или передайте другому доставщику: заказов {0}, замен {1}": "Avval yakunlang yoki boshqa kuryerga oʻtkazing: buyurtmalar {0}, almashtirishlar {1}",
+  "{0} теперь может развозить заказы": "{0} endi buyurtmalarni yetkazishi mumkin",
+  "{0} больше не развозит заказы": "{0} endi buyurtmalarni yetkazmaydi",
 };
 
 export default uz;
