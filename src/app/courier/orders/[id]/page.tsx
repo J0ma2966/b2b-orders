@@ -6,14 +6,14 @@ import { OrderStatusBadge } from "@/components/orders/order-view";
 import { formatPhone } from "@/lib/phone";
 import { AcceptanceForm, ProblemForm, StartDeliveryForm } from "@/components/orders/courier-forms";
 import { db } from "@/lib/db";
-import { requireSupplier } from "@/lib/auth/current";
+import { requireDeliverer } from "@/lib/auth/current";
 import { allowsFraction, RECEIVED } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
 import { accountState } from "@/lib/accounts";
 
 export default async function CourierOrderPage({ params }: PageProps<"/courier/orders/[id]">) {
   const t = await getT();
-  const ctx = await requireSupplier(["COURIER"]);
+  const ctx = await requireDeliverer();
   const { id } = await params;
   const order = await db.order.findUnique({
     where: { id },

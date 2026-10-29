@@ -184,6 +184,9 @@ model SupplierMember {
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   role       SupplierRole
   isActive   Boolean      @default(true)
+  // Владелец или администратор сам развозит заказы (ИП без доставщиков): ему можно
+  // назначать доставки, и ему открыто приложение доставщика. Доставщику не нужен.
+  delivers   Boolean      @default(false)
   createdAt  DateTime     @default(now())
 
   @@unique([supplierId, userId])

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { readSession } from "./session";
 import type { SupplierRole } from "@/generated/prisma/client";
+import { isDeliverer } from "@/lib/supplier-roles";
 
 export type Auth = NonNullable<Awaited<ReturnType<typeof loadAuth>>>;
 
@@ -64,6 +65,15 @@ export async function requireSupplier(roles: SupplierRole[] = ["OWNER", "ADMIN"]
     if (ctx) redirect(ctx.membership.role === "COURIER" ? "/courier" : "/supplier");
     redirect(await homePathFor(auth));
   }
+  return ctx;
+}
+
+// Приложение доставщика: доставщик или владелец/администратор, который развозит сам.
+export async function requireDeliverer() {
+  const auth = await requireAuth();
+  const ctx = await getSupplierContext();
+  if (!ctx) redirect(await homePathFor(auth));
+  if (!isDeliverer(ctx.membership)) redirect("/supplier/delivery");
   return ctx;
 }
 

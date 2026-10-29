@@ -9,6 +9,7 @@ import { addEvent, notifyShop, OrderError } from "@/lib/orders";
 import { addDebtEntry, lockAccount } from "@/lib/delivery";
 import { lineTotal, validQty, RECEIVED } from "./order-core";
 import { RETURNED_FINAL, RETURNED_STATUS_LABEL } from "./replacement-core";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 const num = (v: { toString(): string } | null | undefined) => (v == null ? 0 : Number(v.toString()));
 const ACTIVE: ReplacementStatus[] = ["NEW", "APPROVED", "ASSIGNED", "DONE", "CREDITED"];
@@ -143,7 +144,7 @@ export async function assignReplacement(supplierId: string, id: string, target: 
       if (order.courierId) await notifyUsers([order.courierId], { type: "replacement.assigned", title: `Замена №${r.number} вместе с заказом №${order.number}`, link: "/courier/replacements", entity: "Replacement", entityId: r.id }, tx);
       return;
     }
-    const courier = await tx.supplierMember.findFirst({ where: { supplierId, userId: target.courierId ?? "", role: "COURIER", isActive: true } });
+    const courier = await tx.supplierMember.findFirst({ where: { supplierId, userId: target.courierId ?? "", ...delivererWhere } });
     if (!courier) throw new OrderError("Доставщик не найден");
     await tx.replacement.update({ where: { id }, data: { courierId: courier.userId, newOrderId: null, status: "ASSIGNED", assignedAt: new Date() } });
     await notifyUsers([courier.userId], { type: "replacement.assigned", title: `Новое задание: замена №${r.number}`, link: "/courier/replacements", entity: "Replacement", entityId: r.id }, tx);

@@ -19,7 +19,7 @@ export default async function SupplierHome() {
     db.order.groupBy({ by: ["status"], where: { supplierId: s.id, status: { in: ["PLACED", "ACCEPTED", "ASSEMBLING", "READY", "ASSIGNED", "IN_TRANSIT"] } }, _count: true }),
   ]);
   const byStatus = Object.fromEntries(orders.map((o) => [o.status, o._count])) as Record<string, number>;
-  const todo = s.status === "ACTIVE" ? await todoList(s.id) : [];
+  const todo = s.status === "ACTIVE" ? await todoList(s.id, ctx.membership.delivers ? ctx.auth.user.id : null) : [];
   const inWork = (byStatus.ACCEPTED ?? 0) + (byStatus.ASSEMBLING ?? 0) + (byStatus.ASSIGNED ?? 0) + (byStatus.IN_TRANSIT ?? 0);
   const count = Object.fromEntries(members.map((m) => [m.role, m._count]));
   const canResubmit = supplierTransition("resubmit", s.status) !== null;
@@ -89,7 +89,7 @@ export default async function SupplierHome() {
         )}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
           <Link href="/supplier/team"><Card><div className="text-2xl font-semibold">{count.ADMIN ?? 0}</div><div className="text-sm text-gray-500">{t("Администраторы")}</div></Card></Link>
-          <Link href="/supplier/team"><Card><div className="text-2xl font-semibold">{count.COURIER ?? 0}</div><div className="text-sm text-gray-500">{t("Доставщики")}</div></Card></Link>
+          <Link href="/supplier/delivery"><Card><div className="text-2xl font-semibold">{count.COURIER ?? 0}</div><div className="text-sm text-gray-500">{t("Доставщики")}</div></Card></Link>
           <Link href="/supplier/territory"><Card><div className="text-2xl font-semibold">{territories}</div><div className="text-sm text-gray-500">{t("Территорий доставки")}</div></Card></Link>
         </div>
       </div>
@@ -98,8 +98,8 @@ export default async function SupplierHome() {
 }
 
 // П1: «Сделать сейчас» — что ждёт решения поставщика, со ссылками
-async function todoList(supplierId: string) {
-  const [placed, problems, cancelRequests, replacements, low, debtAccounts, overdueInvoices] = await Promise.all([
+async function todoList(supplierId: string, selfDeliverer: string | null) {
+  const [placed, problems, cancelRequests, replacements, low, debtAccounts, overdueInvoices, ready, mine] = await Promise.all([
     db.order.count({ where: { supplierId, status: "PLACED" } }),
     db.order.count({ where: { supplierId, status: "DELIVERY_PROBLEM" } }),
     db.order.count({ where: { supplierId, status: "NEEDS_CONFIRMATION" } }),
@@ -107,6 +107,8 @@ async function todoList(supplierId: string) {
     lowStockUnitIds(supplierId),
     db.shopAccount.findMany({ where: { supplierId, paymentTermDays: { not: null }, balance: { gt: 0 } }, select: { shopId: true }, take: 300 }),
     db.commissionInvoice.count({ where: { supplierId, status: "ISSUED", dueDate: { lt: new Date() } } }),
+    db.order.count({ where: { supplierId, status: "READY" } }),
+    selfDeliverer ? db.order.count({ where: { supplierId, courierId: selfDeliverer, status: { in: ["ASSIGNED", "IN_TRANSIT"] } } }) : 0,
   ]);
   const states = await Promise.all(debtAccounts.map((a) => accountState(db, a.shopId, supplierId)));
   const overdue = states.filter((st) => (st.aging?.overdueAmount ?? 0) > 0).length;
@@ -114,6 +116,8 @@ async function todoList(supplierId: string) {
     { label: "Новые заказы ждут ответа", count: placed, href: "/supplier/orders?status=PLACED", urgent: true },
     { label: "Проблемы доставки", count: problems, href: "/supplier/orders?status=DELIVERY_PROBLEM", urgent: true },
     { label: "Магазины просят отменить заказ", count: cancelRequests, href: "/supplier/orders?status=NEEDS_CONFIRMATION", urgent: true },
+    { label: "Готовы к доставке, доставщик не назначен", count: ready, href: "/supplier/orders?status=READY", urgent: false },
+    { label: "Мои доставки", count: mine, href: "/courier", urgent: false },
     { label: "Заявки на замену", count: replacements, href: "/supplier/replacements?status=NEW", urgent: false },
     { label: "Просроченные долги магазинов", count: overdue, href: "/supplier/shops", urgent: true },
     { label: "Товары на исходе", count: low.length, href: "/supplier/stock?status=low", urgent: false },

@@ -55,8 +55,13 @@ export function OrderStatusForm({ orderId, actions }: { orderId: string; actions
   );
 }
 
+export type CourierOption = { id: string; name: string; active: number; me?: boolean };
+
+// Единственный, кто может доставить (чаще всего сам поставщик-ИП), выбран сразу
+const onlyOne = (couriers: CourierOption[]) => (couriers.length === 1 ? couriers[0].id : "");
+
 // П2: принятый заказ сразу готов и уходит доставщику
-export function ReadyAndAssignForm({ orderId, couriers, suggested }: { orderId: string; couriers: { id: string; name: string; active: number }[]; suggested: string | null }) {
+export function ReadyAndAssignForm({ orderId, couriers, suggested }: { orderId: string; couriers: CourierOption[]; suggested: string | null }) {
   const t = useT();
   const [state, action, pending] = useActionState(readyAndAssignAction, initialFormState);
   return (
@@ -65,10 +70,10 @@ export function ReadyAndAssignForm({ orderId, couriers, suggested }: { orderId: 
       <input type="hidden" name="orderId" value={orderId} />
       <div className="flex flex-wrap items-end gap-2">
         {couriers.length > 0 && (
-          <Select name="courierId" defaultValue={suggested ?? ""} className="w-auto" aria-label={t("Доставщик")}>
+          <Select name="courierId" defaultValue={suggested ?? onlyOne(couriers)} className="w-auto" aria-label={t("Доставщик")}>
             <option value="">{t("— без доставщика —")}</option>
             {couriers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
+              <option key={c.id} value={c.id}>{c.me ? t("Я сам ({name})", { name: c.name }) : c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
             ))}
           </Select>
         )}
@@ -78,7 +83,7 @@ export function ReadyAndAssignForm({ orderId, couriers, suggested }: { orderId: 
   );
 }
 
-export function AssignCourierForm({ orderId, couriers, current, suggested = null }: { orderId: string; couriers: { id: string; name: string; active: number }[]; current: string | null; suggested?: string | null }) {
+export function AssignCourierForm({ orderId, couriers, current, suggested = null }: { orderId: string; couriers: CourierOption[]; current: string | null; suggested?: string | null }) {
   const t = useT();
   const [state, action, pending] = useActionState(assignCourierAction, initialFormState);
   return (
@@ -86,14 +91,14 @@ export function AssignCourierForm({ orderId, couriers, current, suggested = null
       <FormMessage state={state} />
       <input type="hidden" name="orderId" value={orderId} />
       {couriers.length === 0 ? (
-        <p className="text-sm text-gray-500">{t("Нет доставщиков. Добавьте их в разделе «Сотрудники и доставщики».")}</p>
+        <p className="text-sm text-gray-500">{t("Некому доставлять. Добавьте доставщика или включите «Сам развожу заказы» в разделе «Доставка».")}</p>
       ) : (
         <>
           <Field label="Доставщик" name="courierId">
-            <Select name="courierId" defaultValue={current ?? suggested ?? ""}>
+            <Select name="courierId" defaultValue={current ?? suggested ?? onlyOne(couriers)}>
               <option value="">{t("— не назначен —")}</option>
               {couriers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
+                <option key={c.id} value={c.id}>{c.me ? t("Я сам ({name})", { name: c.name }) : c.name} · {t("в работе {n}", { n: c.active })}{c.id === suggested ? ` · ${t("закреплён за районом")}` : ""}</option>
               ))}
             </Select>
           </Field>
