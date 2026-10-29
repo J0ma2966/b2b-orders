@@ -33,12 +33,16 @@ const config: CapacitorConfig = {
   ios: {
     path: "mobile/ios",
     scheme: "B2BOrders",
-    contentInset: "never",
+    // Содержимое не заходит под строку состояния и «чёлку»: сайт не использует viewport-fit=cover
+    contentInset: "automatic",
     // Service worker (офлайн доставщика) в WKWebView работает только на доменах из WKAppBoundDomains
     limitsNavigationsToAppBoundDomains: true,
     webContentsDebuggingEnabled: dev,
   },
   plugins: {
+    // Android 15+ рисует приложение от края до края; Capacitor сам отодвигает WebView от системных панелей,
+    // пока на странице нет viewport-fit=cover
+    SystemBars: { insetsHandling: "css" },
     SplashScreen: { launchShowDuration: 1500, launchAutoHide: true, backgroundColor: "#1f5ad6", showSpinner: false },
     PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
   },

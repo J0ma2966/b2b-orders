@@ -58,6 +58,10 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 На Mac с Xcode 16+: `npm run mobile:ios` → в Xcode выбрать команду (Team) в Signing & Capabilities, проверить, что есть Push Notifications → Product → Archive → Distribute App → App Store Connect.
 
+В `App.entitlements` стоит `aps-environment = development` (для сборок из Xcode). При Archive → Distribute App с профилем App Store Xcode сам подставляет `production`; проверьте это в окне экспорта (Entitlements). Сервер для TestFlight и App Store должен работать с `APNS_PRODUCTION=1`.
+
+Отступы от системных панелей: сайт не использует `viewport-fit=cover`, поэтому на iOS включён `contentInset: "automatic"`, а на Android 15+ (принудительный edge-to-edge) WebView отодвигает сам Capacitor (`SystemBars.insetsHandling`). При первой установке на устройство проверьте, что шапка не уходит под строку состояния.
+
 ### Иконка и заставка
 
 `python3 scripts/mobile-icons.py` — из `mobile/resources/icon.png` (1024×1024, без прозрачности) делает иконки Android/iOS/PWA и заставки. Сейчас стоит временная иконка «коробка»; замените файл своим логотипом и запустите скрипт.
