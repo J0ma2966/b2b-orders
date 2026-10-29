@@ -9,6 +9,7 @@ import { addEvent, lockOrder, notifyShop, OrderError, releaseAll, shopNote } fro
 import { normalizeQrInput, sameToken } from "@/lib/qr-token";
 import { creditCheck, distributePayment } from "./finance-core";
 import { accountState } from "./accounts";
+import { delivererWhere } from "./supplier-roles";
 import { failsShopCheck, orderTotal, problemText, validQty, type ProblemReason } from "./order-core";
 
 type Tx = Prisma.TransactionClient;
@@ -50,7 +51,7 @@ export async function addDebtEntry(
 }
 
 async function activeCourier(client: Tx | typeof db, supplierId: string, courierId: string) {
-  return !!(await client.supplierMember.findFirst({ where: { supplierId, userId: courierId, role: "COURIER", isActive: true }, select: { id: true } }));
+  return !!(await client.supplierMember.findFirst({ where: { supplierId, userId: courierId, ...delivererWhere }, select: { id: true } }));
 }
 
 async function courierOrder(tx: Tx, orderId: string, courierId: string) {

@@ -5,6 +5,7 @@ import { requireSuperAdmin } from "@/lib/auth/current";
 import { periodRange } from "@/lib/report-core";
 import { getT } from "@/lib/i18n/server";
 import { jobSettings } from "@/lib/jobs";
+import { multiOverdueShops } from "@/lib/accounts";
 
 export default async function AdminDashboard() {
   await requireSuperAdmin();
@@ -23,10 +24,11 @@ export default async function AdminDashboard() {
     db.replacement.count({ where: { status: "NEW" } }),
   ]);
   // А2: что требует внимания администратора
-  const [stalePlaced, staleProblems, overdueInvoices] = await Promise.all([
+  const [stalePlaced, staleProblems, overdueInvoices, risky] = await Promise.all([
     db.order.count({ where: { status: "PLACED", placedAt: { lt: new Date(now - remindH * 3_600_000) } } }),
     db.order.count({ where: { status: "DELIVERY_PROBLEM", problemAt: { lt: new Date(now - 24 * 3_600_000) } } }),
     db.commissionInvoice.count({ where: { status: "ISSUED", dueDate: { lt: new Date(now) } } }),
+    multiOverdueShops(),
   ]);
   const turnover = monthSales.reduce((sum, o) => sum + Number(o.total) + Number(o.correctionTotal), 0);
   const commission = monthSales.reduce((sum, o) => sum + ((Number(o.total) + Number(o.correctionTotal)) * Number(o.commissionRate ?? 0)) / 100, 0);
@@ -38,6 +40,7 @@ export default async function AdminDashboard() {
     { label: "Заявки поставщиков на проверке", value: (s.PENDING ?? 0) + (s.NEEDS_INFO ?? 0), href: "/admin/suppliers?status=PENDING" },
     { label: "Неразобранный антифрод", value: antifraud, href: "/admin/antifraud" },
     { label: "Просроченные счета на комиссию", value: overdueInvoices, href: "/admin/commissions" },
+    { label: "Магазины с просрочкой у нескольких поставщиков", value: risky.length, href: "/admin/finance#risk" },
   ].filter((a) => a.value > 0);
   const tiles = [
     { label: "Заявки на проверке", value: (s.PENDING ?? 0) + (s.NEEDS_INFO ?? 0), href: "/admin/suppliers?status=PENDING", accent: true },

@@ -206,7 +206,8 @@ export async function registerSupplierAction(_prev: FormState, formData: FormDat
         officeAddress: d.officeAddress,
         officeLat: d.officeLat,
         officeLng: d.officeLng,
-        members: { create: { userId, role: "OWNER" } },
+        // Поставщик-ИП развозит сам с первого дня; с доставщиками выключается в «Доставке»
+        members: { create: { userId, role: "OWNER", delivers: true } },
         territories: { create: territoryIds.map((territoryId) => ({ territoryId })) },
         statusHistory: { create: { toStatus: "PENDING", userId, comment: "Заявка подана" } },
       },

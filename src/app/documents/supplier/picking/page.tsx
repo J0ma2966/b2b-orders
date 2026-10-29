@@ -4,6 +4,7 @@ import { requireActiveSupplier } from "@/lib/auth/current";
 import { formatQty } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
 import { ordersForPicking, parsePickingParams, pickingSheet } from "@/lib/picking";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 export async function generateMetadata() {
   const t = await getT();
@@ -16,7 +17,7 @@ export default async function PickingPage({ searchParams }: PageProps<"/document
   const f = parsePickingParams(await searchParams);
   const [orders, couriers] = await Promise.all([
     ordersForPicking(ctx.supplier.id, f),
-    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: true } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: true } }),
   ]);
   const lines = pickingSheet(orders);
   const courier = couriers.find((c) => c.userId === f.courierId);

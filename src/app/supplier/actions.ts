@@ -11,13 +11,11 @@ import { notifySuperAdmins, notifyUsers } from "@/lib/notify";
 import { normalizePhone } from "@/lib/phone";
 import { isRealFile, saveImage, UploadError } from "@/lib/storage";
 import { supplierTransition } from "@/lib/statuses";
-import { canManageMember } from "@/lib/supplier-roles";
+import { actorRoleTag, canManageMember, canSetDelivers, delivererWhere } from "@/lib/supplier-roles";
 import { releaseCourierWork } from "@/lib/delivery";
 import { coord, formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
 
-function roleTag(role: string) {
-  return role === "OWNER" ? "SUPPLIER_OWNER" : role === "ADMIN" ? "SUPPLIER_ADMIN" : "COURIER";
-}
+const roleTag = actorRoleTag;
 
 // ───────────── Условия заказа (П5, Л1, П2) ─────────────
 
@@ -177,7 +175,7 @@ export async function updateTerritoryTermsAction(_prev: FormState, formData: For
   const ctx = await requireSupplier(["OWNER", "ADMIN"]);
   const [rows, couriers] = await Promise.all([
     db.supplierTerritory.findMany({ where: { supplierId: ctx.supplier.id } }),
-    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, select: { userId: true } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, select: { userId: true } }),
   ]);
   const courierIds = new Set(couriers.map((c) => c.userId));
   const changes = [];
@@ -259,7 +257,7 @@ export async function toggleMemberAction(formData: FormData) {
   // Отключённый сотрудник сразу теряет доступ к организации
   if (member.isActive) {
     await db.session.updateMany({ where: { userId: member.userId, activeSupplierId: ctx.supplier.id }, data: { activeSupplierId: null } });
-    if (member.role === "COURIER") await releaseCourierWork(ctx.supplier.id, member.userId, roleTag(ctx.membership.role));
+    if (member.role === "COURIER" || member.delivers) await releaseCourierWork(ctx.supplier.id, member.userId, roleTag(ctx.membership.role));
   }
   await writeAudit({
     entity: "SupplierMember",
@@ -270,6 +268,38 @@ export async function toggleMemberAction(formData: FormData) {
     changes: [{ field: "isActive", old: member.isActive, new: !member.isActive }],
   });
   revalidatePath("/supplier/team");
+}
+
+// «Сам развожу заказы»: владелец или администратор получает приложение доставщика
+// и появляется в списке, кому назначать доставку.
+export async function setDeliversAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireSupplier(["OWNER", "ADMIN"]);
+  const member = await db.supplierMember.findUnique({ where: { id: String(formData.get("memberId") ?? "") }, include: { user: true } });
+  const self = member?.userId === ctx.auth.user.id;
+  if (!member || member.supplierId !== ctx.supplier.id || !canSetDelivers(ctx.membership.role, member.role, self)) return { error: "Недостаточно прав" };
+  const delivers = formData.get("delivers") === "1";
+  if (delivers === member.delivers) return success("");
+  if (!delivers) {
+    // Нельзя выключить, пока на сотруднике висят доставки и замены
+    const [orders, replacements] = await Promise.all([
+      db.order.count({ where: { supplierId: ctx.supplier.id, courierId: member.userId, status: { in: ["ASSIGNED", "IN_TRANSIT", "DELIVERY_PROBLEM"] } } }),
+      db.replacement.count({ where: { supplierId: ctx.supplier.id, courierId: member.userId, status: "ASSIGNED" } }),
+    ]);
+    if (orders + replacements > 0) return { error: `Сначала завершите или передайте другому доставщику: заказов ${orders}, замен ${replacements}` };
+  }
+  await db.supplierMember.update({ where: { id: member.id }, data: { delivers } });
+  await writeAudit({
+    entity: "SupplierMember",
+    entityId: member.id,
+    action: "delivers.update",
+    actorRole: roleTag(ctx.membership.role),
+    supplierId: ctx.supplier.id,
+    changes: [{ field: "delivers", old: member.delivers, new: delivers }],
+  });
+  revalidatePath("/supplier", "layout");
+  revalidatePath("/courier", "layout");
+  if (delivers) return success(self ? "Готово: назначайте доставки на себя и открывайте приложение доставки" : `${member.user.fullName} теперь может развозить заказы`);
+  return success(self ? "Вы больше не развозите заказы" : `${member.user.fullName} больше не развозит заказы`);
 }
 
 export async function resetMemberPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {

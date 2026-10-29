@@ -16,6 +16,7 @@ import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { Badge } from "@/components/ui";
 import { removeForcedAction } from "../actions";
 import { getT } from "@/lib/i18n/server";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 export default async function SupplierOrderPage({ params }: PageProps<"/supplier/orders/[id]">) {
   const t = await getT();
@@ -32,7 +33,7 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
   const [events, couriers, units] = await Promise.all([
     orderEvents(order.id),
     assignable || quickReady
-      ? db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: { include: { _count: { select: { courierOrders: { where: { status: { in: ["ASSIGNED", "IN_TRANSIT"] } } } } } } } } })
+      ? db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: { include: { _count: { select: { courierOrders: { where: { status: { in: ["ASSIGNED", "IN_TRANSIT"] } } } } } } } } })
       : [],
     editable
       ? db.productUnit.findMany({
@@ -50,7 +51,11 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
     open ? paymentDue(db, { id: order.id, shopId: order.shopId, supplierId: order.supplierId, total: Number(order.total), placedAt: order.placedAt }) : null,
     assignable || quickReady ? suggestedCourier(ctx.supplier.id, order.shop.territoryId) : null,
   ]);
-  const courierOptions = couriers.map((c) => ({ id: c.userId, name: c.user.fullName, active: c.user._count.courierOrders }));
+  // Сам поставщик, если развозит, — первым в списке
+  const courierOptions = couriers
+    .map((c) => ({ id: c.userId, name: c.user.fullName, active: c.user._count.courierOrders, me: c.userId === ctx.auth.user.id }))
+    .sort((a, b) => Number(b.me) - Number(a.me));
+  const myDelivery = order.courierId === ctx.auth.user.id && ["ASSIGNED", "IN_TRANSIT", "DELIVERY_PROBLEM"].includes(order.status);
   return (
     <>
       <PageHeader
@@ -176,6 +181,11 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                   <AssignCourierForm orderId={order.id} current={order.courierId} suggested={suggested} couriers={courierOptions} />
                 ) : (
                   <p className="text-sm">{order.courier!.fullName}, {formatPhone(order.courier!.phone)}</p>
+                )}
+                {myDelivery && (
+                  <Link href={`/courier/orders/${order.id}`} className="mt-3 inline-block text-sm font-medium text-brand-600">
+                    {t("Везу сам: открыть в приложении доставки →")}
+                  </Link>
                 )}
               </Card>
             )}

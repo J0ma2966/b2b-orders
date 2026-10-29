@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { Card, EmptyState } from "@/components/ui";
-import { requireSupplier } from "@/lib/auth/current";
+import { requireDeliverer } from "@/lib/auth/current";
 import { cashOrdersSince, courierCash } from "@/lib/cash";
 import { db } from "@/lib/db";
 import { getT } from "@/lib/i18n/server";
 import { HandoverRow } from "@/components/orders/cash";
+import { handsOverCash } from "@/lib/supplier-roles";
 
 // Д1: касса доставщика — наличные на руках и что сдано поставщику
 export default async function CourierCashPage() {
-  const [ctx, t] = await Promise.all([requireSupplier(["COURIER"]), getT()]);
+  const [ctx, t] = await Promise.all([requireDeliverer(), getT()]);
   const cash = await courierCash(ctx.supplier.id, ctx.auth.user.id);
+  // Владелец развозит сам: наличные сразу его, сдавать некому — показываем только собранное
+  const handsOver = handsOverCash(ctx.membership.role);
   const [orders, handovers] = await Promise.all([
-    cashOrdersSince(ctx.supplier.id, ctx.auth.user.id, cash.lastHandover?.createdAt ?? null),
+    cashOrdersSince(ctx.supplier.id, ctx.auth.user.id, handsOver ? (cash.lastHandover?.createdAt ?? null) : null),
     db.cashHandover.findMany({ where: { supplierId: ctx.supplier.id, courierId: ctx.auth.user.id }, orderBy: { createdAt: "desc" }, take: 10 }),
   ]);
   return (
@@ -19,15 +22,15 @@ export default async function CourierCashPage() {
       <Link href="/courier" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-ink">{t("← Все доставки")}</Link>
       <h1 className="mb-4 text-2xl font-bold">{t("Касса")}</h1>
       <div className="rounded-2xl bg-brand-600 p-5 text-on-brand">
-        <div className="text-sm opacity-80">{t("Наличные на руках")}</div>
-        <div className="mt-1 text-4xl font-bold tabular-nums">{t.money(cash.onHand)}</div>
+        <div className="text-sm opacity-80">{handsOver ? t("Наличные на руках") : t("Наличными сегодня")}</div>
+        <div className="mt-1 text-4xl font-bold tabular-nums">{t.money(handsOver ? cash.onHand : cash.today)}</div>
         <div className="mt-2 text-sm opacity-80">
           {t("Сегодня получено {sum} по {n} заказам", { sum: t.money(cash.today), n: cash.todayOrders })}
         </div>
       </div>
-      <p className="mt-3 text-sm text-gray-500">{t("Сдайте наличные поставщику: он отметит принятую сумму, и она уйдёт из кассы.")}</p>
+      {handsOver && <p className="mt-3 text-sm text-gray-500">{t("Сдайте наличные поставщику: он отметит принятую сумму, и она уйдёт из кассы.")}</p>}
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-semibold text-gray-500">{cash.lastHandover ? t("После последней сдачи") : t("Наличные заказы")}</h2>
+        <h2 className="mb-2 text-sm font-semibold text-gray-500">{cash.lastHandover && handsOver ? t("После последней сдачи") : t("Наличные заказы")}</h2>
         {orders.length === 0 ? (
           <EmptyState>{t("Наличных оплат пока нет")}</EmptyState>
         ) : (

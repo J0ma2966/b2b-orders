@@ -1,6 +1,6 @@
 import { EntityActivity } from "@/components/orders/entity-activity";
 import { notFound } from "next/navigation";
-import { Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
@@ -13,6 +13,8 @@ import { SHOP_STATUS_COLOR, SHOP_STATUS_LABEL } from "@/lib/statuses";
 import { toggleShopBlockAction } from "../../actions";
 import { ShopStatusForm } from "./status-form";
 import { getT } from "@/lib/i18n/server";
+import { multiOverdueShops } from "@/lib/accounts";
+import { OverdueAccounts } from "@/components/admin/multi-overdue";
 
 export default async function ShopDetailPage({ params }: PageProps<"/admin/shops/[id]">) {
   const t = await getT();
@@ -26,7 +28,7 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
     loadTerritoryMap(),
   ]);
   if (!shop) notFound();
-  const suppliers = await availableSuppliersForShop(shop.territoryId);
+  const [suppliers, [risk]] = await Promise.all([availableSuppliersForShop(shop.territoryId), multiOverdueShops({ shopId: shop.id })]);
   return (
     <>
       <PageHeader
@@ -38,6 +40,14 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
           </span>
         }
       />
+      {risk && (
+        <div className="mb-4">
+          <Alert tone="warning">
+            <b>{t("Просрочка у {n} поставщиков, всего {sum}", { n: risk.accounts.length, sum: t.money(risk.overdueTotal) })}</b>
+            <OverdueAccounts accounts={risk.accounts} />
+          </Alert>
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
           <Card>

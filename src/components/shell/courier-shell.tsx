@@ -67,11 +67,18 @@ async function SupplierName() {
 }
 
 async function CourierActions() {
-  const [auth, t] = await Promise.all([getAuth(), getT()]);
+  const [auth, t, ctx] = await Promise.all([getAuth(), getT(), getSupplierContext()]);
   if (!auth) return <LanguageSwitcher />;
   const [unread, stamp] = await Promise.all([db.notification.count({ where: { userId: auth.user.id, readAt: null } }), liveStamp(auth.user.id)]);
+  // Поставщик, который развозит сам, возвращается отсюда в свой кабинет
+  const staff = ctx && ctx.membership.role !== "COURIER";
   return (
     <div className="flex items-center gap-1.5">
+      {staff && (
+        <Link href="/supplier/delivery" className="grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Кабинет поставщика")} title={t("Кабинет поставщика")}>
+          <span aria-hidden>🏢</span>
+        </Link>
+      )}
       <LanguageSwitcher />
       <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Уведомления")}>

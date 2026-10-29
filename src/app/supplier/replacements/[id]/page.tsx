@@ -9,6 +9,7 @@ import { formatQty } from "@/lib/catalog";
 import { REPLACEMENT_STATUS_COLOR, REPLACEMENT_STATUS_LABEL } from "@/lib/replacement-core";
 import { getT } from "@/lib/i18n/server";
 import { lineTotal } from "@/lib/order-core";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 export default async function SupplierReplacementPage({ params }: PageProps<"/supplier/replacements/[id]">) {
   const t = await getT();
@@ -17,7 +18,7 @@ export default async function SupplierReplacementPage({ params }: PageProps<"/su
   const r = await db.replacement.findUnique({ where: { id }, include: { shop: true, order: true, orderItem: true, courier: true, newOrder: true, productUnit: true } });
   if (!r || r.supplierId !== ctx.supplier.id) notFound();
   const [couriers, orders] = await Promise.all([
-    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: true } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: true } }),
     db.order.findMany({ where: { supplierId: ctx.supplier.id, shopId: r.shopId, status: { in: ["PLACED", "ACCEPTED", "ASSEMBLING", "READY", "ASSIGNED"] } }, orderBy: { placedAt: "desc" } }),
   ]);
   const available = Number(r.productUnit.physicalQty) - Number(r.productUnit.reservedQty);
