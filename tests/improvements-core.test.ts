@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { creditLeft, debtAging, requiredPayment } from "@/lib/finance-core";
 import { deliveryDateOptions, isoWeekday, planRoute, tashkentDay, yandexRouteUrl } from "@/lib/order-core";
-import { buildXlsx, readXlsx } from "@/lib/xlsx";
+import { buildXlsx, readXlsx, zip } from "@/lib/xlsx";
 import { parseImportTable } from "@/lib/catalog-import-core";
 
 describe("оплата при получении (Л1)", () => {
@@ -86,6 +86,19 @@ describe("П7: Excel", () => {
   it("записанный файл читается обратно: строки, числа, спецсимволы", () => {
     const buf = buildXlsx([{ name: "Заказы/2026", rows: [["№", "Магазин", "Сумма"], [1, "«Ромашка» & <Ко>", 12500.5], [2, null, 100]] }]);
     expect(readXlsx(buf)).toEqual([["№", "Магазин", "Сумма"], [1, "«Ромашка» & <Ко>", 12500.5], [2, null, 100]]);
+  });
+  it("ссылки на далёкие столбцы и строки не раздувают таблицу (файл из нескольких байт не занимает сервер)", () => {
+    const book = (sheet: string) =>
+      zip([
+        ["xl/workbook.xml", Buffer.from('<workbook><sheets><sheet name="1" sheetId="1" r:id="rId1"/></sheets></workbook>')],
+        ["xl/_rels/workbook.xml.rels", Buffer.from('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>')],
+        ["xl/worksheets/sheet1.xml", Buffer.from(`<worksheet><sheetData>${sheet}</sheetData></worksheet>`)],
+      ]);
+    const started = Date.now();
+    const far = readXlsx(book('<row r="1"><c r="A1" t="inlineStr"><is><t>Чай</t></is></c><c r="FXSHRXW1" t="inlineStr"><is><t>x</t></is></c></row>'));
+    expect(far).toEqual([["Чай"]]);
+    expect(() => readXlsx(book('<row r="2000000000"><c r="A2000000000"><v>1</v></c></row>'))).toThrow("загрузите его частями");
+    expect(Date.now() - started).toBeLessThan(2000);
   });
   it("не-Excel файл — понятная ошибка", () => {
     expect(() => readXlsx(Buffer.from("name;price\nЧай;1000"))).toThrow("не похож на Excel");

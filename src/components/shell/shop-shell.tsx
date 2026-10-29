@@ -3,6 +3,8 @@ import { Suspense, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { db } from "@/lib/db";
+import { liveStamp } from "@/lib/live";
+import { LiveRefresh } from "./live-refresh";
 import { getShopContext } from "@/lib/auth/current";
 import { logoutAction } from "@/app/(auth)/actions";
 import { getT } from "@/lib/i18n/server";
@@ -94,13 +96,15 @@ async function cartSummary(shopId: string) {
 async function ShopActions() {
   const [ctx, t] = await Promise.all([getShopContext(), getT()]);
   if (!ctx) return <LanguageSwitcher onDark />;
-  const [unread, cart] = await Promise.all([
+  const [unread, cart, stamp] = await Promise.all([
     db.notification.count({ where: { userId: ctx.auth.user.id, readAt: null } }),
     cartSummary(ctx.shop.id),
+    liveStamp(ctx.auth.user.id),
   ]);
   return (
     <>
       <LanguageSwitcher onDark />
+      <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative grid size-9 place-items-center rounded-full hover:bg-white/10" aria-label={t("Уведомления")}>
         <span aria-hidden>🔔</span>
         {unread > 0 && (

@@ -77,7 +77,7 @@ export function buildXlsx(sheets: Sheet[]): Buffer {
   return zip(files.map(([name, text]) => [name, Buffer.from(text, "utf8")]));
 }
 
-function zip(entries: [string, Buffer][]): Buffer {
+export function zip(entries: [string, Buffer][]): Buffer {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;
@@ -176,6 +176,12 @@ function colIndex(ref: string) {
   return n - 1;
 }
 
+// Ссылка вида r="XFDXFD1" или r="1048576" из присланного файла иначе раздула бы массив до
+// миллиардов ячеек и заняла сервер на десятки минут: столбцы дальше предела пропускаются,
+// слишком длинный лист отклоняется.
+const MAX_COLS = 50;
+const MAX_ROWS = 10_000;
+
 // Первый лист книги как таблица строк; числа — числами, остальное — строками.
 export function readXlsx(buf: Buffer): (string | number | null)[][] {
   const files = unzip(buf);
@@ -192,6 +198,7 @@ export function readXlsx(buf: Buffer): (string | number | null)[][] {
   for (const rm of sheet.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const rAttr = /\br="(\d+)"/.exec(rm[1]);
     const rIndex = rAttr ? Number(rAttr[1]) - 1 : rows.length;
+    if (!(rIndex >= 0 && rIndex < MAX_ROWS)) throw new XlsxError(`В файле больше ${MAX_ROWS} строк — загрузите его частями`);
     const row: (string | number | null)[] = [];
     let next = 0;
     for (const cm of (rm[2] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
@@ -199,6 +206,7 @@ export function readXlsx(buf: Buffer): (string | number | null)[][] {
       const ref = /\br="([A-Z]+\d+)"/.exec(attrs)?.[1];
       const ci = ref ? colIndex(ref) : next;
       next = ci + 1;
+      if (ci >= MAX_COLS) continue;
       const type = /\bt="(\w+)"/.exec(attrs)?.[1];
       const inner = cm[2] ?? "";
       const v = /<v>([\s\S]*?)<\/v>/.exec(inner)?.[1];

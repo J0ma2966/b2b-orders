@@ -3,6 +3,8 @@ import { Suspense, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { db } from "@/lib/db";
+import { liveStamp } from "@/lib/live";
+import { LiveRefresh } from "./live-refresh";
 import { getAuth, getSupplierContext } from "@/lib/auth/current";
 import { logoutAction } from "@/app/(auth)/actions";
 import { getT } from "@/lib/i18n/server";
@@ -67,10 +69,11 @@ async function SupplierName() {
 async function CourierActions() {
   const [auth, t] = await Promise.all([getAuth(), getT()]);
   if (!auth) return <LanguageSwitcher />;
-  const unread = await db.notification.count({ where: { userId: auth.user.id, readAt: null } });
+  const [unread, stamp] = await Promise.all([db.notification.count({ where: { userId: auth.user.id, readAt: null } }), liveStamp(auth.user.id)]);
   return (
     <div className="flex items-center gap-1.5">
       <LanguageSwitcher />
+      <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Уведомления")}>
         <span aria-hidden>🔔</span>
         {unread > 0 && (
