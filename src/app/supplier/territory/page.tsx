@@ -5,6 +5,7 @@ import { getTerritoryOptions } from "@/lib/territory";
 import { TerritoryForm } from "./form";
 import { TerritoryTermsForm } from "./terms-form";
 import { Tr } from "@/components/ui/tr";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 export default async function SupplierTerritoryPage() {
   const ctx = await requireSupplier(["OWNER", "ADMIN"]);
@@ -20,7 +21,7 @@ export default async function SupplierTerritoryPage() {
         ],
       },
     }),
-    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: true } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: true } }),
   ]);
   return (
     <>

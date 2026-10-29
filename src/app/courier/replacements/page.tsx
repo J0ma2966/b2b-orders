@@ -3,13 +3,13 @@ import { Media } from "@/components/orders/replacement-view";
 import { CompleteReplacementForm } from "@/components/orders/replacement-forms";
 import { ActionTiles } from "@/components/orders/delivery-card";
 import { db } from "@/lib/db";
-import { requireSupplier } from "@/lib/auth/current";
+import { requireDeliverer } from "@/lib/auth/current";
 import { formatQty } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
 
 export default async function CourierReplacementsPage() {
   const t = await getT();
-  const ctx = await requireSupplier(["COURIER"]);
+  const ctx = await requireDeliverer();
   const me = ctx.auth.user.id;
   const rows = await db.replacement.findMany({
     where: {

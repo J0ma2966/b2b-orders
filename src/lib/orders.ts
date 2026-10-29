@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/format";
 import { generateQrToken } from "@/lib/qr-token";
 import { paymentDue } from "@/lib/accounts";
 import { supplierTermsForShop } from "@/lib/supplier-terms";
+import { delivererWhere } from "@/lib/supplier-roles";
 import {
   canAssignCourier,
   canEditForced,
@@ -493,12 +494,13 @@ export async function assignCourier(supplierId: string, orderId: string, courier
       if (order.courierId) await notifyUsers([order.courierId], { type: "order.unassigned", title: `Заказ №${order.number} снят с вас`, link: "/courier", entity: "Order", entityId: order.id }, tx);
       return;
     }
-    const courier = await tx.supplierMember.findFirst({ where: { supplierId, userId: courierUserId, role: "COURIER", isActive: true }, include: { user: true } });
+    const courier = await tx.supplierMember.findFirst({ where: { supplierId, userId: courierUserId, ...delivererWhere }, include: { user: true } });
     if (!courier) throw new OrderError("Доставщик не найден");
     if (order.courierId === courierUserId) return;
     await tx.order.update({ where: { id: order.id }, data: { status: "ASSIGNED", courierId: courierUserId, assignedAt: new Date() } });
     await addEvent(tx, order.id, { type: "courier.assigned", from: order.status, to: "ASSIGNED", actorRole, data: { courierId: courierUserId, courierName: courier.user.fullName, previousCourierId: order.courierId } }, actor);
-    await notifyUsers([courierUserId], { type: "order.assigned", title: `Вам назначен заказ №${order.number}`, link: "/courier", entity: "Order", entityId: order.id }, tx);
+    // Поставщик, назначивший доставку на себя, уведомление себе не получает
+    if (courierUserId !== actor.userId) await notifyUsers([courierUserId], { type: "order.assigned", title: `Вам назначен заказ №${order.number}`, link: "/courier", entity: "Order", entityId: order.id }, tx);
     if (order.courierId) await notifyUsers([order.courierId], { type: "order.unassigned", title: `Заказ №${order.number} передан другому доставщику`, link: "/courier", entity: "Order", entityId: order.id }, tx);
     if (order.status !== "ASSIGNED") await notifyShop(order.shopId, shopNote(order, "назначен доставщик", courier.user.fullName), tx);
   });
@@ -517,7 +519,7 @@ export async function makeReady(supplierId: string, orderId: string, actorRole: 
 export async function suggestedCourier(supplierId: string, shopTerritoryId: string) {
   const terms = await supplierTermsForShop(db, supplierId, shopTerritoryId);
   if (!terms.courierId) return null;
-  const member = await db.supplierMember.findFirst({ where: { supplierId, userId: terms.courierId, role: "COURIER", isActive: true } });
+  const member = await db.supplierMember.findFirst({ where: { supplierId, userId: terms.courierId, ...delivererWhere } });
   return member ? terms.courierId : null;
 }
 

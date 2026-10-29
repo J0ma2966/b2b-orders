@@ -1,13 +1,13 @@
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PointsMap, type MapPoint } from "@/components/map/points-map";
 import { db } from "@/lib/db";
-import { requireSupplier } from "@/lib/auth/current";
+import { requireDeliverer } from "@/lib/auth/current";
 import { DELIVERY_ACTIVE } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
 
 export default async function CourierMapPage() {
   const t = await getT();
-  const ctx = await requireSupplier(["COURIER"]);
+  const ctx = await requireDeliverer();
   const me = ctx.auth.user.id;
   const [orders, replacements] = await Promise.all([
     db.order.findMany({ where: { supplierId: ctx.supplier.id, courierId: me, status: { in: DELIVERY_ACTIVE } }, include: { shop: true } }),

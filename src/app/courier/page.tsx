@@ -1,13 +1,14 @@
 import { EmptyState } from "@/components/ui";
 import { DeliveryHero, DeliveryRow } from "@/components/orders/delivery-card";
 import { db } from "@/lib/db";
-import { requireSupplier } from "@/lib/auth/current";
+import { requireDeliverer } from "@/lib/auth/current";
 import { WarmPages } from "@/components/orders/offline-sync";
 import { yandexRouteUrl } from "@/lib/order-core";
 import { courierRoute } from "@/lib/route";
 import { getT } from "@/lib/i18n/server";
 import Link from "next/link";
 import { courierCash } from "@/lib/cash";
+import { handsOverCash } from "@/lib/supplier-roles";
 import { moveRouteAction, resetRouteAction } from "./actions";
 
 const moveBtn = "grid size-9 place-items-center rounded-lg bg-gray-100 text-base text-ink hover:bg-gray-200 disabled:opacity-30";
@@ -16,7 +17,7 @@ const moveBtn = "grid size-9 place-items-center rounded-lg bg-gray-100 text-base
 // ниже — маршрут дня (Д2): ближайшая точка за ближайшей, порядок можно поменять вручную.
 export default async function CourierHome() {
   const t = await getT();
-  const ctx = await requireSupplier(["COURIER"]);
+  const ctx = await requireDeliverer();
   const { route, later } = await courierRoute(ctx.supplier.id, ctx.auth.user.id);
   const replacementsByShop = await db.replacement.groupBy({
     by: ["shopId"],
@@ -25,6 +26,7 @@ export default async function CourierHome() {
   });
   const repl = new Map(replacementsByShop.map((r) => [r.shopId, r._count]));
   const cash = await courierCash(ctx.supplier.id, ctx.auth.user.id);
+  const handsOver = handsOverCash(ctx.membership.role);
   // В пути — первой, затем по маршруту
   const [current, ...queue] = route;
   const routeUrl = route.length > 1 ? yandexRouteUrl(route) : null;
@@ -38,8 +40,8 @@ export default async function CourierHome() {
         {later.length > 0 && ` · ${t("Предстоящие")} · ${later.length}`}
       </p>
       <Link href="/courier/cash" className="mb-4 flex items-center justify-between rounded-xl bg-surface px-4 py-3 ring-1 ring-gray-200">
-        <span className="text-sm text-gray-500">💵 {t("Наличные на руках")}</span>
-        <b className="tabular-nums">{t.money(cash.onHand)}</b>
+        <span className="text-sm text-gray-500">💵 {handsOver ? t("Наличные на руках") : t("Наличными сегодня")}</span>
+        <b className="tabular-nums">{t.money(handsOver ? cash.onHand : cash.today)}</b>
       </Link>
       {route.length === 0 && later.length === 0 && <EmptyState>{t("Назначенных доставок пока нет")}</EmptyState>}
       {current && <DeliveryHero o={current} replacements={repl.get(current.shopId)} />}

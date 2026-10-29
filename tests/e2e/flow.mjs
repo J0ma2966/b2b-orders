@@ -512,6 +512,84 @@ await sup.goto(`${BASE}/supplier/stock`);
 await sup.waitForTimeout(800);
 log("остатки после замены:", JSON.stringify((await sup.locator("main").innerText()).slice(0, 400)));
 
+// ═════════ Поставщик-ИП развозит сам ═════════
+const check = (name, ok) => {
+  log(name, ok ? "OK" : "ОШИБКА");
+  if (!ok) process.exitCode = 1;
+};
+await sup.goto(`${BASE}/supplier/delivery`);
+await sup.waitForTimeout(1000);
+check("новый поставщик сразу развозит сам:", (await visible(sup, "Открыть приложение доставки").count()) > 0);
+await sup.getByRole("button", { name: "Не развожу сам" }).click();
+await sup.waitForTimeout(1500);
+check("выключил «Сам развожу»:", (await sup.getByRole("button", { name: "Сам развожу заказы" }).count()) > 0);
+await sup.getByRole("button", { name: "Сам развожу заказы" }).click();
+await sup.waitForTimeout(1500);
+check("снова включил:", (await visible(sup, "Открыть приложение доставки").count()) > 0);
+await shot(sup, "39-supplier-delivery");
+
+await shop.goto(`${BASE}/shop/suppliers/${supplierId}/products/${productUrl.split("/").pop()}`);
+await shop.waitForTimeout(800);
+await shop.locator("[name=qty]:visible").first().fill("2");
+await shop.getByRole("button", { name: "В корзину" }).first().click();
+await shop.waitForTimeout(1500);
+await shop.goto(`${BASE}/shop/cart/${supplierId}`);
+await shop.getByRole("button", { name: "Оформить заказ" }).click();
+await shop.waitForURL(/placed=1/, { timeout: 15000, waitUntil: "commit" });
+const selfOrderUrl = shop.url().split("?")[0];
+const selfOrderId = selfOrderUrl.split("/").pop();
+await sup.goto(`${BASE}/supplier/orders/${selfOrderId}`);
+await sup.waitForTimeout(1000);
+for (const b of ["Принять заказ", "Начать сборку", "Готов к доставке"]) {
+  await sup.getByRole("button", { name: b }).click();
+  await sup.waitForTimeout(1500);
+}
+const meOption = await sup.locator("[name=courierId] option", { hasText: "Я сам" }).first().getAttribute("value");
+check("«Я сам» в списке доставщиков:", !!meOption);
+await sup.locator("[name=courierId]").selectOption(meOption);
+await sup.getByRole("button", { name: "Назначить" }).click();
+await sup.waitForTimeout(1500);
+await sup.reload();
+await sup.waitForTimeout(1000);
+check("ссылка «Везу сам»:", (await visible(sup, /Везу сам/).count()) > 0);
+
+// Тот же поставщик в дороге — с телефона, в приложении доставки
+const selfCour = await (await ctx(true)).newPage();
+await selfCour.goto(`${BASE}/login`);
+await selfCour.getByLabel("Телефон").fill(SUP_PHONE);
+await selfCour.getByLabel("Пароль").fill("supplier123");
+await selfCour.getByRole("button", { name: "Войти" }).click();
+await selfCour.waitForURL(/\/supplier/, { timeout: 15000, waitUntil: "commit" });
+await selfCour.goto(`${BASE}/courier`);
+await selfCour.waitForTimeout(1200);
+check("поставщик видит свою доставку:", selfCour.url().endsWith("/courier") && (await selfCour.locator(`a[href='/courier/orders/${selfOrderId}']`).count()) > 0);
+await shot(selfCour, "40-supplier-as-courier-mobile");
+await selfCour.goto(`${BASE}/courier/orders/${selfOrderId}`);
+await selfCour.waitForTimeout(1000);
+await selfCour.getByRole("button", { name: /Выехал к магазину/ }).click();
+await selfCour.waitForTimeout(1500);
+await selfCour.reload();
+await selfCour.waitForTimeout(1000);
+await shop.goto(selfOrderUrl);
+await shop.waitForTimeout(1000);
+await shop.getByRole("button", { name: "Подтвердить получение" }).click();
+await shop.waitForTimeout(500);
+const selfCode = (await shop.locator("p.font-mono:visible").innerText()).trim();
+await selfCour.locator("[name=received]").fill("10000");
+await selfCour.locator("[name=qr]").fill(selfCode);
+await selfCour.getByRole("button", { name: "Подтвердить получение" }).click();
+await selfCour.waitForTimeout(2000);
+log("приёмка поставщиком:", JSON.stringify((await selfCour.locator("main").innerText()).slice(0, 200)));
+await shop.goto(selfOrderUrl);
+await shop.waitForTimeout(1000);
+check("магазин получил заказ от поставщика:", (await visible(shop, /Завершён|Частично принят/).count()) > 0);
+await selfCour.goto(`${BASE}/courier/cash`);
+await selfCour.waitForTimeout(800);
+check("касса владельца без «сдать поставщику»:", (await visible(selfCour, "Наличными сегодня").count()) > 0 && (await visible(selfCour, /Сдайте наличные/).count()) === 0);
+await selfCour.getByLabel("Кабинет поставщика").click();
+await selfCour.waitForURL(/supplier\/delivery/, { timeout: 15000, waitUntil: "commit" });
+check("из приложения доставки обратно в кабинет:", true);
+
 // отчёты, карта, финансы
 await sup.goto(`${BASE}/supplier/reports?period=month`);
 await sup.waitForTimeout(1200);

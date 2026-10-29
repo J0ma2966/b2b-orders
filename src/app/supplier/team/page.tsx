@@ -4,9 +4,9 @@ import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { formatPhone } from "@/lib/phone";
 import { SUPPLIER_ROLE_LABEL } from "@/lib/statuses";
-import { assignableRoles, canManageMember } from "@/lib/supplier-roles";
+import { assignableRoles, canManageMember, canSetDelivers } from "@/lib/supplier-roles";
 import { toggleMemberAction } from "../actions";
-import { AddMemberForm, ResetPasswordButton } from "./forms";
+import { AddMemberForm, DeliversToggle, ResetPasswordButton } from "./forms";
 import { getT } from "@/lib/i18n/server";
 
 export default async function TeamPage() {
@@ -25,7 +25,8 @@ export default async function TeamPage() {
         <Card className="p-0 sm:p-0 xl:col-span-2">
           <ul className="divide-y divide-gray-100">
             {members.map((m) => {
-              const manageable = canManageMember(ctx.membership.role, m.role) && m.userId !== ctx.auth.user.id;
+              const self = m.userId === ctx.auth.user.id;
+              const manageable = canManageMember(ctx.membership.role, m.role) && !self;
               return (
                 <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <div className={m.isActive ? "" : "opacity-50"}>
@@ -36,7 +37,9 @@ export default async function TeamPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge color={m.role === "COURIER" ? "blue" : "gray"}>{SUPPLIER_ROLE_LABEL[m.role]}</Badge>
+                    {m.delivers && m.role !== "COURIER" && <Badge color="blue">{t("Развозит сам")}</Badge>}
                     {!m.isActive && <Badge color="red">{t("Отключён")}</Badge>}
+                    {m.isActive && canSetDelivers(ctx.membership.role, m.role, self) && <DeliversToggle memberId={m.id} delivers={m.delivers} />}
                     {manageable && (
                       <>
                         <ResetPasswordButton memberId={m.id} />

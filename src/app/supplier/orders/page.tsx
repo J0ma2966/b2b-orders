@@ -11,6 +11,7 @@ import { requireActiveSupplier } from "@/lib/auth/current";
 import { CLOSED, orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
 import type { Prisma } from "@/generated/prisma/client";
 import { getT } from "@/lib/i18n/server";
+import { delivererWhere } from "@/lib/supplier-roles";
 
 export default async function SupplierOrdersPage({ searchParams }: PageProps<"/supplier/orders">) {
   const t = await getT();
@@ -28,7 +29,7 @@ export default async function SupplierOrdersPage({ searchParams }: PageProps<"/s
   const [total, rows, couriers] = await Promise.all([
     db.order.count({ where }),
     db.order.findMany({ where, include: { shop: true, courier: true }, orderBy: { placedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
-    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, role: "COURIER", isActive: true }, include: { user: true } }),
+    db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: true } }),
   ]);
   // Л1: заказ выше доступного кредита магазина — сколько нужно получить при доставке
   const overLimit = new Map<string, number>();
