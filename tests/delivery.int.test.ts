@@ -4,7 +4,7 @@ vi.mock("@/lib/auth/current", () => ({ getAuth: async () => null }));
 
 import { db } from "@/lib/db";
 import { addToCart, assignCourier, checkout, OrderError, supplierOrderAction } from "@/lib/orders";
-import { confirmDelivery, correctBalance, decideCancelRequest, markNotDelivered, registerDebtPayment, requestCancel, setCredit, startDelivery } from "@/lib/delivery";
+import { confirmDelivery, correctBalance, decideCancelRequest, markNotDelivered, registerDebtPayment, releaseCourierWork, requestCancel, resolveProblem, setCredit, startDelivery } from "@/lib/delivery";
 import { applyStock } from "@/lib/stock";
 
 const enabled = !!process.env.TEST_DATABASE_URL;
@@ -157,5 +157,25 @@ describe.skipIf(!enabled)("чужой поставщик не трогает с�
     await expect(registerDebtPayment(supplierId, shop.id, 1000, "CASH", new Date(), null)).rejects.toThrow("Магазин не найден");
     await expect(setCredit(supplierId, shop.id, true, 5_000_000)).rejects.toThrow("Магазин не найден");
     expect(await db.shopAccount.count({ where: { shopId: shop.id } })).toBe(0);
+  });
+
+  it("отключённый доставщик теряет заказы: назначенные — на переназначение, в пути — в проблему", async () => {
+    const user = await db.user.create({ data: { phone: `+99894${tag.slice(-7)}`, passwordHash: "-", fullName: "Второй" } });
+    const member = await db.supplierMember.create({ data: { supplierId, userId: user.id, role: "COURIER" } });
+    const inTransit = await shopWithOrder(1);
+    await db.order.update({ where: { id: inTransit.order.id }, data: { courierId: user.id } });
+    const assigned = await shopWithOrder(1);
+    await db.order.update({ where: { id: assigned.order.id }, data: { courierId: user.id, status: "ASSIGNED" } });
+    await db.supplierMember.update({ where: { id: member.id }, data: { isActive: false } });
+    // Пока заказы на нём, отключённый доставщик не может их провести (даже работая у другого поставщика)
+    const items = inTransit.order.items.map((i) => ({ id: i.id, delivered: 1, accepted: 1 }));
+    await expect(confirmDelivery(user.id, inTransit.order.id, { items, received: 1000, method: "CASH", qr: inTransit.order.qrToken! })).rejects.toThrow("не найден");
+    expect(await releaseCourierWork(supplierId, user.id, "SUPPLIER_OWNER")).toMatchObject({ reassign: 1, problems: 1 });
+    expect(await db.order.findUniqueOrThrow({ where: { id: assigned.order.id } })).toMatchObject({ status: "READY", courierId: null });
+    expect((await db.order.findUniqueOrThrow({ where: { id: inTransit.order.id } })).status).toBe("DELIVERY_PROBLEM");
+    // «Продолжить доставку» с отключённым доставщиком нельзя — только вернуть на склад
+    await expect(resolveProblem(supplierId, inTransit.order.id, "continue", null, "SUPPLIER_OWNER")).rejects.toThrow("отключён");
+    await resolveProblem(supplierId, inTransit.order.id, "back_to_ready", null, "SUPPLIER_OWNER");
+    expect(await db.order.findUniqueOrThrow({ where: { id: inTransit.order.id } })).toMatchObject({ status: "READY", courierId: null });
   });
 });

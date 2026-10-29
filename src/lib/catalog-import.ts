@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { applyStock, currentActor } from "@/lib/stock";
+import { applyStock, currentActor, lockStockUnits } from "@/lib/stock";
 import { changeUnitPrice } from "@/lib/pricing";
 import { unitName } from "@/lib/catalog";
 import { isSuspiciousDrop } from "@/lib/stock-core";
@@ -65,6 +65,8 @@ export async function applyImport(supplierId: string, rows: ImportRow[], fileNam
     async (tx) => {
       const plan = await planImport(supplierId, rows, tx);
       const { find } = await loadCatalog(tx, supplierId);
+      // Существующие единицы — под блокировку сразу и по порядку, как при оформлении заказов
+      await lockStockUnits(tx, rows.flatMap((r) => find(r)?.units.map((u) => u.id) ?? []));
       const categories = new Map((await tx.category.findMany({ where: { supplierId } })).map((c) => [c.name.toLowerCase(), c]));
       const made = new Map<string, { id: string; name: string; supplierId: string; units: { id: string; kind: string; customName: string; price: Prisma.Decimal | null; baseUnitId: string | null }[] }>();
       const reason = `Загрузка из Excel: ${fileName}`.slice(0, 200);

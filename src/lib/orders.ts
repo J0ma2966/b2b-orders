@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { CancelSide, Order, OrderStatus, PaymentMethod } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { applyStock, currentActor, StockError } from "@/lib/stock";
+import { applyStock, currentActor, lockStockUnits, StockError } from "@/lib/stock";
 import { notifySupplierStaff, notifyUsers, type NotificationInput } from "@/lib/notify";
 import { supplierForShop } from "@/lib/shop-catalog";
 import { formatQty, unitName } from "@/lib/catalog";
@@ -71,6 +71,7 @@ export async function notifyShop(shopId: string, n: NotificationInput, tx: Tx | 
 
 // Освобождает резерв по всем позициям заказа (отмена, отклонение).
 export async function releaseAll(tx: Tx, order: { id: string; items: { productUnitId: string; qty: Prisma.Decimal }[] }, actor: Actor, reason: string) {
+  await lockStockUnits(tx, order.items.map((i) => i.productUnitId));
   for (const item of order.items) {
     await applyStock(tx, { unitId: item.productUnitId, type: "RELEASE", qty: num(item.qty), reason, relatedEntity: "Order", relatedId: order.id }, actor);
   }
@@ -134,30 +135,41 @@ export async function addToCart(shop: { id: string; territoryId: string; isBlock
   if (!unit) throw new OrderError("Товар недоступен для заказа");
   if (!validQty(unit.kind, qty)) throw new OrderError("Неверное количество");
   const actor = await currentActor();
-  const cart = await getOrCreateCart(shop.id, supplierId, actor.userId);
-  const existing = await db.orderItem.findFirst({ where: { orderId: cart.id, productUnitId: unit.id } });
-  const newQty = num(existing?.qty) + qty;
-  const available = num(unit.physicalQty) - num(unit.reservedQty);
-  if (newQty > available) {
-    throw new OrderError(available > 0 ? `Доступно только ${formatQty(available)} ${unitName(unit)}` : "Товара нет в наличии");
-  }
-  if (existing) {
-    await db.orderItem.update({ where: { id: existing.id }, data: { qty: newQty, price: unit.price! } });
-  } else {
-    await db.orderItem.create({
-      data: {
-        orderId: cart.id,
-        productUnitId: unit.id,
-        productName: unit.product.name,
-        unitLabel: unitName(unit),
-        price: unit.price!,
-        qty,
-        addedByUserId: actor.userId,
-      },
+  // Позиция меняется под блокировкой корзины: параллельное оформление иначе зарезервирует
+  // старое количество, а позиция появится или изменится уже в оформленном заказе
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const cart = await getOrCreateCart(shop.id, supplierId, actor.userId);
+    const r = await db.$transaction(async (tx) => {
+      const order = await lockOrder(tx, cart.id);
+      // Корзину только что оформили — товар ляжет в новую
+      if (order.status !== "DRAFT") return null;
+      const existing = order.items.find((i) => i.productUnitId === unit.id);
+      const newQty = num(existing?.qty) + qty;
+      const available = num(unit.physicalQty) - num(unit.reservedQty);
+      if (newQty > available) {
+        throw new OrderError(available > 0 ? `Доступно только ${formatQty(available)} ${unitName(unit)}` : "Товара нет в наличии");
+      }
+      if (existing) {
+        await tx.orderItem.update({ where: { id: existing.id }, data: { qty: newQty, price: unit.price! } });
+      } else {
+        await tx.orderItem.create({
+          data: {
+            orderId: cart.id,
+            productUnitId: unit.id,
+            productName: unit.product.name,
+            unitLabel: unitName(unit),
+            price: unit.price!,
+            qty,
+            addedByUserId: actor.userId,
+          },
+        });
+      }
+      await recalcTotal(tx, cart.id);
+      return { cartId: cart.id, qty: newQty };
     });
+    if (r) return r;
   }
-  await db.$transaction((tx) => recalcTotal(tx, cart.id));
-  return { cartId: cart.id, qty: newQty };
+  throw new OrderError("Корзина только что изменилась, добавьте товар ещё раз");
 }
 
 // М1: «Повторить заказ» — те же товары в корзину по текущим ценам; что недоступно, перечисляется
@@ -204,15 +216,17 @@ export async function repeatOrder(shop: { id: string; territoryId: string; isBlo
 export async function setCartQty(shopId: string, itemId: string, qty: number) {
   const item = await db.orderItem.findUnique({ where: { id: itemId }, include: { order: true, productUnit: true } });
   if (!item || item.order.shopId !== shopId || item.order.status !== "DRAFT") throw new OrderError("Позиция не найдена");
-  if (qty === 0) {
-    await db.orderItem.delete({ where: { id: item.id } });
-  } else {
-    if (!validQty(item.productUnit.kind, qty)) throw new OrderError("Неверное количество");
-    const available = num(item.productUnit.physicalQty) - num(item.productUnit.reservedQty);
-    if (qty > available) throw new OrderError(`Доступно только ${formatQty(Math.max(0, available))} ${item.unitLabel}`);
-    await db.orderItem.update({ where: { id: item.id }, data: { qty } });
-  }
-  await db.$transaction((tx) => recalcTotal(tx, item.orderId));
+  if (qty !== 0 && !validQty(item.productUnit.kind, qty)) throw new OrderError("Неверное количество");
+  const available = num(item.productUnit.physicalQty) - num(item.productUnit.reservedQty);
+  if (qty > available) throw new OrderError(`Доступно только ${formatQty(Math.max(0, available))} ${item.unitLabel}`);
+  // Под блокировкой корзины: если её успели оформить, оформленный заказ не меняется
+  await db.$transaction(async (tx) => {
+    const order = await lockOrder(tx, item.orderId);
+    if (order.status !== "DRAFT" || !order.items.some((i) => i.id === item.id)) throw new OrderError("Корзина уже оформлена или позиция убрана, обновите страницу");
+    if (qty === 0) await tx.orderItem.delete({ where: { id: item.id } });
+    else await tx.orderItem.update({ where: { id: item.id }, data: { qty } });
+    await recalcTotal(tx, item.orderId);
+  });
 }
 
 // Приводит корзину к актуальному состоянию каталога и остатков (ТЗ п. 22).
@@ -343,13 +357,14 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
         const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
         if (items.length === 0) throw new OrderError("Корзина пуста");
 
+        const now = new Date();
+        const promos = await activePromotions(tx, supplierId, now);
+        await lockStockUnits(tx, [...items.map((i) => i.productUnitId), ...promos.map((p) => p.giftUnitId)]);
         for (const item of items) {
           await applyStock(tx, { unitId: item.productUnitId, type: "RESERVE", qty: num(item.qty), reason: "Оформление заказа", relatedEntity: "Order", relatedId: order.id }, actor);
         }
 
         // Бонусы — после резерва основных позиций, только из оставшегося доступного остатка
-        const now = new Date();
-        const promos = await activePromotions(tx, supplierId, now);
         const bonusNotes: string[] = [];
         if (promos.length > 0) {
           const bought = new Map<string, number>();

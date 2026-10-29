@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { REGIONS } from "./territories";
+import { initialSuperadminPassword } from "./superadmin";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
@@ -27,7 +28,7 @@ async function main() {
   });
 
   const phone = process.env.SUPERADMIN_PHONE ?? "+998900000000";
-  const password = process.env.SUPERADMIN_PASSWORD ?? "admin12345";
+  const { password, mustChange } = initialSuperadminPassword(process.env.SUPERADMIN_PASSWORD);
   const admin = await db.user.findUnique({ where: { phone } });
   if (!admin) {
     await db.user.create({
@@ -36,7 +37,7 @@ async function main() {
         fullName: "Супер-администратор",
         passwordHash: await bcrypt.hash(password, 12),
         isSuperAdmin: true,
-        mustChangePassword: !process.env.SUPERADMIN_PASSWORD,
+        mustChangePassword: mustChange,
       },
     });
     console.log(`Создан супер-администратор ${phone}`);

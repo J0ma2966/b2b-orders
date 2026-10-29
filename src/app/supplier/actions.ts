@@ -12,6 +12,7 @@ import { normalizePhone } from "@/lib/phone";
 import { isRealFile, saveImage, UploadError } from "@/lib/storage";
 import { supplierTransition } from "@/lib/statuses";
 import { canManageMember } from "@/lib/supplier-roles";
+import { releaseCourierWork } from "@/lib/delivery";
 import { coord, formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
 
 function roleTag(role: string) {
@@ -258,6 +259,7 @@ export async function toggleMemberAction(formData: FormData) {
   // Отключённый сотрудник сразу теряет доступ к организации
   if (member.isActive) {
     await db.session.updateMany({ where: { userId: member.userId, activeSupplierId: ctx.supplier.id }, data: { activeSupplierId: null } });
+    if (member.role === "COURIER") await releaseCourierWork(ctx.supplier.id, member.userId, roleTag(ctx.membership.role));
   }
   await writeAudit({
     entity: "SupplierMember",
