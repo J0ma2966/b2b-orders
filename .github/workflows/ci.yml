@@ -55,7 +55,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - name: Переводы на узбекский
-        run: node scripts/i18n-check.mjs --missing | tee /tmp/i18n.txt && grep -q "^0 из" /tmp/i18n.txt
+        # строки без перевода печатаются в stdout, итог — в stderr
+        run: |
+          node scripts/i18n-check.mjs --missing > /tmp/i18n.txt
+          cat /tmp/i18n.txt
+          test ! -s /tmp/i18n.txt
       - run: npm test
       - run: npm run build
       - name: Сквозной сценарий в браузере
