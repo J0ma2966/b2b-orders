@@ -18,7 +18,7 @@ const ACC = {
 const supplierId = sql(`SELECT id FROM "Supplier" WHERE status = 'ACTIVE' ORDER BY "createdAt" DESC`);
 const orderId = sql(`SELECT id FROM "Order" WHERE status <> 'DRAFT' ORDER BY (status = 'IN_TRANSIT') DESC, "placedAt" ASC`);
 const PAGES = {
-  shop: ["/shop", `/shop/suppliers/${supplierId}`, "/shop/search?q=вода", "/shop/cart", "/shop/orders", `/shop/orders/${orderId}`],
+  shop: ["/shop", `/shop/suppliers/${supplierId}`, "/shop?q=вода", "/shop/cart", "/shop/orders", `/shop/orders/${orderId}`],
   courier: ["/courier", `/courier/orders/${orderId}`, "/courier/replacements", "/courier/history", "/account", "/courier/map"],
   supplier: ["/supplier", "/supplier/orders", `/supplier/orders/${orderId}`],
   admin: ["/admin", "/admin/suppliers"],

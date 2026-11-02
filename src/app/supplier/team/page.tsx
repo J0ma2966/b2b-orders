@@ -30,7 +30,7 @@ export default async function TeamPage() {
               return (
                 <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <div className={m.isActive ? "" : "opacity-50"}>
-                    <div className="font-medium">{m.user.fullName}</div>
+                    <div className="font-medium">{t.person(m.user.fullName)}</div>
                     <div className="text-xs text-gray-500">
                       {formatPhone(m.user.phone)} · {t("с {date}", { date: t.date(m.createdAt) })}
                     </div>

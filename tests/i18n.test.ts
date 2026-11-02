@@ -55,3 +55,16 @@ describe("узбекский словарь", () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe("удалённый пользователь", () => {
+  it("подпись на языке интерфейса, обычные имена как есть", async () => {
+    const { DELETED_NAME } = await import("@/lib/i18n/core");
+    const { formatPhone } = await import("@/lib/phone");
+    expect(makeT("uz").person(DELETED_NAME)).toBe("Oʻchirilgan foydalanuvchi");
+    expect(makeT("ru").person(DELETED_NAME)).toBe(DELETED_NAME);
+    expect(makeT("uz").person("Новый")).toBe("Новый");
+    expect(makeT("uz").person(null)).toBe("");
+    expect(formatPhone("deleted:abc123")).toBe("—");
+    expect(formatPhone("+998901234567")).toBe("+998 90 123-45-67");
+  });
+});

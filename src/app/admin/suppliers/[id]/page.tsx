@@ -82,7 +82,7 @@ export default async function SupplierDetailPage({ params }: PageProps<"/admin/s
               {supplier.members.map((m) => (
                 <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <div>
-                    <div className="text-sm font-medium">{m.user.fullName}</div>
+                    <div className="text-sm font-medium">{t.person(m.user.fullName)}</div>
                     <div className="text-xs text-gray-500">
                       {t(SUPPLIER_ROLE_LABEL[m.role])} · {formatPhone(m.user.phone)}{!m.isActive && ` · ${t("отключён")}`}
                     </div>

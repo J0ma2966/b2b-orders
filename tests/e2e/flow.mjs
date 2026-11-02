@@ -250,7 +250,9 @@ await shot(admin, "12-antifraud");
 log("антифрод у админа:", await admin.getByText("Вода питьевая 1 л").locator("visible=true").count() > 0);
 await admin.getByRole("button", { name: "Отклонить и вернуть цену" }).first().click();
 await admin.waitForTimeout(1500);
-log("решение антифрода:", await admin.getByText("Решение сохранено").locator("visible=true").count() > 0);
+const afOk = await admin.getByText("Решение сохранено").locator("visible=true").count() > 0;
+log("решение антифрода:", afOk ? "OK" : "ОШИБКА");
+if (!afOk) process.exitCode = 1;
 
 await sup.goto(`${BASE}/supplier/stock`);
 await sup.waitForTimeout(800);
@@ -262,6 +264,22 @@ await shop.waitForTimeout(1200);
 await shot(shop, "14-shop-catalog-mobile");
 const card = await shop.locator("a", { hasText: "Вода питьевая 1 л" }).locator("visible=true").first().innerText();
 log("карточка в каталоге магазина:", JSON.stringify(card));
+
+// лента товаров на главной: товары всех поставщиков, с подписью поставщика
+await shop.goto(`${BASE}/shop`);
+await shop.waitForTimeout(1200);
+await shot(shop, "14b-shop-feed-mobile");
+const feedOk = (await shop.locator("a", { hasText: "Вода питьевая 1 л" }).locator("visible=true").count()) > 0
+  && (await shop.getByRole("link", { name: SUPNAME }).locator("visible=true").count()) > 0;
+log("лента товаров на главной:", feedOk ? "OK" : "ОШИБКА");
+if (!feedOk) process.exitCode = 1;
+await shop.goto(`${BASE}/shop/search?q=${encodeURIComponent("вода")}`);
+await shop.waitForTimeout(1000);
+const searchOk = new URL(shop.url()).pathname === "/shop" && (await shop.locator("a", { hasText: "Вода питьевая 1 л" }).locator("visible=true").count()) > 0;
+log("поиск в ленте:", searchOk ? "OK" : "ОШИБКА");
+if (!searchOk) process.exitCode = 1;
+await shop.goto(`${BASE}/shop/suppliers/${supplierId}`);
+await shop.waitForTimeout(800);
 await shop.locator("a", { hasText: "Вода питьевая 1 л" }).first().click();
 await shop.waitForURL(/products\//, { waitUntil: "commit" });
 await shop.waitForTimeout(1000);

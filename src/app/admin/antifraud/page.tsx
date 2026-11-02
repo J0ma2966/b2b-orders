@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
@@ -45,6 +45,11 @@ export default async function AntifraudPage({ searchParams }: PageProps<"/admin/
   return (
     <>
       <PageHeader title="Антифрод цен" subtitle="Снижение цены на 30% и более" />
+      {typeof sp.saved === "string" && (
+        <div className="mb-4">
+          <Alert tone="success">Решение сохранено</Alert>
+        </div>
+      )}
       <FilterBar status={status} allLabel="Открытые" statuses={Object.entries(STATUS).map(([k, v]) => [k, v[0]])} search={false} />
       {events.length === 0 ? (
         <EmptyState>{t("Событий нет")}</EmptyState>

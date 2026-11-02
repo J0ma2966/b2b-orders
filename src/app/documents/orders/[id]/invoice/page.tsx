@@ -55,7 +55,7 @@ export default async function InvoicePage({ params }: PageProps<"/documents/orde
         </tbody>
       </table>
       <div className="mt-10 grid grid-cols-2 gap-8">
-        <div>{t("Передал:")} ____________ {o.courier?.fullName}</div>
+        <div>{t("Передал:")} ____________ {t.person(o.courier?.fullName)}</div>
         <div>{t("Принял:")} ____________ {o.contactName}</div>
       </div>
     </>

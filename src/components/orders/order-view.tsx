@@ -94,7 +94,7 @@ export async function OrderHistory({ events }: { events: EventView[] }) {
           {e.comment && <div className="text-sm whitespace-pre-line text-gray-700">{t(e.comment)}</div>}
           <div className="text-xs text-gray-500">
             {t.dateTime(e.createdAt)}
-            {e.user && ` · ${e.user.fullName}`}
+            {e.user && ` · ${t.person(e.user.fullName)}`}
             {e.actorRole && ` (${t(actorRoleText(e.actorRole))})`}
           </div>
         </li>

@@ -73,7 +73,7 @@ async function ShopName() {
 async function SearchForm({ className }: { className?: string }) {
   const t = await getT();
   return (
-    <form action="/shop/search" role="search" className={className}>
+    <form action="/shop" role="search" className={className}>
       <input
         name="q"
         type="search"
