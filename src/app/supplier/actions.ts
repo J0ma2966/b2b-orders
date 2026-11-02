@@ -280,9 +280,10 @@ export async function setDeliversAction(_prev: FormState, formData: FormData): P
   const delivers = formData.get("delivers") === "1";
   if (delivers === member.delivers) return success("");
   if (!delivers) {
-    // Нельзя выключить, пока на сотруднике висят доставки и замены
+    // Нельзя выключить, пока на сотруднике висят доставки и замены; заказ с запросом отмены
+    // после отказа в отмене вернётся к нему же
     const [orders, replacements] = await Promise.all([
-      db.order.count({ where: { supplierId: ctx.supplier.id, courierId: member.userId, status: { in: ["ASSIGNED", "IN_TRANSIT", "DELIVERY_PROBLEM"] } } }),
+      db.order.count({ where: { supplierId: ctx.supplier.id, courierId: member.userId, status: { in: ["ASSIGNED", "IN_TRANSIT", "DELIVERY_PROBLEM", "NEEDS_CONFIRMATION"] } } }),
       db.replacement.count({ where: { supplierId: ctx.supplier.id, courierId: member.userId, status: "ASSIGNED" } }),
     ]);
     if (orders + replacements > 0) return { error: `Сначала завершите или передайте другому доставщику: заказов ${orders}, замен ${replacements}` };
