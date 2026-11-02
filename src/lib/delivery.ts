@@ -2,13 +2,14 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import type { PaymentMethod } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { applyStock, currentActor } from "@/lib/stock";
+import { applyStock, currentActor, lockStockUnits } from "@/lib/stock";
 import { notifySupplierStaff, notifyUsers } from "@/lib/notify";
 import { formatMoney } from "@/lib/format";
 import { addEvent, lockOrder, notifyShop, OrderError, releaseAll, shopNote } from "@/lib/orders";
 import { normalizeQrInput, sameToken } from "@/lib/qr-token";
 import { creditCheck, distributePayment } from "./finance-core";
 import { accountState } from "./accounts";
+import { delivererWhere } from "./supplier-roles";
 import { failsShopCheck, orderTotal, problemText, validQty, type ProblemReason } from "./order-core";
 
 type Tx = Prisma.TransactionClient;
@@ -49,10 +50,55 @@ export async function addDebtEntry(
   });
 }
 
+async function activeCourier(client: Tx | typeof db, supplierId: string, courierId: string) {
+  return !!(await client.supplierMember.findFirst({ where: { supplierId, userId: courierId, ...delivererWhere }, select: { id: true } }));
+}
+
 async function courierOrder(tx: Tx, orderId: string, courierId: string) {
   const order = await lockOrder(tx, orderId);
-  if (order.courierId !== courierId) throw new OrderError("Заказ не найден");
+  // Отключённый у поставщика доставщик (даже если работает у другого) с его заказами больше не работает
+  if (order.courierId !== courierId || !(await activeCourier(tx, order.supplierId, courierId))) throw new OrderError("Заказ не найден");
   return order;
+}
+
+// Доставщика отключили: назначенные заказы возвращаются «Готов к доставке» для переназначения,
+// заказы в пути становятся «Проблемой при доставке» — её решает поставщик (вернуть на склад
+// или отменить), задания на замену снова ждут доставщика. Иначе заказы зависли бы в пути.
+export async function releaseCourierWork(supplierId: string, courierId: string, actorRole: string) {
+  const actor = await currentActor();
+  const note = "Доставщик отключён: верните заказ на склад для другого доставщика или отмените";
+  const open = await db.order.findMany({ where: { supplierId, courierId, status: { in: ["ASSIGNED", "IN_TRANSIT", "NEEDS_CONFIRMATION"] } }, select: { id: true } });
+  let reassign = 0;
+  let problems = 0;
+  for (const { id } of open) {
+    await db.$transaction(async (tx) => {
+      const order = await lockOrder(tx, id);
+      if (order.courierId !== courierId) return;
+      if (order.status === "ASSIGNED") {
+        await tx.order.update({ where: { id }, data: { status: "READY", courierId: null, assignedAt: null } });
+        await addEvent(tx, id, { type: "courier.unassigned", from: "ASSIGNED", to: "READY", comment: "Доставщик отключён", actorRole }, actor);
+        reassign++;
+      } else if (order.status === "IN_TRANSIT") {
+        await tx.order.update({ where: { id }, data: { status: "DELIVERY_PROBLEM", problemReason: "OTHER", problemNote: note, problemAt: new Date(), staleRemindedAt: null } });
+        await addEvent(tx, id, { type: "delivery.problem", from: "IN_TRANSIT", to: "DELIVERY_PROBLEM", comment: note, actorRole }, actor);
+        problems++;
+      } else if (order.status === "NEEDS_CONFIRMATION") {
+        // Если в отмене откажут, заказ вернётся не «в пути» к отключённому доставщику, а в проблему
+        await tx.order.update({ where: { id }, data: { statusBeforeRequest: "DELIVERY_PROBLEM", problemReason: "OTHER", problemNote: note, problemAt: new Date() } });
+        problems++;
+      }
+    });
+  }
+  const replacements = await db.replacement.updateMany({ where: { supplierId, courierId, status: "ASSIGNED", newOrderId: null }, data: { status: "APPROVED", courierId: null, assignedAt: null } });
+  if (reassign + problems + replacements.count > 0) {
+    await notifySupplierStaff(supplierId, {
+      type: "courier.deactivated",
+      title: "Заказы отключённого доставщика ждут решения",
+      body: `Вернулись к назначению: ${reassign}, в пути (теперь «Проблема при доставке»): ${problems}, замен без доставщика: ${replacements.count}`,
+      link: "/supplier/orders",
+    });
+  }
+  return { reassign, problems, replacements: replacements.count };
 }
 
 // ───────────── Доставщик (ТЗ п. 29–35) ─────────────
@@ -132,6 +178,7 @@ export async function confirmDelivery(courierId: string, orderId: string, input:
     if (order.qrUsedAt || !order.qrToken) throw new OrderError("QR-код уже использован");
     if (!sameToken(normalizeQrInput(input.qr), order.qrToken)) throw new OrderError("QR-код не подходит к этому заказу");
 
+    await lockStockUnits(tx, order.items.map((i) => i.productUnitId));
     const units = new Map((await tx.productUnit.findMany({ where: { id: { in: order.items.map((i) => i.productUnitId) } } })).map((u) => [u.id, u]));
     const byId = new Map(input.items.map((i) => [i.id, i]));
     const accepted: { kind: (typeof order.items)[number]["kind"]; price: number; qty: number }[] = [];
@@ -269,6 +316,7 @@ export async function resolveProblem(supplierId: string, orderId: string, resolu
     } else if (resolution === "back_to_ready") {
       await tx.order.update({ where: { id: order.id }, data: { status: "READY", courierId: null, assignedAt: null, inTransitAt: null } });
     } else {
+      if (!order.courierId || !(await activeCourier(tx, supplierId, order.courierId))) throw new OrderError("Доставщик заказа отключён: верните заказ на склад или отмените");
       await tx.order.update({ where: { id: order.id }, data: { status: "IN_TRANSIT" } });
     }
     const to = resolution === "cancel" ? "CANCELLED_BY_SUPPLIER" : resolution === "back_to_ready" ? "READY" : "IN_TRANSIT";

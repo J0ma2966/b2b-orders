@@ -158,7 +158,8 @@ export async function completeReplacement(courierId: string, id: string, comment
   await db.$transaction(async (tx) => {
     const r = await lockReplacement(tx, id);
     const mine = r.courierId === courierId || r.newOrder?.courierId === courierId;
-    if (!mine) throw new OrderError("Задание не найдено");
+    const active = await tx.supplierMember.findFirst({ where: { supplierId: r.supplierId, userId: courierId, ...delivererWhere }, select: { id: true } });
+    if (!mine || !active) throw new OrderError("Задание не найдено");
     if (r.status !== "ASSIGNED" && !(r.status === "APPROVED" && r.newOrder?.courierId === courierId)) throw new OrderError("Задание недоступно");
     const qty = num(r.qty);
     const rel = { relatedEntity: "Replacement", relatedId: r.id };

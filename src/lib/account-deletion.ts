@@ -3,6 +3,8 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { notifySuperAdmins } from "@/lib/notify";
+import { releaseCourierWork } from "@/lib/delivery";
+import { delivererWhere } from "@/lib/supplier-roles";
 import type { Prisma } from "@/generated/prisma/client";
 
 // Удаление аккаунта самим пользователем (требование App Store 5.1.1(v) и Google Play).
@@ -34,7 +36,9 @@ export async function deletionImpact(userId: string, tx: Tx | typeof db = db) {
 export async function deleteUserAccount(userId: string) {
   // Случайный пароль считается заранее: bcrypt медленный, транзакцию не держим
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
-  return db.$transaction(async (tx) => {
+  // Где человек возит заказы: после удаления их нужно вернуть на склад или отметить проблему
+  const delivering = await db.supplierMember.findMany({ where: { userId, ...delivererWhere }, select: { supplierId: true } });
+  const result = await db.$transaction(async (tx) => {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.isSuperAdmin) throw new Error("Супер-администратор не удаляется из приложения");
     if (user.status === "DELETED") return { alreadyDeleted: true as const };
@@ -75,4 +79,8 @@ export async function deleteUserAccount(userId: string) {
     });
     return { alreadyDeleted: false as const, ...impact };
   });
+  if (!result.alreadyDeleted) {
+    for (const { supplierId } of delivering) await releaseCourierWork(supplierId, userId, "COURIER");
+  }
+  return result;
 }

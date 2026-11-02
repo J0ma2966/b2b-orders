@@ -85,6 +85,19 @@ export async function applyStock(tx: Tx, op: StockOperation, actor?: { userId: s
   return { physical, reserved };
 }
 
+// Строки остатков блокируются заранее и всегда в одном порядке (по id базовой единицы).
+// Иначе две транзакции с несколькими товарами (корзины «вода, сок» и «сок, вода») берут
+// блокировки встречно и одна из них падает с deadlock.
+export async function lockStockUnits(tx: Tx, unitIds: string[]) {
+  const ids = [...new Set(unitIds)];
+  if (ids.length === 0) return;
+  await tx.$queryRaw`
+    SELECT id FROM "ProductUnit"
+     WHERE id IN (SELECT COALESCE("baseUnitId", id) FROM "ProductUnit" WHERE id = ANY(${ids}::text[]))
+     ORDER BY id
+       FOR UPDATE`;
+}
+
 // Л4: число целых связанных единиц (коробок) из доступного остатка базовой. Строки связанных
 // единиц блокируются уже после базовой — порядок блокировок всегда «база → связанные».
 export async function syncLinkedUnits(tx: Tx, baseUnitId: string) {

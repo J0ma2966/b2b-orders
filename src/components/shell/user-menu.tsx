@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { liveStamp } from "@/lib/live";
+import { LiveRefresh } from "./live-refresh";
 import { getAuth } from "@/lib/auth/current";
 import { logoutAction } from "@/app/(auth)/actions";
 import { stopImpersonationAction } from "@/app/admin/impersonation-actions";
@@ -17,10 +19,11 @@ export async function UserMenu() {
       </div>
     );
   }
-  const unread = await db.notification.count({ where: { userId: auth.user.id, readAt: null } });
+  const [unread, stamp] = await Promise.all([db.notification.count({ where: { userId: auth.user.id, readAt: null } }), liveStamp(auth.user.id)]);
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <LanguageSwitcher />
+      <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative rounded-full p-2 hover:bg-gray-100" aria-label={t("Уведомления")}>
         <span aria-hidden>🔔</span>
         {unread > 0 && (

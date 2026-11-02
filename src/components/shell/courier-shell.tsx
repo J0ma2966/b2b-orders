@@ -3,6 +3,8 @@ import { Suspense, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { db } from "@/lib/db";
+import { liveStamp } from "@/lib/live";
+import { LiveRefresh } from "./live-refresh";
 import { getAuth, getSupplierContext } from "@/lib/auth/current";
 import { logoutAction } from "@/app/(auth)/actions";
 import { getT } from "@/lib/i18n/server";
@@ -67,7 +69,7 @@ async function SupplierName() {
 async function CourierActions() {
   const [auth, t, ctx] = await Promise.all([getAuth(), getT(), getSupplierContext()]);
   if (!auth) return <LanguageSwitcher />;
-  const unread = await db.notification.count({ where: { userId: auth.user.id, readAt: null } });
+  const [unread, stamp] = await Promise.all([db.notification.count({ where: { userId: auth.user.id, readAt: null } }), liveStamp(auth.user.id)]);
   // Поставщик, который развозит сам, возвращается отсюда в свой кабинет
   const staff = ctx && ctx.membership.role !== "COURIER";
   return (
@@ -78,6 +80,7 @@ async function CourierActions() {
         </Link>
       )}
       <LanguageSwitcher />
+      <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Уведомления")}>
         <span aria-hidden>🔔</span>
         {unread > 0 && (
