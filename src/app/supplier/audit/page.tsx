@@ -37,7 +37,7 @@ export default async function SupplierAuditPage({ searchParams }: PageProps<"/su
     db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
   ]);
   const userIds = [...new Set(rows.flatMap((r) => [r.actorUserId, r.onBehalfOfUserId]).filter((x): x is string => !!x))];
-  const users = new Map((await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })).map((u) => [u.id, u.fullName]));
+  const users = new Map((await db.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true } })).map((u) => [u.id, t.person(u.fullName)]));
   const entityLabel = new Map(ENTITIES);
   return (
     <>

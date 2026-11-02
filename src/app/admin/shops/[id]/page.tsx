@@ -78,7 +78,7 @@ export default async function ShopDetailPage({ params }: PageProps<"/admin/shops
                   <ul key="u" className="space-y-1">
                     {shop.members.map((m) => (
                       <li key={m.id} className="flex flex-wrap items-center gap-x-2">
-                        {m.user.fullName} ({formatPhone(m.user.phone)})
+                        {t.person(m.user.fullName)} ({formatPhone(m.user.phone)})
                         {!m.user.isSuperAdmin && <ResetPasswordForm userId={m.userId} />}
                       </li>
                     ))}

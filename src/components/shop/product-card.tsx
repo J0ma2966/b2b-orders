@@ -23,6 +23,7 @@ export async function ProductCard({
   canOrder = true,
   promos,
   favorite,
+  supplier,
 }: {
   p: Product;
   supplierId: string;
@@ -30,6 +31,8 @@ export async function ProductCard({
   canOrder?: boolean;
   promos?: Map<string, PromoBadge>;
   favorite?: boolean;
+  // В ленте на главной — у какого поставщика товар
+  supplier?: { name: string; href: string };
 }) {
   const t = await getT();
   const photo = fileUrl(p.photoPaths[0]);
@@ -56,6 +59,11 @@ export async function ProductCard({
         )}
         <div className="line-clamp-2 min-h-10 px-3 pt-2.5 text-sm leading-5 font-medium group-hover:text-brand-700">{p.name}</div>
       </Link>
+      {supplier && (
+        <Link href={supplier.href} className="truncate px-3 pt-1 text-xs text-gray-500 hover:text-brand-700">
+          {supplier.name}
+        </Link>
+      )}
       <ul className="mt-auto space-y-1.5 px-3 pt-2 pb-3">
         {p.units.map((u) => {
           const avail = Number(u.physicalQty) - Number(u.reservedQty);

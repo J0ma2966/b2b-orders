@@ -84,7 +84,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
                   ["Адрес", order.deliveryAddress],
                   ["Контакт", order.contactName && `${order.contactName}, ${formatPhone(order.contactPhone ?? "")}`],
                   ["Желаемая дата", order.deliveryDate ? t.date(order.deliveryDate) : null],
-                  ["Доставщик", order.courier ? <>{order.courier.fullName}, <a className="text-brand-600" href={`tel:${order.courier.phone}`}>{formatPhone(order.courier.phone)}</a></> : null],
+                  ["Доставщик", order.courier ? <>{t.person(order.courier.fullName)}, <a className="text-brand-600" href={`tel:${order.courier.phone}`}>{formatPhone(order.courier.phone)}</a></> : null],
                   ["Комментарий", order.comment],
                 ]}
               />

@@ -1,0 +1,81 @@
+# Проверка сайта при каждом PR и при попадании в main:
+# миграции на чистой базе, типы, линтер, автотесты, сборка и сквозной сценарий в браузере.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: b2b
+          POSTGRES_PASSWORD: b2b
+          POSTGRES_DB: b2b
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U b2b"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://b2b:b2b@localhost:5432/b2b
+      TEST_DATABASE_URL: postgresql://b2b:b2b@localhost:5432/b2b_test
+      UPLOAD_DIR: ./storage/uploads
+      JOBS_DISABLED: "1"
+      SUPERADMIN_PHONE: "+998900000000"
+      SUPERADMIN_PASSWORD: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Тестовая база
+        run: PGPASSWORD=b2b psql -h localhost -U b2b -d b2b -c "CREATE DATABASE b2b_test"
+      - name: Миграции на чистой базе
+        run: |
+          npx prisma migrate deploy
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Переводы на узбекский
+        # строки без перевода печатаются в stdout, итог — в stderr
+        run: |
+          node scripts/i18n-check.mjs --missing > /tmp/i18n.txt
+          cat /tmp/i18n.txt
+          test ! -s /tmp/i18n.txt
+      - run: npm test
+      - run: npm run build
+      - name: Сквозной сценарий в браузере
+        run: |
+          npx playwright install --with-deps chromium
+          npx prisma db seed
+          npm run start > /tmp/server.log 2>&1 &
+          npx --yes wait-on@8.0.3 -t 60000 http-get://localhost:3000/login
+          mkdir -p /tmp/e2e
+          E2E_OUT=/tmp/e2e ADMIN_PW=admin12345 node tests/e2e/flow.mjs
+          E2E_OUT=/tmp/e2e node tests/e2e/mobile-compliance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screens
+          path: |
+            /tmp/e2e
+            /tmp/server.log
+          retention-days: 7

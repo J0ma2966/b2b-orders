@@ -25,7 +25,12 @@ export type T = {
   dateTime(d: Date | string | null | undefined): string;
   // Русское склонение после числа; в узбекском существительное после числа не меняется
   plural(n: number, one: string, few: string, many: string): string;
+  // Имя человека как есть; у удалённого аккаунта — подпись на языке интерфейса
+  person(name: string | null | undefined): string;
 };
+
+// Имя, которое получает аккаунт после удаления (см. lib/account-deletion.ts)
+export const DELETED_NAME = "Удалённый пользователь";
 
 const TZ = "Asia/Tashkent";
 const dateTimeFmt = new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: TZ });
@@ -151,6 +156,7 @@ export function makeT(locale: Locale): T {
   t.money = (v) => formatMoneyIn(locale, v);
   t.date = (d) => formatDateIn(locale, d);
   t.dateTime = (d) => formatDateTimeIn(d);
+  t.person = (name) => (name === DELETED_NAME ? translate(locale, DELETED_NAME) : (name ?? ""));
   t.plural = (n, one, few, many) => (locale === "ru" ? pluralRu(n, one, few, many) : translate(locale, one));
   instances[locale] = t;
   return t;

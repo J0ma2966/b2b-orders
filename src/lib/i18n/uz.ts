@@ -1660,6 +1660,20 @@ const uz: Record<string, string> = {
   "Сначала завершите или передайте другому доставщику: заказов {0}, замен {1}": "Avval yakunlang yoki boshqa kuryerga oʻtkazing: buyurtmalar {0}, almashtirishlar {1}",
   "{0} теперь может развозить заказы": "{0} endi buyurtmalarni yetkazishi mumkin",
   "{0} больше не развозит заказы": "{0} endi buyurtmalarni yetkazmaydi",
+  "Лента товаров": "Mahsulotlar tasmasi",
+  "Сбросить": "Tozalash",
+  "Поставщики ({n})": "Yetkazib beruvchilar ({n})",
+  "Сначала новые": "Avval yangilari",
+  "По названию": "Nomi boʻyicha",
+  "Поставщики ещё не добавили товары": "Yetkazib beruvchilar hali mahsulot qoʻshmagan",
+  "Доставщик отключён: верните заказ на склад для другого доставщика или отмените": "Kuryer oʻchirilgan: buyurtmani boshqa kuryer uchun omborga qaytaring yoki bekor qiling",
+  "Доставщик отключён": "Kuryer oʻchirilgan",
+  "Заказы отключённого доставщика ждут решения": "Oʻchirilgan kuryerning buyurtmalari qaror kutmoqda",
+  "Вернулись к назначению: {0}, в пути (теперь «Проблема при доставке»): {1}, замен без доставщика: {2}": "Tayinlashga qaytdi: {0}, yoʻlda (endi «Yetkazishda muammo»): {1}, kuryersiz almashtirishlar: {2}",
+  "Доставщик заказа отключён: верните заказ на склад или отмените": "Buyurtma kuryeri oʻchirilgan: buyurtmani omborga qaytaring yoki bekor qiling",
+  "Корзина только что изменилась, добавьте товар ещё раз": "Savat hozirgina oʻzgardi, mahsulotni yana qoʻshing",
+  "Корзина уже оформлена или позиция убрана, обновите страницу": "Savat allaqachon rasmiylashtirilgan yoki mahsulot olib tashlangan, sahifani yangilang",
+  "В файле больше {0} строк — загрузите его частями": "Faylda {0} qatordan koʻp — uni qismlarga boʻlib yuklang",
 };
 
 export default uz;

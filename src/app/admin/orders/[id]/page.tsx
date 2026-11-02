@@ -44,7 +44,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/order
                 ["Адрес", order.deliveryAddress],
                 ["Контакт", order.contactName && `${order.contactName}, ${formatPhone(order.contactPhone ?? "")}`],
                 ["Желаемая дата", order.deliveryDate ? t.date(order.deliveryDate) : null],
-                ["Доставщик", order.courier?.fullName],
+                ["Доставщик", order.courier ? t.person(order.courier.fullName) : null],
                 ["Ставка комиссии", order.commissionRate !== null ? `${order.commissionRate.toString()}%` : null],
                 ["Расчётная комиссия", commission !== null ? t.money(commission) : null],
               ]}

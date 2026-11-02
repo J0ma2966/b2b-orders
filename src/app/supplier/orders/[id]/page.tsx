@@ -180,7 +180,7 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                 {assignable ? (
                   <AssignCourierForm orderId={order.id} current={order.courierId} suggested={suggested} couriers={courierOptions} />
                 ) : (
-                  <p className="text-sm">{order.courier!.fullName}, {formatPhone(order.courier!.phone)}</p>
+                  <p className="text-sm">{t.person(order.courier!.fullName)}, {formatPhone(order.courier!.phone)}</p>
                 )}
                 {myDelivery && (
                   <Link href={`/courier/orders/${order.id}`} className="mt-3 inline-block text-sm font-medium text-brand-600">

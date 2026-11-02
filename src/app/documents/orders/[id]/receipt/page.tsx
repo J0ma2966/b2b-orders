@@ -58,7 +58,7 @@ export default async function ReceiptPage({ params }: PageProps<"/documents/orde
         <Row k="Общая задолженность магазина" v={balanceLabel(balance, t)} bold />
       </dl>
       <p className="mt-6 border-t border-gray-300 pt-2 text-xs text-gray-600">
-        {t("Получение подтверждено магазином по QR-коду {date}. Доставщик: {courier}.", { date: t.dateTime(o.qrUsedAt), courier: o.courier?.fullName ?? "—" })}{" "}
+        {t("Получение подтверждено магазином по QR-коду {date}. Доставщик: {courier}.", { date: t.dateTime(o.qrUsedAt), courier: o.courier ? t.person(o.courier.fullName) : "—" })}{" "}
         {t("Платформа фиксирует оплату, но не проводит платежи.")}
       </p>
     </>

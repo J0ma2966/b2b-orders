@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
@@ -61,7 +62,8 @@ export async function resolveAntifraudAction(_prev: FormState, formData: FormDat
     }
   });
   revalidatePath("/admin/antifraud");
-  return { ok: true, message: "Решение сохранено", at: Date.now() };
+  // Решённое событие уходит из списка открытых вместе с формой, поэтому итог показывает сама страница
+  redirect(`/admin/antifraud?saved=${action}`);
 }
 
 export async function restoreSupplierVisibilityAction(formData: FormData) {

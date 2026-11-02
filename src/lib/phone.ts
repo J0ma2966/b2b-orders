@@ -13,6 +13,8 @@ export function normalizePhone(input: string): string | null {
 }
 
 export function formatPhone(phone: string): string {
+  // Телефон удалённого аккаунта стёрт (deleted:<id>), показывать нечего
+  if (phone.startsWith("deleted:")) return "—";
   const m = /^\+998(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(phone);
   if (!m) return phone;
   return `+998 ${m[1]} ${m[2]}-${m[3]}-${m[4]}`;

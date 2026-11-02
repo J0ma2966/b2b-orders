@@ -21,18 +21,19 @@ export const shopVisibleUnits = { where: { isActive: true, price: { not: null } 
 export type CatalogFilter = "" | "fav" | "often" | "promo";
 
 // Действующие акции поставщика по единице-условию (М3)
-export async function activePromotions(supplierId: string, now = new Date()) {
-  const rows = await db.bonusPromotion.findMany({ where: { supplierId, isActive: true, startsAt: { lte: now }, endsAt: { gt: now } }, orderBy: { createdAt: "asc" } });
+export async function activePromotions(supplierId: string | string[], now = new Date()) {
+  const rows = await db.bonusPromotion.findMany({ where: { supplierId: Array.isArray(supplierId) ? { in: supplierId } : supplierId, isActive: true, startsAt: { lte: now }, endsAt: { gt: now } }, orderBy: { createdAt: "asc" } });
   const byUnit = new Map<string, (typeof rows)[number]>();
   for (const r of rows) if (!byUnit.has(r.triggerUnitId)) byUnit.set(r.triggerUnitId, r);
   return byUnit;
 }
 
-// М4: «часто заказываю» — товары из полученных заказов магазина, по числу заказов
-export async function oftenOrdered(shopId: string, supplierId: string, take = 30) {
+// М4: «часто заказываю» — товары из полученных заказов магазина, по числу заказов.
+// Без supplierId — по всем поставщикам (лента на главной).
+export async function oftenOrdered(shopId: string, supplierId: string | undefined, take = 30) {
   const rows = await db.orderItem.groupBy({
     by: ["productUnitId"],
-    where: { kind: { not: "BONUS" }, order: { shopId, supplierId, status: { in: ["COMPLETED", "PARTIALLY_ACCEPTED"] } } },
+    where: { kind: { not: "BONUS" }, order: { shopId, ...(supplierId && { supplierId }), status: { in: ["COMPLETED", "PARTIALLY_ACCEPTED"] } } },
     _count: { _all: true },
     orderBy: { _count: { productUnitId: "desc" } },
     take: take * 2,
@@ -69,6 +70,45 @@ export async function shopCatalog(
     }),
   ]);
   return { total, products, categories };
+}
+
+export type FeedSort = "new" | "name";
+
+// Лента товаров на главной магазина: все доступные поставщики сразу.
+// Категории у каждого поставщика свои, поэтому фильтр — по названию категории.
+export async function shopFeed(
+  supplierIds: string[],
+  opts: { q?: string; category?: string; supplierId?: string; filter?: CatalogFilter; sort?: FeedSort; shopId: string; skip: number; take: number },
+) {
+  const ids = opts.supplierId ? supplierIds.filter((id) => id === opts.supplierId) : supplierIds;
+  if (ids.length === 0) return { total: 0, products: [], categories: [] as string[] };
+  const now = new Date();
+  let only: Prisma.ProductWhereInput = {};
+  if (opts.filter === "fav") only = { favorites: { some: { shopId: opts.shopId } } };
+  if (opts.filter === "often") only = { id: { in: await oftenOrdered(opts.shopId, undefined, 60) } };
+  if (opts.filter === "promo") {
+    only = { units: { some: { isActive: true, price: { not: null }, bonusTriggers: { some: { isActive: true, startsAt: { lte: now }, endsAt: { gt: now } } } } } };
+  }
+  const visible: Prisma.ProductWhereInput = { OR: ids.map((id) => shopVisibleProduct(id)) };
+  const where: Prisma.ProductWhereInput = {
+    AND: [
+      visible,
+      only,
+      ...(opts.category ? [{ category: { name: opts.category, isArchived: false } }] : []),
+      ...(opts.q ? [{ OR: [{ name: { contains: opts.q, mode: "insensitive" as const } }, { brand: { contains: opts.q, mode: "insensitive" as const } }] }] : []),
+    ],
+  };
+  const orderBy: Prisma.ProductOrderByWithRelationInput[] = opts.sort === "name" ? [{ name: "asc" }, { id: "asc" }] : [{ createdAt: "desc" }, { id: "asc" }];
+  const [total, products, categories] = await Promise.all([
+    db.product.count({ where }),
+    db.product.findMany({ where, include: { units: shopVisibleUnits }, orderBy, skip: opts.skip, take: opts.take }),
+    db.category.findMany({
+      where: { supplierId: { in: ids }, isArchived: false, products: { some: visible } },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { name: true },
+    }),
+  ]);
+  return { total, products, categories: [...new Set(categories.map((c) => c.name))] };
 }
 
 export async function favoriteIds(shopId: string, productIds: string[]) {

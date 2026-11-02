@@ -47,7 +47,7 @@ export async function DebtHistory({ entries, orderHref }: { entries: Entry[]; or
                 <td className="px-3 py-2">{e.order ? <Link className="text-brand-600" href={orderHref(e.order.id)}>№{e.order.number}</Link> : "—"}</td>
                 <td className={amount > 0 ? "px-3 py-2 text-right text-red-700" : "px-3 py-2 text-right text-green-700"}>{amount > 0 ? "+" : "−"}{t.money(Math.abs(amount))}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">{balanceLabel(Number(e.balanceAfter), t)}</td>
-                <td className="px-3 py-2 text-xs text-gray-600">{e.user?.fullName}{e.comment && <div>{t(e.comment)}</div>}</td>
+                <td className="px-3 py-2 text-xs text-gray-600">{t.person(e.user?.fullName)}{e.comment && <div>{t(e.comment)}</div>}</td>
               </tr>
             );
           })}

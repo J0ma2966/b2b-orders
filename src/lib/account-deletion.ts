@@ -11,7 +11,8 @@ import type { Prisma } from "@/generated/prisma/client";
 // Личные данные человека стираются сразу. Заказы, долги, оплаты и чеки — учётные документы
 // организаций (магазина и поставщика), они остаются, но без имени и телефона удалённого человека.
 
-export const DELETED_NAME = "Удалённый пользователь";
+import { DELETED_NAME } from "@/lib/i18n/core";
+export { DELETED_NAME };
 
 type Tx = Prisma.TransactionClient;
 
