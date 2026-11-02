@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оптовые заказы</title>
+</head>
+<body>
+<!-- Приложение открывает сервер (server.url в capacitor.config.ts); эта страница — запасная -->
+<script src="app-config.js"></script>
+<script>window.location.replace((window.APP_CONFIG && window.APP_CONFIG.serverUrl) || "offline.html");</script>
+</body>
+</html>

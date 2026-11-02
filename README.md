@@ -8,6 +8,7 @@
 - PostgreSQL + Prisma 7
 - Tailwind CSS 4, Leaflet + OpenStreetMap
 - PWA: магазин и доставщик ставят приложение на телефон
+- Мобильные приложения Android и iOS: Capacitor 8 (`mobile/`, см. [docs/mobile.md](docs/mobile.md))
 - Vitest (логика), Playwright (сквозной сценарий)
 
 ## Запуск
@@ -46,6 +47,7 @@ npm run dev
 | `src/app/courier` | Кабинет доставщика |
 | `src/app/shop` | Кабинет магазина (мобильный) |
 | `docs/decisions.md` | Решения по пробелам ТЗ |
+| `mobile/`, `capacitor.config.ts` | Приложения Android и iOS, сборка и публикация — `docs/mobile.md` |
 
 ## Этапы (ТЗ п. 88)
 

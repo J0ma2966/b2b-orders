@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { useActionState } from "react";
 import { Alert, Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { PrivacyNote } from "@/components/forms/privacy-note";
 import { AccountFields } from "@/components/forms/account-fields";
 import { MapPicker } from "@/components/map/map-picker";
 import { TerritorySelect } from "@/components/territory/territory-select";
@@ -54,6 +55,7 @@ export function ShopRegisterForm({ territories, loggedIn }: { territories: Terri
           <Input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
         </Field>
       </fieldset>
+      <PrivacyNote />
       <SubmitButton className="w-full sm:w-auto" pendingText="Регистрируем…">{t("Зарегистрировать магазин")}</SubmitButton>
     </ActionForm>
   );
