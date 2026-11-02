@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireAuth } from "@/lib/auth/current";
+import { getAuth, requireAuth } from "@/lib/auth/current";
+import { validDeviceToken } from "@/lib/native-push-core";
 
 export async function setPushEnabledAction(enabled: boolean) {
   const auth = await requireAuth();
@@ -20,5 +21,16 @@ export async function savePushSubscriptionAction(sub: { endpoint: string; keys: 
   });
   await db.user.update({ where: { id: auth.realUser.id }, data: { pushEnabled: true } });
   revalidatePath("/account");
+  return { ok: true };
+}
+
+// Мобильное приложение: токен устройства для push. Привязан к текущей сессии и удаляется при выходе.
+export async function saveDeviceTokenAction(input: { platform: "android" | "ios"; token: string }) {
+  const auth = await getAuth();
+  if (!auth || auth.isImpersonating) return { error: "Нет входа" };
+  const platform = input?.platform === "ios" ? ("IOS" as const) : input?.platform === "android" ? ("ANDROID" as const) : null;
+  if (!platform || !validDeviceToken(platform, input.token)) return { error: "Неверный токен устройства" };
+  const data = { userId: auth.realUser.id, sessionId: auth.session.id, platform };
+  await db.deviceToken.upsert({ where: { token: input.token }, update: data, create: { ...data, token: input.token } });
   return { ok: true };
 }

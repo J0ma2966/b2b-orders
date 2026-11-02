@@ -16,6 +16,7 @@ datasource db {
 enum UserStatus {
   ACTIVE
   BLOCKED
+  DELETED // удалил аккаунт сам: личные данные обезличены, история заказов организации сохранена
 }
 
 model User {
@@ -32,6 +33,7 @@ model User {
   pushEnabled  Boolean    @default(true)
   // Язык интерфейса (ru, uz): для push и уведомлений, когда пользователь не в приложении
   locale       String     @default("ru")
+  deletedAt    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -43,6 +45,7 @@ model User {
   courierOrders     Order[]          @relation("OrderCourier")
   courierReplacements Replacement[]  @relation("ReplacementCourier")
   pushSubscriptions PushSubscription[]
+  deviceTokens      DeviceToken[]
   courierTerritories SupplierTerritory[] @relation("TerritoryCourier")
   cashHandovers      CashHandover[]      @relation("HandoverCourier")
 }
@@ -63,6 +66,7 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   lastSeenAt DateTime @default(now())
+  deviceTokens DeviceToken[]
 
   @@index([userId])
 }
@@ -877,6 +881,28 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+}
+
+// Push в мобильном приложении: токен FCM (Android) или APNs (iOS) устройства.
+// Привязан к сессии входа — после выхода на телефоне уведомления на него не приходят.
+model DeviceToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?
+  session   Session?       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  platform  DevicePlatform
+  token     String         @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([sessionId])
 }
 
 // ───────────── Касса доставщика (Д1) ─────────────

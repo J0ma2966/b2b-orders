@@ -5,6 +5,10 @@ import "@fontsource-variable/unbounded";
 import "@fontsource-variable/commissioner";
 import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
+import { NativeBridge } from "@/components/native/native-bridge";
+import { NativePushSync } from "@/components/native/native-push-sync";
+import { getAuth } from "@/lib/auth/current";
+import { nativePushConfigured } from "@/lib/native-push";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale, getT } from "@/lib/i18n/server";
 
@@ -30,6 +34,13 @@ async function LocaleRoot({ children }: { children: ReactNode }) {
   return <I18nProvider locale={await getLocale()}>{children}</I18nProvider>;
 }
 
+// Мобильное приложение: обновить токен push для вошедшего пользователя
+async function NativeSession() {
+  const auth = await getAuth();
+  if (!auth || auth.isImpersonating || !auth.realUser.pushEnabled) return null;
+  return <NativePushSync config={nativePushConfigured} />;
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ru" className="h-full antialiased">
@@ -38,6 +49,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <LocaleRoot>{children}</LocaleRoot>
         </Suspense>
         <SwRegister />
+        <NativeBridge />
+        <Suspense>
+          <NativeSession />
+        </Suspense>
       </body>
     </html>
   );

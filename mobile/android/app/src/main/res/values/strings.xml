@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Оптовые заказы</string>
+    <string name="title_activity_main">Оптовые заказы</string>
+    <string name="package_name" translatable="false">uz.b2borders.app</string>
+    <string name="custom_url_scheme" translatable="false">uz.b2borders.app</string>
+</resources>

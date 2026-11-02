@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { addToCart, assignCourier, checkout, OrderError, supplierOrderAction } from "@/lib/orders";
 import { confirmDelivery, correctBalance, decideCancelRequest, markNotDelivered, registerDebtPayment, releaseCourierWork, requestCancel, resolveProblem, setCredit, startDelivery } from "@/lib/delivery";
 import { applyStock } from "@/lib/stock";
+import { deleteUserAccount } from "@/lib/account-deletion";
 
 const enabled = !!process.env.TEST_DATABASE_URL;
 const tag = String(Date.now()).slice(-8);
@@ -177,5 +178,17 @@ describe.skipIf(!enabled)("чужой поставщик не трогает с�
     await expect(resolveProblem(supplierId, inTransit.order.id, "continue", null, "SUPPLIER_OWNER")).rejects.toThrow("отключён");
     await resolveProblem(supplierId, inTransit.order.id, "back_to_ready", null, "SUPPLIER_OWNER");
     expect(await db.order.findUniqueOrThrow({ where: { id: inTransit.order.id } })).toMatchObject({ status: "READY", courierId: null });
+  });
+
+  it("доставщик удалил аккаунт: его заказы не зависают", async () => {
+    const user = await db.user.create({ data: { phone: `+99895${tag.slice(-7)}`, passwordHash: "-", fullName: "Удаляется" } });
+    await db.supplierMember.create({ data: { supplierId, userId: user.id, role: "COURIER" } });
+    const inTransit = await shopWithOrder(1);
+    await db.order.update({ where: { id: inTransit.order.id }, data: { courierId: user.id } });
+    const assigned = await shopWithOrder(1);
+    await db.order.update({ where: { id: assigned.order.id }, data: { courierId: user.id, status: "ASSIGNED" } });
+    await deleteUserAccount(user.id);
+    expect(await db.order.findUniqueOrThrow({ where: { id: assigned.order.id } })).toMatchObject({ status: "READY", courierId: null });
+    expect((await db.order.findUniqueOrThrow({ where: { id: inTransit.order.id } })).status).toBe("DELIVERY_PROBLEM");
   });
 });

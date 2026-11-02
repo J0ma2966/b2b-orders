@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
+import { isNativeApp } from "@/lib/native";
+import { registerNativePush, type NativePushConfig } from "@/components/native/native-push";
 import { savePushSubscriptionAction, setPushEnabledAction } from "./push-actions";
 
 function keyToBytes(base64: string) {
@@ -12,13 +14,19 @@ function keyToBytes(base64: string) {
 }
 
 // Push управляется отдельно; уведомления в колокольчике сохраняются всегда (ТЗ п. 57)
-export function PushSettings({ enabled, devices, publicKey }: { enabled: boolean; devices: number; publicKey: string | null }) {
+export function PushSettings({ enabled, devices, publicKey, native }: { enabled: boolean; devices: number; publicKey: string | null; native: NativePushConfig }) {
   const t = useT();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
   async function subscribe() {
     setMessage(null);
+    // Мобильное приложение: системные уведомления Android / iOS
+    if (isNativeApp()) {
+      const error = await registerNativePush(native, true).catch(() => "Не удалось включить push");
+      if (!error && !enabled) await setPushEnabledAction(true);
+      return setMessage(error ?? "Push включён на этом устройстве");
+    }
     if (!publicKey) return setMessage("Push не настроен на сервере");
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return setMessage("Браузер не поддерживает push. На iPhone добавьте приложение на главный экран.");
     const permission = await Notification.requestPermission();

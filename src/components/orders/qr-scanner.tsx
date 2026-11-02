@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { useT } from "@/lib/i18n/client";
+import { isNativeApp } from "@/lib/native";
 
 // Сканер QR камерой телефона. Если камера недоступна — код вводится вручную.
 export function QrScanner({ onScan, onClose }: { onScan: (text: string) => void; onClose: () => void }) {
@@ -33,6 +34,8 @@ export function QrScanner({ onScan, onClose }: { onScan: (text: string) => void;
             const img = g.getImageData(0, 0, c.width, c.height);
             const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
             if (code?.data) {
+              // В приложении — короткая вибрация: код считан, можно убирать телефон
+              if (isNativeApp()) import("@capacitor/haptics").then(({ Haptics, NotificationType }) => Haptics.notification({ type: NotificationType.Success })).catch(() => null);
               onScan(code.data);
               return;
             }
