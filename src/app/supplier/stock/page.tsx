@@ -41,7 +41,30 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
       {units.length === 0 ? (
         <EmptyState>{t("Нет товаров")}</EmptyState>
       ) : (
-        <Card className="overflow-x-auto p-0 sm:p-0">
+        <>
+        {/* Телефон: карточки без горизонтальной прокрутки */}
+        <Card className="divide-y divide-gray-100 p-0! sm:hidden">
+          {units.map((u) => {
+            const avail = Number(u.physicalQty) - Number(u.reservedQty);
+            return (
+              <Link key={u.id} href={`/supplier/stock/${u.id}`} className="flex items-center gap-3 px-4 py-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm">{u.product.name} <span className="text-gray-500">· {t(unitName(u))}</span></span>
+                  <span className="block text-xs text-gray-500">
+                    {u.baseUnit
+                      ? t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })
+                      : `${t("Физический")} ${formatQty(u.physicalQty)} · ${t("Резерв")} ${formatQty(u.reservedQty)}`}
+                  </span>
+                </span>
+                <span className={`shrink-0 text-right font-semibold tabular-nums ${stockTone(avail, u.lowStockThreshold)}`}>
+                  {formatQty(avail)}
+                  <span className="block text-[11px] font-normal text-gray-400">{u.lowStockThreshold !== null ? t("порог {qty}", { qty: formatQty(u.lowStockThreshold) }) : t("Доступно")}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </Card>
+        <Card className="hidden overflow-x-auto p-0 sm:block sm:p-0">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="border-b border-gray-200 text-left text-xs text-gray-500">
               <tr>
@@ -70,7 +93,7 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
                         <td className="px-4 py-2 text-right tabular-nums">{formatQty(u.reservedQty)}</td>
                       </>
                     )}
-                    <td className={`px-4 py-2 text-right font-semibold tabular-nums ${avail <= 0 ? "text-red-600" : u.lowStockThreshold !== null && avail < Number(u.lowStockThreshold) ? "text-yellow-700" : ""}`}>
+                    <td className={`px-4 py-2 text-right font-semibold tabular-nums ${stockTone(avail, u.lowStockThreshold)}`}>
                       {formatQty(avail)}
                       {u.lowStockThreshold !== null && <span className="block text-xs font-normal text-gray-400">{t("порог {qty}", { qty: formatQty(u.lowStockThreshold) })}</span>}
                     </td>
@@ -83,8 +106,13 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
             </tbody>
           </table>
         </Card>
+        </>
       )}
       <Pagination page={page} total={total} basePath="/supplier/stock" params={{ q, status: filter }} />
     </>
   );
+}
+
+function stockTone(avail: number, threshold: unknown) {
+  return avail <= 0 ? "text-red-600" : threshold !== null && avail < Number(threshold) ? "text-yellow-700" : "";
 }

@@ -11,6 +11,7 @@ export function AppShell({
   root,
   nav,
   mobileNav,
+  bottom,
   context,
   children,
 }: {
@@ -18,6 +19,8 @@ export function AppShell({
   root: string;
   nav: NavItem[];
   mobileNav?: NavItem[];
+  // Своя нижняя панель (серверный компонент, например со счётчиками); пока грузится — mobileNav без счётчиков
+  bottom?: ReactNode;
   context?: ReactNode;
   children: ReactNode;
 }) {
@@ -29,8 +32,9 @@ export function AppShell({
       <header className="sticky top-0 z-[1001] border-b border-gray-200 bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href={root} className="shrink-0 font-semibold text-brand-700"><Tr>{title}</Tr></Link>
-            {context && <Suspense>{context}</Suspense>}
+            <Link href={root} className="min-w-0 truncate font-semibold text-brand-700 sm:shrink-0"><Tr>{title}</Tr></Link>
+            {/* На телефоне с нижней панелью место в шапке занимают язык и уведомления; контекст — на экране «Ещё» */}
+            {context && <div className={mobileNav ? "hidden min-w-0 sm:block" : "min-w-0"}><Suspense>{context}</Suspense></div>}
           </div>
           <Suspense fallback={<div className="h-8" />}>
             <UserMenu />
@@ -56,7 +60,7 @@ export function AppShell({
       </div>
       {mobileNav && (
         <Suspense fallback={<BottomNavView items={mobileNav} root={root} />}>
-          <BottomNav items={mobileNav} root={root} />
+          {bottom ?? <BottomNav items={mobileNav} root={root} />}
         </Suspense>
       )}
     </div>

@@ -1,30 +1,5 @@
-import { AppShell } from "@/components/shell/app-shell";
-import { SupplierSwitcher } from "./switcher";
-
-const NAV = [
-  { href: "/supplier", label: "Обзор", icon: "📊" },
-  { href: "/supplier/orders", label: "Заказы", icon: "📋" },
-  { href: "/supplier/catalog", label: "Каталог", icon: "📦" },
-  { href: "/supplier/stock", label: "Остатки", icon: "🏬" },
-  { href: "/supplier/bonuses", label: "Бонусы", icon: "🎁" },
-  { href: "/supplier/shops", label: "Магазины и долги", icon: "🏪" },
-  { href: "/supplier/delivery", label: "Доставка", icon: "🚚" },
-  { href: "/supplier/cash", label: "Касса доставщиков", icon: "💵" },
-  { href: "/supplier/replacements", label: "Замены", icon: "🔁" },
-  { href: "/supplier/returned", label: "Возвращённые товары", icon: "↩️" },
-  { href: "/supplier/reports", label: "Отчёты", icon: "📈" },
-  { href: "/supplier/commission", label: "Комиссия платформы", icon: "🧮" },
-  { href: "/supplier/map", label: "Карта", icon: "🗺️" },
-  { href: "/supplier/profile", label: "Профиль", icon: "🏢" },
-  { href: "/supplier/territory", label: "Территория доставки", icon: "🗺️" },
-  { href: "/supplier/team", label: "Сотрудники и доставщики", icon: "👥" },
-  { href: "/supplier/audit", label: "Журнал действий", icon: "🧾" },
-];
+import { SupplierShell } from "@/components/shell/supplier-shell";
 
 export default function SupplierLayout({ children }: LayoutProps<"/supplier">) {
-  return (
-    <AppShell title="Кабинет поставщика" root="/supplier" nav={NAV} context={<SupplierSwitcher />}>
-      {children}
-    </AppShell>
-  );
+  return <SupplierShell>{children}</SupplierShell>;
 }
