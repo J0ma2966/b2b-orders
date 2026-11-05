@@ -71,6 +71,8 @@ jobs:
           mkdir -p /tmp/e2e
           E2E_OUT=/tmp/e2e ADMIN_PW=admin12345 node tests/e2e/flow.mjs
           E2E_OUT=/tmp/e2e node tests/e2e/mobile-compliance.mjs
+          E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs ru
+          E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs uz
       - uses: actions/upload-artifact@v4
         if: always()
         with:

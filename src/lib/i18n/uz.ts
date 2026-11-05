@@ -1674,6 +1674,13 @@ const uz: Record<string, string> = {
   "Корзина только что изменилась, добавьте товар ещё раз": "Savat hozirgina oʻzgardi, mahsulotni yana qoʻshing",
   "Корзина уже оформлена или позиция убрана, обновите страницу": "Savat allaqachon rasmiylashtirilgan yoki mahsulot olib tashlangan, sahifani yangilang",
   "В файле больше {0} строк — загрузите его частями": "Faylda {0} qatordan koʻp — uni qismlarga boʻlib yuklang",
+  // Приложение поставщика: экран «Ещё»
+  "Ещё": "Yana",
+  "Режим доставки": "Yetkazish rejimi",
+  "Маршрут, приёмка по QR, оплата, работа без сети": "Marshrut, QR orqali qabul, toʻlov, tarmoqsiz ishlash",
+  "Включите, чтобы доставлять заказы из этого же приложения": "Buyurtmalarni shu ilovadan yetkazish uchun yoqing",
+  "Профиль, пароль, уведомления": "Profil, parol, bildirishnomalar",
+  "Деньги": "Pul",
 };
 
 export default uz;
