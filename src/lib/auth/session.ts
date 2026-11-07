@@ -42,7 +42,8 @@ export async function createSession(
 async function setSessionCookie(token: string, expiresAt: Date) {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // COOKIE_SECURE=0 — проверка в локальной сети по http://192.168…:3000 (браузер не сохранит Secure-cookie без HTTPS)
+    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "0",
     sameSite: "lax",
     path: "/",
     expires: expiresAt,

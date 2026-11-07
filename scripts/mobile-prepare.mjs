@@ -2,6 +2,13 @@
 // Запуск: MOBILE_SERVER_URL=https://заказы.uz npm run mobile:sync
 import { readFileSync, writeFileSync } from "node:fs";
 
+if (process.env.MOBILE_DEV_SETUP) {
+  // Адрес сервера выбирается в самом приложении (отладочная сборка для локальной сети)
+  writeFileSync(new URL("../mobile/www/app-config.js", import.meta.url), `window.APP_CONFIG = ${JSON.stringify({ serverUrl: null, devSetup: true })};\n`);
+  console.log("Сервер приложения: выбирается при первом запуске (MOBILE_DEV_SETUP)");
+  process.exit(0);
+}
+
 const url = new URL(process.env.MOBILE_SERVER_URL ?? "https://app.example.uz");
 if (url.protocol !== "https:" && !process.env.MOBILE_ALLOW_HTTP) {
   console.error("MOBILE_SERVER_URL должен начинаться с https:// (для разработки: MOBILE_ALLOW_HTTP=1)");

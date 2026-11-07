@@ -4,9 +4,12 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // Адрес сервера задаётся при сборке: MOBILE_SERVER_URL=https://заказы.uz npx cap sync
 // Сервер — Next.js с Server Actions, поэтому страницы не выкладываются в приложение,
 // а грузятся с сервера; в приложении лежит только страница «нет связи» (mobile/www).
+// Сборка для проверки в локальной сети: MOBILE_DEV_SETUP=1 — адрес сервера не зашит,
+// при первом запуске приложение спрашивает его (только отладочная сборка, см. docs/local-wifi.md).
+const devSetup = !!process.env.MOBILE_DEV_SETUP;
 const serverUrl = process.env.MOBILE_SERVER_URL ?? "https://app.example.uz";
 const host = new URL(serverUrl).host;
-const dev = serverUrl.startsWith("http://");
+const dev = devSetup || serverUrl.startsWith("http://");
 
 const config: CapacitorConfig = {
   appId: process.env.MOBILE_APP_ID ?? "uz.b2borders.app",
@@ -16,14 +19,17 @@ const config: CapacitorConfig = {
   appendUserAgent: "B2BOrdersApp/1",
   backgroundColor: "#f5f6f8",
   loggingBehavior: "production",
-  server: {
-    url: serverUrl,
-    // Только свой домен; остальные ссылки открываются в системном браузере
-    allowNavigation: [host],
-    errorPath: "offline.html",
-    // Открытый HTTP — только для разработки на локальной сети
-    cleartext: dev,
-  },
+  server: devSetup
+    ? // Страница выбора сервера из mobile/www; выбранный адрес подставляет MainActivity
+      { errorPath: "offline.html", cleartext: true }
+    : {
+        url: serverUrl,
+        // Только свой домен; остальные ссылки открываются в системном браузере
+        allowNavigation: [host],
+        errorPath: "offline.html",
+        // Открытый HTTP — только для разработки на локальной сети
+        cleartext: dev,
+      },
   android: {
     path: "mobile/android",
     allowMixedContent: false,

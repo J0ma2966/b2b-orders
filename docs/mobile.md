@@ -40,6 +40,8 @@ npm run mobile:android   # открывает Android Studio
 npm run mobile:ios       # открывает Xcode (только на Mac)
 ```
 
+**Проверка на своём компьютере по Wi‑Fi** — отладочный APK без зашитого адреса (`MOBILE_DEV_SETUP=1`, адрес вводится на телефоне), пошагово: [docs/local-wifi.md](local-wifi.md).
+
 `mobile:sync` пишет адрес сервера в страницу «Нет связи» и в `WKAppBoundDomains` (Info.plist), затем `cap sync` копирует настройки в оба проекта. Для разработки на своём компьютере: `MOBILE_ALLOW_HTTP=1 MOBILE_SERVER_URL=http://192.168.1.10:3000 npm run mobile:sync` — открытый HTTP разрешён только в отладочной сборке Android.
 
 Проверка в CI: `.github/workflows/mobile.yml` на каждый PR собирает отладочный APK (скачивается в разделе Actions → запуск → Artifacts) и iOS-сборку для симулятора. Адрес сервера для CI — переменная репозитория `MOBILE_SERVER_URL`.
