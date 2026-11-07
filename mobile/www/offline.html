@@ -13,6 +13,9 @@
   h1 { font-size: 20px; margin: 0 0 8px; }
   p { margin: 0 0 6px; color: #5b6475; }
   .uz { margin-top: 14px; font-size: 14px; }
+  .secondary { background: #fff; color: #1f5ad6; border: 1px solid #c9cfda !important; margin-top: 10px !important; }
+  .hint { margin-top: 10px; font-size: 13px; word-break: break-all; }
+  [hidden] { display: none !important; }
   button { margin-top: 22px; width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: #1f5ad6; color: #fff; font-size: 16px; font-weight: 600; }
 </style>
 </head>
@@ -23,11 +26,31 @@
   <p>Проверьте интернет и попробуйте ещё раз. Доставщик может открыть сохранённые доставки, когда связь появится хотя бы на минуту.</p>
   <p class="uz"><b>Server bilan aloqa yo‘q.</b> Internetni tekshirib, qayta urinib ko‘ring.</p>
   <button type="button" id="retry">Повторить · Qayta urinish</button>
+  <button type="button" id="change" class="secondary" hidden>Сменить адрес сервера · Manzilni o‘zgartirish</button>
+  <p class="hint" id="current" hidden></p>
 </main>
 <script src="app-config.js"></script>
 <script>
+  // Тестовая сборка (локальная сеть): адрес сервера выбран на телефоне и его можно сменить
+  var devServer = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.DevServer;
+  var devUrl = null;
+  if (devServer) {
+    devServer.get().then(function (r) {
+      if (!r || !r.available) return;
+      devUrl = r.url || null;
+      document.getElementById("change").hidden = false;
+      if (devUrl) {
+        var cur = document.getElementById("current");
+        cur.textContent = "Сервер: " + devUrl;
+        cur.hidden = false;
+      }
+    }).catch(function () {});
+  }
+  document.getElementById("change").addEventListener("click", function () {
+    window.location.replace("index.html?setup=1");
+  });
   document.getElementById("retry").addEventListener("click", function () {
-    var url = (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || "/";
+    var url = devUrl || (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || "index.html";
     window.location.replace(url);
   });
 </script>

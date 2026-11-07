@@ -42,6 +42,17 @@ jobs:
           name: android-debug-apk
           path: mobile/android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+      # Отладочный APK для проверки в своей Wi‑Fi сети: адрес сервера вводится на телефоне (docs/local-wifi.md)
+      - name: APK для проверки по Wi‑Fi
+        run: |
+          MOBILE_DEV_SETUP=1 npm run mobile:sync -- android
+          (cd mobile/android && ./gradlew --no-daemon assembleDebug)
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk b2b-orders-wifi-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-wifi-test-apk
+          path: b2b-orders-wifi-test.apk
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
