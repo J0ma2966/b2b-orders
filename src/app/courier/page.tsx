@@ -7,6 +7,7 @@ import { yandexRouteUrl } from "@/lib/order-core";
 import { courierRoute } from "@/lib/route";
 import { getT } from "@/lib/i18n/server";
 import Link from "next/link";
+import { Banknote, Map as MapIcon } from "lucide-react";
 import { courierCash } from "@/lib/cash";
 import { handsOverCash } from "@/lib/supplier-roles";
 import { moveRouteAction, resetRouteAction } from "./actions";
@@ -39,8 +40,8 @@ export default async function CourierHome() {
         {t("Сегодня")} · {route.length}
         {later.length > 0 && ` · ${t("Предстоящие")} · ${later.length}`}
       </p>
-      <Link href="/courier/cash" className="mb-4 flex items-center justify-between rounded-xl bg-surface px-4 py-3 ring-1 ring-gray-200">
-        <span className="text-sm text-gray-500">💵 {handsOver ? t("Наличные на руках") : t("Наличными сегодня")}</span>
+      <Link href="/courier/cash" className="mb-4 flex items-center justify-between rounded-2xl bg-surface px-4 py-3 ring-1 ring-gray-200">
+        <span className="flex items-center gap-2.5 text-sm text-gray-500"><span className="grid size-8 place-items-center rounded-xl bg-green-50 text-green-700"><Banknote className="size-[18px]" aria-hidden /></span>{handsOver ? t("Наличные на руках") : t("Наличными сегодня")}</span>
         <b className="tabular-nums">{t.money(handsOver ? cash.onHand : cash.today)}</b>
       </Link>
       {route.length === 0 && later.length === 0 && <EmptyState>{t("Назначенных доставок пока нет")}</EmptyState>}
@@ -56,8 +57,8 @@ export default async function CourierHome() {
             )}
           </div>
           {routeUrl && (
-            <a href={routeUrl} target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 text-sm font-semibold text-ink hover:bg-gray-200">
-              <span aria-hidden>🗺️</span>
+            <a href={routeUrl} target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gray-100 px-4 text-sm font-semibold text-ink hover:bg-gray-200">
+              <MapIcon className="size-[18px]" aria-hidden />
               {t("Открыть весь маршрут в Яндекс Картах")}
             </a>
           )}

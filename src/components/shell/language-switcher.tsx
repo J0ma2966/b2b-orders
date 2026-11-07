@@ -15,7 +15,7 @@ export function LanguageSwitcher({ className, onDark }: { className?: string; on
   const current = useLocale();
   const [pending, start] = useTransition();
   return (
-    <div className={cn("inline-flex rounded-lg p-0.5 text-xs ring-1", onDark ? "ring-white/30" : "ring-gray-200", pending && "opacity-60", className)} role="group" aria-label={t("Язык / Til")}>
+    <div className={cn("inline-flex rounded-full p-0.5 text-xs ring-1", onDark ? "ring-white/30" : "ring-gray-200", pending && "opacity-60", className)} role="group" aria-label={t("Язык / Til")}>
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -30,7 +30,7 @@ export function LanguageSwitcher({ className, onDark }: { className?: string; on
             start(() => setLocaleAction(fd));
           }}
           className={cn(
-            "rounded-md px-2 py-1",
+            "rounded-full px-2.5 py-1 font-medium",
             l === current ? (onDark ? "bg-white text-brand-700" : "bg-brand-600 text-on-brand") : onDark ? "text-white/80 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100",
           )}
         >

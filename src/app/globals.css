@@ -96,9 +96,144 @@ body {
   outline-offset: 2px;
 }
 
+/* ── Движение ──────────────────────────────────────────────────────────────
+   Короткие анимации с «мягкой» кривой: уходящее исчезает быстро, новое появляется плавнее.
+   Всё отключается при «Уменьшить движение» в системе (последний блок файла). */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-exit: 120ms;
+  --duration-enter: 260ms;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Отклик на нажатие: кнопки, плитки и карточки-ссылки чуть «проседают» под пальцем */
+:where(a, button, summary)[class*="rounded"]:not(:disabled) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, scale;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+}
+:where(a, button, summary)[class*="rounded"]:not(:disabled):active {
+  scale: 0.97;
+  transition-duration: 60ms;
+}
+:where(a, button)[class*="rounded-xl"]:not(:disabled):active,
+:where(a, button)[class*="rounded-2xl"]:not(:disabled):active {
+  scale: 0.985;
+}
+
+/* Нижняя панель: плашка активного раздела переезжает, значок «подпрыгивает», счётчик «выскакивает» */
+.nav-indicator {
+  transition:
+    transform 420ms var(--ease-spring),
+    opacity 200ms ease;
+}
+.tab-item:active {
+  scale: 1;
+}
+.tab-item:active .tab-icon {
+  scale: 0.86;
+}
+.tab-icon {
+  transition: scale 160ms var(--ease-out);
+}
+.tab-icon[data-on] {
+  animation: tab-bounce 420ms var(--ease-spring);
+}
+@keyframes tab-bounce {
+  0% { transform: translateY(0) scale(0.86); }
+  45% { transform: translateY(-3px) scale(1.08); }
+  100% { transform: none; }
+}
+.badge-pop {
+  animation: badge-pop 360ms var(--ease-spring);
+}
+@keyframes badge-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: none; }
+}
+
+/* Скелетон вместо надписи «Загрузка…»: серые блоки с бегущим бликом повторяют форму страницы */
+.skeleton {
+  background: linear-gradient(100deg, var(--color-gray-200) 30%, var(--color-gray-100) 50%, var(--color-gray-200) 70%);
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+}
+@keyframes skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+/* Появление блоков (всплывающие сообщения, раскрытые панели) */
+.animate-rise {
+  animation: rise var(--duration-enter) var(--ease-out) both;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+/* ── Переходы между страницами (View Transitions, React <ViewTransition> в template.tsx) ──
+   Переход по ссылке: старая страница гаснет, новая поднимается снизу.
+   Переход по вкладке нижней панели (тип «tab»): мягкий наплыв без сдвига.
+   Шапка и нижняя панель стоят на месте, страница под ними остаётся нажимаемой. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(app-header),
+::view-transition-group(bottom-nav) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-header),
+::view-transition-old(bottom-nav) {
+  display: none;
+}
+::view-transition-new(app-header),
+::view-transition-new(bottom-nav) {
+  animation: none;
+}
+::view-transition-old(.page-out),
+::view-transition-old(.tab-out) {
+  animation: var(--duration-exit) var(--ease-in) both vt-fade-out;
+}
+::view-transition-new(.page-in) {
+  animation: 300ms var(--ease-out) 40ms both vt-rise;
+}
+::view-transition-new(.tab-in) {
+  animation: 240ms var(--ease-out) 40ms both vt-fade-in;
+}
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-rise {
+  from { opacity: 0; transform: translateY(16px); }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; transform: scale(0.99); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     animation: none !important;
+  }
+  :where(a, button, summary)[class*="rounded"]:active,
+  .tab-item:active .tab-icon {
+    scale: none !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

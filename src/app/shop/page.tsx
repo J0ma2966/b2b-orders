@@ -63,7 +63,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
               className="flex shrink-0 items-center gap-2 rounded-full bg-accent/15 py-1.5 pr-1.5 pl-3 text-sm ring-1 ring-accent/40 hover:ring-accent"
             >
               <span aria-hidden>🛒</span>
-              <span className="max-w-40 truncate font-medium">{c.supplier.displayName}</span>
+              <span className="max-w-28 truncate font-medium sm:max-w-40">{c.supplier.displayName}</span>
               <span className="font-bold tabular-nums">{t.money(c.total)}</span>
               <span className="rounded-full bg-accent px-2.5 py-0.5 font-semibold text-on-accent">{t("Оформить")}</span>
             </Link>

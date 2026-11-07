@@ -25,7 +25,9 @@ const PAGES = {
 };
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-for (const [device, opts] of [["desktop", { viewport: { width: 1280, height: 860 } }], ["mobile", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }]]) {
+// DEVICES=mobile — только телефон
+const DEVICES = (process.env.DEVICES ?? "desktop,mobile").split(",");
+for (const [device, opts] of [["desktop", { viewport: { width: 1280, height: 860 } }], ["mobile", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }]].filter(([d]) => DEVICES.includes(d))) {
   const ctx = await browser.newContext(opts);
   await ctx.addCookies([{ name: "lang", value: lang, url: BASE }]);
   const page = await ctx.newPage();

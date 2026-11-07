@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Bell, LogOut } from "lucide-react";
 import { db } from "@/lib/db";
 import { liveStamp } from "@/lib/live";
 import { LiveRefresh } from "./live-refresh";
@@ -24,17 +25,20 @@ export async function UserMenu() {
     <div className="flex items-center gap-2 sm:gap-3">
       <LanguageSwitcher />
       <LiveRefresh stamp={stamp} />
-      <Link href="/notifications" className="relative rounded-full p-2 hover:bg-gray-100" aria-label={t("Уведомления")}>
-        <span aria-hidden>🔔</span>
+      <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Уведомления")}>
+        <Bell className="size-5 text-gray-700" aria-hidden />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-medium text-white">
+          <span key={unread} className="badge-pop absolute top-0 right-0 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-semibold text-white ring-2 ring-surface">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
       </Link>
       <Link href="/account" className="hidden max-w-40 truncate text-sm text-gray-700 sm:block">{auth.user.fullName}</Link>
       <form action={logoutAction}>
-        <button className="text-sm text-gray-500 hover:text-gray-900">{t("Выйти")}</button>
+        <button className="flex items-center gap-1.5 rounded-full p-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900 sm:px-3" aria-label={t("Выйти")} title={t("Выйти")}>
+          <LogOut className="size-5 sm:size-4" aria-hidden />
+          <span className="hidden sm:inline">{t("Выйти")}</span>
+        </button>
       </form>
     </div>
   );
