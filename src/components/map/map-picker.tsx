@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
+import { currentPosition, LocationError } from "@/lib/geolocation";
 import type { LatLng } from "./map-picker-inner";
 
 const Inner = dynamic(() => import("./map-picker-inner"), {
@@ -31,21 +32,17 @@ export function MapPicker({
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
 
-  function locate() {
-    if (!navigator.geolocation) return setGeoError("Браузер не поддерживает определение местоположения");
+  // В приложении — нативная геолокация с запросом разрешения (src/lib/geolocation.ts)
+  async function locate() {
     setLocating(true);
     setGeoError(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating(false);
-      },
-      () => {
-        setGeoError("Не удалось определить местоположение. Отметьте точку на карте вручную.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
+    try {
+      setPoint(await currentPosition());
+    } catch (e) {
+      setGeoError(e instanceof LocationError ? e.message : "Не удалось определить местоположение. Отметьте точку на карте вручную.");
+    } finally {
+      setLocating(false);
+    }
   }
 
   return (
