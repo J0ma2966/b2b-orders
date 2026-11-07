@@ -127,16 +127,22 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
   const t = useT();
   const first = units.find((u) => u.avail > 0) ?? units[0];
   const [unitId, setUnitId] = useState(first?.id);
-  const [qty, setQty] = useState(1);
+  // Количество можно и набрать с клавиатуры (опт — десятки штук), и менять «−» / «+»
+  const [text, setText] = useState("1");
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
   const [pending, start] = useTransition();
   const unit = units.find((u) => u.id === unitId) ?? first;
   if (!unit) return null;
   const max = Math.max(0, unit.avail - unit.inCart);
   const money = (n: number) => t.money(n);
+  const parsed = Number(text.replace(",", "."));
+  const valid = Number.isFinite(parsed) && parsed > 0 && (unit.fraction || Number.isInteger(parsed));
+  const qty = valid ? parsed : 0;
+  const step = (d: number) => setText(String(Math.min(Math.max(1, max), Math.max(1, Math.floor(qty || 1) + d))));
 
   function add() {
     setState({});
+    if (!valid) return setState({ error: "Укажите количество" });
     tapHaptic();
     start(async () => {
       const fd = new FormData();
@@ -145,7 +151,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
       fd.set("qty", String(qty));
       const r = await addToCartAction(initialFormState, fd);
       setState(r.error ? { error: r.error } : { ok: r.message });
-      if (!r.error) setQty(1);
+      if (!r.error) setText("1");
     });
   }
 
@@ -161,7 +167,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
                 type="button"
                 onClick={() => {
                   setUnitId(u.id);
-                  setQty(1);
+                  setText("1");
                   setState({});
                 }}
                 aria-pressed={u.id === unit.id}
@@ -188,11 +194,25 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
           )}
           <div className="pointer-events-auto mx-auto flex max-w-xl gap-2 rounded-[1.75rem] bg-night p-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.45)]">
             <div className="flex h-16 items-center rounded-[1.25rem] bg-night-2 px-1 text-white">
-              <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
+              <button type="button" onClick={() => step(-1)} disabled={valid && qty <= 1} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
                 <Minus className="size-5" strokeWidth={2.4} aria-hidden />
               </button>
-              <span key={qty} className="count-pop min-w-8 text-center text-xl font-bold tabular-nums">{qty}</span>
-              <button type="button" onClick={() => setQty((q) => Math.min(Math.max(1, max), q + 1))} disabled={qty >= max} aria-label={t("Больше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
+              <input
+                name="qty"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setState({});
+                }}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => e.key === "Enter" && add()}
+                inputMode={unit.fraction ? "decimal" : "numeric"}
+                enterKeyHint="done"
+                aria-label={t("Количество")}
+                style={{ width: `${Math.min(7, Math.max(2, text.length)) + 1}ch` }}
+                className="bg-transparent text-center text-xl font-bold tabular-nums focus:outline-none"
+              />
+              <button type="button" onClick={() => step(1)} disabled={valid && qty >= max} aria-label={t("Больше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
                 <Plus className="size-5" strokeWidth={2.4} aria-hidden />
               </button>
             </div>
@@ -203,7 +223,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
               className="flex h-16 min-w-0 flex-1 flex-col items-center justify-center rounded-[1.25rem] bg-lime px-3 text-night disabled:opacity-50"
             >
               <span className="truncate text-base leading-tight font-bold">{max <= 0 ? t("Нет в наличии") : pending ? t("Добавляю…") : t("В корзину")}</span>
-              {max > 0 && <span className="text-sm font-semibold tabular-nums">{money(unit.price * qty)}</span>}
+              {max > 0 && valid && <span className="text-sm font-semibold tabular-nums">{money(unit.price * qty)}</span>}
             </button>
           </div>
         </div>
