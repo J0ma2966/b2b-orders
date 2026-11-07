@@ -230,6 +230,16 @@ export async function setCartQty(shopId: string, itemId: string, qty: number) {
   });
 }
 
+// Кнопка «−» на карточке товара: на одну единицу меньше, на последней — позиция убирается из корзины.
+// Ищется по единице товара, потому что только что добавленная позиция на карточке ещё без номера.
+export async function removeOneFromCart(shopId: string, unitId: string) {
+  const item = await db.orderItem.findFirst({ where: { productUnitId: unitId, order: { shopId, status: "DRAFT" } }, select: { id: true, qty: true } });
+  if (!item) return 0;
+  const next = Math.max(0, Math.round((num(item.qty) - 1) * 1000) / 1000);
+  await setCartQty(shopId, item.id, next);
+  return next;
+}
+
 // Приводит корзину к актуальному состоянию каталога и остатков (ТЗ п. 22).
 // Возвращает список того, что изменилось; пустой список — корзину можно оформлять.
 async function refreshCart(tx: Tx, orderId: string) {

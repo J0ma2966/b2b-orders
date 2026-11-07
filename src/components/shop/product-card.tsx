@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FavoriteButton, QuickAddButton } from "@/components/orders/shop-forms";
+import { CartStepper, FavoriteButton } from "@/components/orders/shop-forms";
 import { formatQty, unitName } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
 import { fileUrl } from "@/lib/storage-url";
@@ -24,6 +24,7 @@ export async function ProductCard({
   promos,
   favorite,
   supplier,
+  cart,
 }: {
   p: Product;
   supplierId: string;
@@ -33,6 +34,8 @@ export async function ProductCard({
   favorite?: boolean;
   // В ленте на главной — у какого поставщика товар
   supplier?: { name: string; href: string };
+  // Сколько каждой единицы уже в корзине (счётчик «− N +»)
+  cart?: Map<string, number>;
 }) {
   const t = await getT();
   const photo = fileUrl(p.photoPaths[0]);
@@ -69,7 +72,7 @@ export async function ProductCard({
           const avail = Number(u.physicalQty) - Number(u.reservedQty);
           const unit = t(unitName(u));
           return (
-            <li key={u.id} className="flex items-center justify-between gap-2">
+            <li key={u.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
               <div className="min-w-0 leading-tight">
                 <div className="text-[15px] font-bold tabular-nums">{t.money(u.price)}</div>
                 <div className={avail > 0 ? "truncate text-xs text-gray-500" : "truncate text-xs text-red-600"}>
@@ -84,7 +87,9 @@ export async function ProductCard({
                   )}
                 </div>
               </div>
-              {canOrder && avail > 0 && <QuickAddButton supplierId={supplierId} unitId={u.id} label={`${p.name}, ${unit}`} />}
+              {canOrder && (avail > 0 || (cart?.get(u.id) ?? 0) > 0) && (
+                <CartStepper supplierId={supplierId} unitId={u.id} qty={cart?.get(u.id) ?? 0} max={avail} label={`${p.name}, ${unit}`} unit={unit} />
+              )}
             </li>
           );
         })}

@@ -1685,6 +1685,11 @@ const uz: Record<string, string> = {
   "Включите, чтобы доставлять заказы из этого же приложения": "Buyurtmalarni shu ilovadan yetkazish uchun yoqing",
   "Профиль, пароль, уведомления": "Profil, parol, bildirishnomalar",
   "Деньги": "Pul",
+  // Счётчик «− N +» на карточке товара
+  "В корзине: {0}": "Savatda: {0}",
+  "В корзине: {qty}": "Savatda: {qty}",
+  "Убрать одну: {name}": "Bittaga kamaytirish: {name}",
+  "Добавить ещё: {name}": "Yana qoʻshish: {name}",
 };
 
 export default uz;

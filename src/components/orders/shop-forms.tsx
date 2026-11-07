@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useOptimistic, useState, useTransition } from "react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addToCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
+import { addToCartAction, removeOneFromCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
 import { useT } from "@/lib/i18n/client";
+import { tapHaptic } from "@/lib/native";
+import { formatQty } from "@/lib/catalog";
 
 export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: string; unitId: string; step: string; max: number }) {
   const t = useT();
@@ -26,30 +29,73 @@ export function AddToCartForm({ supplierId, unitId, step, max }: { supplierId: s
   );
 }
 
-// Кнопка «+» на карточке товара: одна единица в корзину без перехода на страницу товара
-export function QuickAddButton({ supplierId, unitId, label }: { supplierId: string; unitId: string; label: string }) {
+// Счётчик на карточке товара: «+» кладёт одну единицу в корзину, после этого рядом появляются «−» и количество.
+// Число меняется сразу под пальцем (оптимистично), сервер проверяет остаток; при отказе число возвращается и видна причина.
+export function CartStepper({ supplierId, unitId, qty, max, label, unit }: { supplierId: string; unitId: string; qty: number; max: number; label: string; unit: string }) {
   const t = useT();
-  const [state, action, pending] = useActionState(addToCartAction, initialFormState);
-  const added = state.ok && !pending;
+  const [shown, step] = useOptimistic(qty, (cur: number, delta: number) => Math.max(0, Math.round((cur + delta) * 1000) / 1000));
+  const [error, setError] = useState<string | null>(null);
+  const [, start] = useTransition();
+
+  function change(delta: 1 | -1) {
+    setError(null);
+    tapHaptic();
+    start(async () => {
+      step(delta);
+      const fd = new FormData();
+      fd.set("supplierId", supplierId);
+      fd.set("unitId", unitId);
+      fd.set("qty", "1");
+      const r = await (delta > 0 ? addToCartAction : removeOneFromCartAction)(initialFormState, fd);
+      if (r.error) setError(r.error);
+    });
+  }
+
+  const status = <span className="sr-only" role="status">{error ? t(error) : shown > 0 ? t("В корзине: {qty}", { qty: `${formatQty(shown)} ${unit}` }) : ""}</span>;
+  if (shown <= 0) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => change(1)}
+          aria-label={t("Добавить в корзину: {name}", { name: label })}
+          title={error ? t(error) : undefined}
+          className={cn("grid size-9 shrink-0 place-items-center rounded-full", error ? "bg-red-100 text-red-700" : "bg-accent text-on-accent hover:brightness-95")}
+        >
+          {error ? <span aria-hidden className="font-bold">!</span> : <Plus className="size-[18px]" strokeWidth={2.6} aria-hidden />}
+        </button>
+        {error && <p className="w-full text-xs leading-tight text-red-600">{t(error)}</p>}
+        {status}
+      </>
+    );
+  }
   return (
-    <ActionForm action={action} pending={pending} className="shrink-0">
-      <input type="hidden" name="supplierId" value={supplierId} />
-      <input type="hidden" name="unitId" value={unitId} />
-      <input type="hidden" name="qty" value="1" />
-      <button
-        disabled={pending}
-        aria-label={t("Добавить в корзину: {name}", { name: label })}
-        title={state.error ? t(state.error) : undefined}
-        className={cn(
-          "grid size-9 place-items-center rounded-full text-lg font-semibold transition-colors",
-          added ? "bg-brand-600 text-on-brand" : state.error ? "bg-red-100 text-red-700" : "bg-accent text-on-accent hover:brightness-95",
-          pending && "opacity-60",
-        )}
-      >
-        <span aria-hidden>{added ? "✓" : state.error ? "!" : "+"}</span>
-      </button>
-      <span className="sr-only" role="status">{added ? t(state.message) : state.error ? t(state.error) : ""}</span>
-    </ActionForm>
+    <>
+      <div className="stepper-in flex h-9 w-full items-center justify-between rounded-full bg-accent p-0.5 text-on-accent">
+        <button
+          type="button"
+          onClick={() => change(-1)}
+          aria-label={t("Убрать одну: {name}", { name: label })}
+          className="grid size-8 place-items-center rounded-full bg-black/10 hover:bg-black/15"
+        >
+          {shown > 1 ? <Minus className="size-4" strokeWidth={2.6} aria-hidden /> : <Trash2 className="size-4" strokeWidth={2.2} aria-hidden />}
+        </button>
+        <span key={shown} className="count-pop min-w-0 truncate px-1 text-sm font-bold tabular-nums">
+          {formatQty(shown)} <span className="font-medium opacity-75">{unit}</span>
+        </span>
+        <button
+          type="button"
+          onClick={() => change(1)}
+          disabled={shown >= max}
+          aria-label={t("Добавить ещё: {name}", { name: label })}
+          className="grid size-8 place-items-center rounded-full bg-black/10 hover:bg-black/15 disabled:opacity-40"
+        >
+          <Plus className="size-4" strokeWidth={2.6} aria-hidden />
+        </button>
+      </div>
+      {error && <p className="w-full text-xs leading-tight text-red-600">{t(error)}</p>}
+      {status}
+    </>
   );
 }
 

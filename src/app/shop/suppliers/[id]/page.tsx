@@ -7,7 +7,7 @@ import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
-import { activePromotions, favoriteIds, shopCatalog, supplierForShop, type CatalogFilter } from "@/lib/shop-catalog";
+import { activePromotions, cartQtyByUnit, favoriteIds, shopCatalog, supplierForShop, type CatalogFilter } from "@/lib/shop-catalog";
 import { fileUrl } from "@/lib/storage-url";
 
 export default async function ShopSupplierPage({ params, searchParams }: PageProps<"/shop/suppliers/[id]">) {
@@ -22,7 +22,11 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
   const filter = (["fav", "often", "promo"].includes(String(sp.f)) ? sp.f : "") as CatalogFilter;
   const page = pageFrom(sp);
   const { total, products, categories } = await shopCatalog(supplier.id, { q, categoryId, filter, shopId: ctx.shop.id, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE });
-  const [promos, favs] = await Promise.all([activePromotions(supplier.id), favoriteIds(ctx.shop.id, products.map((p) => p.id))]);
+  const [promos, favs, inCart] = await Promise.all([
+    activePromotions(supplier.id),
+    favoriteIds(ctx.shop.id, products.map((p) => p.id)),
+    cartQtyByUnit(ctx.shop.id, products.flatMap((p) => p.units.map((u) => u.id))),
+  ]);
   const logo = fileUrl(supplier.logoPath);
   const cartCount = await db.orderItem.count({ where: { order: { shopId: ctx.shop.id, supplierId: supplier.id, status: "DRAFT" } } });
   const base = `/shop/suppliers/${supplier.id}`;
@@ -93,7 +97,7 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
-            <ProductCard key={p.id} p={p} supplierId={supplier.id} href={`${base}/products/${p.id}`} canOrder={!supplier.ordersDisabled} promos={promos} favorite={favs.has(p.id)} />
+            <ProductCard key={p.id} p={p} supplierId={supplier.id} href={`${base}/products/${p.id}`} canOrder={!supplier.ordersDisabled} promos={promos} favorite={favs.has(p.id)} cart={inCart} />
           ))}
         </div>
       )}

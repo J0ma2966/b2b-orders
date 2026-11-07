@@ -158,6 +158,21 @@ html {
   100% { transform: none; }
 }
 
+/* Счётчик на карточке товара: «+» раскрывается в «− N +», число «щёлкает» при каждом изменении */
+.stepper-in {
+  transform-origin: right center;
+  animation: stepper-in 280ms var(--ease-spring);
+}
+@keyframes stepper-in {
+  from { opacity: 0; transform: scaleX(0.3); }
+}
+.count-pop {
+  animation: count-pop 220ms var(--ease-out);
+}
+@keyframes count-pop {
+  from { opacity: 0.4; transform: translateY(35%) scale(0.9); }
+}
+
 /* Скелетон вместо надписи «Загрузка…»: серые блоки с бегущим бликом повторяют форму страницы */
 .skeleton {
   background: linear-gradient(100deg, var(--color-gray-200) 30%, var(--color-gray-100) 50%, var(--color-gray-200) 70%);

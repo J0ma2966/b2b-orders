@@ -7,7 +7,7 @@ import { availableSuppliersForShop } from "@/lib/territory";
 import { db } from "@/lib/db";
 import { orderStatusFilter } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
-import { activePromotions, favoriteIds, shopFeed, type CatalogFilter, type FeedSort } from "@/lib/shop-catalog";
+import { activePromotions, cartQtyByUnit, favoriteIds, shopFeed, type CatalogFilter, type FeedSort } from "@/lib/shop-catalog";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim().slice(0, 100) : "");
 
@@ -40,7 +40,10 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
           orderBy: { updatedAt: "desc" },
         }),
   ]);
-  const favs = await favoriteIds(shop.id, products.map((p) => p.id));
+  const [favs, inCart] = await Promise.all([
+    favoriteIds(shop.id, products.map((p) => p.id)),
+    cartQtyByUnit(shop.id, products.flatMap((p) => p.units.map((u) => u.id))),
+  ]);
 
   const params = { q, c: category, s: supplierId, f: filter, sort: sort === "new" ? "" : sort };
   const href = (over: Partial<typeof params>) => {
@@ -156,6 +159,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
                       promos={promos}
                       favorite={favs.has(p.id)}
                       supplier={{ name: s.displayName, href: base }}
+                      cart={inCart}
                     />
                   );
                 })}
