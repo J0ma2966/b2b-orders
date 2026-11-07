@@ -45,3 +45,6 @@ next-env.d.ts
 # загруженные файлы
 /storage
 !.env.example
+
+# ключи push (npm run push:setup)
+/secrets/
