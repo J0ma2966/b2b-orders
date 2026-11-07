@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
+import { sessionCookieSecure } from "@/lib/auth/cookie-secure";
 
 export const SESSION_COOKIE = "b2b_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -42,8 +43,8 @@ export async function createSession(
 async function setSessionCookie(token: string, expiresAt: Date) {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
-    // COOKIE_SECURE=0 — проверка в локальной сети по http://192.168…:3000 (браузер не сохранит Secure-cookie без HTTPS)
-    secure: process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "0",
+    // Без Secure только на локальных адресах (http://192.168…:3000) — см. cookie-secure.ts
+    secure: sessionCookieSecure(process.env, (await headers()).get("host")),
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
