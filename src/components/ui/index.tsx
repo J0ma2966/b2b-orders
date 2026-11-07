@@ -8,7 +8,7 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 }
 
 const buttonVariants = {
-  primary: "bg-brand-600 text-on-brand hover:bg-brand-700 disabled:bg-brand-600/50",
+  primary: "bg-brand-600 text-on-brand shadow-sm shadow-brand-700/20 hover:bg-brand-700 disabled:bg-brand-600/50 disabled:shadow-none",
   secondary: "bg-surface text-gray-900 ring-1 ring-gray-300 hover:bg-gray-50",
   danger: "bg-red-600 text-white hover:bg-red-600/85",
   ghost: "text-gray-700 hover:bg-gray-100",
@@ -17,7 +17,7 @@ const buttonVariants = {
 type ButtonVariant = keyof typeof buttonVariants;
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed min-h-10";
+  "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed min-h-11";
 
 export function Button({
   variant = "primary",
@@ -38,7 +38,7 @@ export function ButtonLink({
 }
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-xl bg-surface p-4 shadow-sm ring-1 ring-gray-200 sm:p-6", className)} {...props} />;
+  return <div className={cn("rounded-2xl bg-surface p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_14px_-4px_rgb(0_0_0/0.06)] ring-1 ring-gray-200/70 sm:p-6", className)} {...props} />;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -80,7 +80,7 @@ export function Field({
 }
 
 const inputBase =
-  "block w-full rounded-lg border-0 bg-surface px-3 py-2.5 text-base text-gray-900 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500 focus:outline-none sm:text-sm";
+  "block w-full rounded-xl border-0 bg-surface px-3 py-2.5 text-base text-gray-900 ring-1 ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500 focus:outline-none sm:text-sm";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input id={props.name} className={cn(inputBase, className)} {...props} />;
@@ -117,15 +117,32 @@ export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "
     success: "bg-green-50 text-green-800 ring-green-200",
     warning: "bg-yellow-50 text-yellow-800 ring-yellow-200",
   };
-  return <div className={cn("rounded-lg px-4 py-3 text-sm ring-1", tones[tone])}>{tr(children)}</div>;
+  return <div className={cn("animate-rise rounded-xl px-4 py-3 text-sm ring-1", tones[tone])}>{tr(children)}</div>;
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">{tr(children)}</div>;
+  return <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">{tr(children)}</div>;
 }
 
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={cn("skeleton rounded-lg", className)} />;
+}
+
+// Пока страница грузится — её «силуэт»: заголовок и карточки с бегущим бликом, а не надпись
 export function Spinner() {
-  return <div className="p-8 text-center text-sm text-gray-500"><Tr>Загрузка…</Tr></div>;
+  return (
+    <div className="space-y-4 py-1" role="status" aria-busy="true">
+      <span className="sr-only"><Tr>Загрузка…</Tr></span>
+      <Skeleton className="h-7 w-2/5 rounded-xl" />
+      <Skeleton className="h-4 w-1/4" />
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-20 rounded-2xl" />
+        <Skeleton className="h-20 rounded-2xl" />
+      </div>
+      <Skeleton className="h-28 rounded-2xl" />
+      <Skeleton className="h-28 rounded-2xl" />
+    </div>
+  );
 }
 
 export function DefinitionList({ items }: { items: [string, ReactNode][] }) {

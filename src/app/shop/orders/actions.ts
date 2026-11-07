@@ -7,7 +7,7 @@ import { requireShop } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { supplierForShop } from "@/lib/shop-catalog";
 import { writeAudit } from "@/lib/audit";
-import { addToCart, cancelByShop, checkout, checkoutAll, OrderError, repeatOrder, setCartQty } from "@/lib/orders";
+import { addToCart, cancelByShop, checkout, checkoutAll, OrderError, removeOneFromCart, repeatOrder, setCartQty } from "@/lib/orders";
 import { requestCancel } from "@/lib/delivery";
 import { askOwnerToCheckout } from "@/lib/shop-team";
 import { parseAmount } from "@/lib/catalog";
@@ -30,6 +30,19 @@ export async function addToCartAction(_prev: FormState, formData: FormData): Pro
     const r = await addToCart(ctx.shop, supplierId, unitId, qty);
     revalidatePath("/shop", "layout");
     return success(`Добавлено в корзину. Всего этой позиции: ${formatQty(r.qty)}`);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// «−» на карточке товара
+export async function removeOneFromCartAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  const unitId = String(formData.get("unitId") ?? "");
+  try {
+    const left = await removeOneFromCart(ctx.shop.id, unitId);
+    revalidatePath("/shop", "layout");
+    return success(left > 0 ? `В корзине: ${formatQty(left)}` : "Позиция убрана");
   } catch (e) {
     return fail(e);
   }

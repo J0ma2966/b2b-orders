@@ -12,8 +12,15 @@ export const SHOP_NAV: NavItem[] = [
   { href: "/shop/profile", label: "Профиль", icon: "👤" },
 ];
 
-// В нижнем меню телефона — пять главных разделов; остальное собрано в профиле
-export const SHOP_MOBILE_NAV = SHOP_NAV.filter((i) => ["/shop", "/shop/suppliers", "/shop/cart", "/shop/orders", "/shop/profile"].includes(i.href));
+// В нижнем меню телефона — пять главных разделов (как в макете: главная, корзина, заказы, долги, профиль);
+// поставщики — на главной («Все»), остальное собрано в профиле
+const SHORT: Record<string, string> = { "/shop/debts": "Долги" };
+export const SHOP_MOBILE_NAV = ["/shop", "/shop/cart", "/shop/orders", "/shop/debts", "/shop/profile"].map((href) => {
+  const item = SHOP_NAV.find((i) => i.href === href)!;
+  return { ...item, label: SHORT[href] ?? item.label, also: href === "/shop" ? ["/shop/suppliers", "/shop/search"] : undefined };
+});
+// Страницы поставщика и товара: вместо нижнего меню — своя плашка с итогом корзины
+export const SHOP_NAV_HIDE_ON = ["/shop/suppliers/"];
 
 // М6: эти разделы видит только владелец магазина
 export const SHOP_OWNER_ONLY = ["/shop/debts", "/shop/team"];

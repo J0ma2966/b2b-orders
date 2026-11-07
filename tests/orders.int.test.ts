@@ -4,7 +4,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/auth/current", () => ({ getAuth: async () => null }));
 
 import { db } from "@/lib/db";
-import { addForcedItem, addToCart, cancelByShop, checkout, OrderError, supplierOrderAction } from "@/lib/orders";
+import { addForcedItem, addToCart, cancelByShop, checkout, OrderError, removeOneFromCart, supplierOrderAction } from "@/lib/orders";
+import { cartQtyByUnit } from "@/lib/shop-catalog";
 import { applyStock } from "@/lib/stock";
 
 const enabled = !!process.env.TEST_DATABASE_URL;
@@ -77,6 +78,21 @@ describe.skipIf(!enabled)("заказы: оформление, резерв, б�
       await cancelByShop(o.shopId, o.id, "тест");
     }
     expect(await unitAvail(waterId)).toEqual({ physical: 10, reserved: 0 });
+  });
+
+  it("счётчик на карточке: «+» и «−» меняют количество, на нуле позиция убирается", async () => {
+    const shop = await newShop(100);
+    await addToCart(shop, supplierId, snackId, 1);
+    await addToCart(shop, supplierId, snackId, 1);
+    expect((await cartQtyByUnit(shop.id, [snackId, waterId])).get(snackId)).toBe(2);
+    // Больше остатка не кладётся (чипсов 2)
+    await expect(addToCart(shop, supplierId, snackId, 1)).rejects.toThrow(OrderError);
+    expect(await removeOneFromCart(shop.id, snackId)).toBe(1);
+    expect(await removeOneFromCart(shop.id, snackId)).toBe(0);
+    expect((await cartQtyByUnit(shop.id, [snackId])).has(snackId)).toBe(false);
+    expect(await db.orderItem.count({ where: { productUnitId: snackId, order: { shopId: shop.id } } })).toBe(0);
+    // Лишнее нажатие «−» ничего не ломает
+    expect(await removeOneFromCart(shop.id, snackId)).toBe(0);
   });
 
   it("изменилась цена — заказ не оформляется, корзина обновлена; повтор оформляет по новой цене", async () => {

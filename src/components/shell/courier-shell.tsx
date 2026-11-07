@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
+import { Bell, Building, LogOut, Truck } from "lucide-react";
 import { Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { db } from "@/lib/db";
@@ -30,11 +31,11 @@ export function CourierShell({ children }: { children: ReactNode }) {
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
-      <header className="sticky top-0 z-[1001] border-b border-gray-200 bg-page/95 backdrop-blur">
+      <header className="sticky top-0 z-[1001] border-b border-gray-200/60 bg-page/80 backdrop-blur-xl backdrop-saturate-150" style={{ viewTransitionName: "app-header" }}>
         <div className="mx-auto flex h-14 max-w-xl items-center justify-between gap-3 px-4">
           <Link href="/courier" className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-lg text-on-brand" aria-hidden>
-              🚚
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-600 text-on-brand" aria-hidden>
+              <Truck className="size-5" strokeWidth={2.2} />
             </span>
             <span className="min-w-0 leading-tight">
               <span className="block text-[15px] font-bold"><Tr>Доставщик</Tr></span>
@@ -48,7 +49,7 @@ export function CourierShell({ children }: { children: ReactNode }) {
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-28">
+      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-32">
         <Suspense>
           <CourierOfflineSync />
         </Suspense>
@@ -77,20 +78,20 @@ async function CourierActions() {
     <div className="flex items-center gap-1.5">
       {staff && (
         <Link href="/supplier/delivery" className="grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Кабинет поставщика")} title={t("Кабинет поставщика")}>
-          <span aria-hidden>🏢</span>
+          <Building className="size-5" aria-hidden />
         </Link>
       )}
       <LanguageSwitcher />
       <LiveRefresh stamp={stamp} />
       <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Уведомления")}>
-        <span aria-hidden>🔔</span>
+        <Bell className="size-5" aria-hidden />
         {unread > 0 && (
-          <span className="absolute top-0 right-0 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-bold text-white">{unread > 99 ? "99+" : unread}</span>
+          <span key={unread} className="badge-pop absolute top-0 right-0 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-bold text-white ring-2 ring-page">{unread > 99 ? "99+" : unread}</span>
         )}
       </Link>
       <form action={logoutAction}>
         <button className="grid size-10 place-items-center rounded-full text-gray-500 hover:bg-gray-100" aria-label={t("Выйти")} title={t("Выйти")}>
-          <span aria-hidden>⏻</span>
+          <LogOut className="size-5" aria-hidden />
         </button>
       </form>
     </div>

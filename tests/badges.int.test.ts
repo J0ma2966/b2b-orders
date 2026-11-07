@@ -78,10 +78,14 @@ describe.skipIf(!enabled)("счётчики разделов, принудите
   });
 
   it("разделы без места в нижней панели собираются в «Профиль»; корзина — число позиций", async () => {
+    // «Долги» — своя вкладка нижней панели, «Замены» живут в профиле
     await db.notification.create({ data: { userId: shopUserId, type: "debt.payment", title: "Погашение", link: "/shop/debts" } });
+    await db.notification.create({ data: { userId: shopUserId, type: "replacement.created", title: "Замена", link: "/shop/replacements" } });
     await addToCart(shop, supplierId, unitId, 1);
     const b = await shopBadges(shopUserId, shop.id, SHOP_NAV.map((i) => i.href), SHOP_MOBILE_NAV.map((i) => i.href));
     expect(b.side["/shop/debts"]).toBe(1);
+    expect(b.bottom["/shop/debts"]).toBe(1);
+    expect(b.side["/shop/replacements"]).toBe(1);
     expect(b.bottom["/shop/profile"]).toBe(1);
     expect(b.bottom["/shop/cart"]).toBe(1);
   });

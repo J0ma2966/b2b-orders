@@ -8,14 +8,29 @@ import { cn } from "@/components/ui";
 import { useT } from "@/lib/i18n/client";
 
 const SHORT: Record<Locale, string> = { ru: "Рус", uz: "Oʻzb" };
+// В тёмной шапке главной — как в макете: UZ / RU
+const CODE: Record<Locale, string> = { ru: "RU", uz: "UZ" };
+// В профиле — переключатель на всю ширину с полными названиями
+const FULL: Record<Locale, string> = { ru: "Русский", uz: "Oʻzbekcha" };
 
-// onDark — для цветной шапки витрины магазина
-export function LanguageSwitcher({ className, onDark }: { className?: string; onDark?: boolean }) {
+// onDark — для тёмной шапки витрины на компьютере, onNight — для большой тёмной шапки главной магазина на телефоне,
+// wide — для профиля магазина
+export function LanguageSwitcher({ className, onDark, onNight, wide }: { className?: string; onDark?: boolean; onNight?: boolean; wide?: boolean }) {
   const t = useT();
   const current = useLocale();
   const [pending, start] = useTransition();
   return (
-    <div className={cn("inline-flex rounded-lg p-0.5 text-xs ring-1", onDark ? "ring-white/30" : "ring-gray-200", pending && "opacity-60", className)} role="group" aria-label={t("Язык / Til")}>
+    <div
+      className={cn(
+        wide ? "grid grid-cols-2 gap-1 rounded-2xl bg-page p-1.5 text-base" : "inline-flex shrink-0 rounded-full",
+        !wide && (onNight ? "bg-night-2 p-1 text-sm font-bold" : "p-0.5 text-xs ring-1"),
+        !wide && !onNight && (onDark ? "ring-white/30" : "ring-gray-200"),
+        pending && "opacity-60",
+        className,
+      )}
+      role="group"
+      aria-label={t("Язык / Til")}
+    >
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -30,11 +45,24 @@ export function LanguageSwitcher({ className, onDark }: { className?: string; on
             start(() => setLocaleAction(fd));
           }}
           className={cn(
-            "rounded-md px-2 py-1",
-            l === current ? (onDark ? "bg-white text-brand-700" : "bg-brand-600 text-on-brand") : onDark ? "text-white/80 hover:bg-white/10" : "text-gray-600 hover:bg-gray-100",
+            wide ? "rounded-xl py-3 font-bold transition-colors" : "rounded-full font-medium",
+            wide ? "" : onNight ? "px-3 py-1.5" : "px-2.5 py-1",
+            l === current
+              ? wide
+                ? "bg-night text-lime"
+                : onNight
+                ? "bg-white font-bold text-night"
+                : onDark
+                  ? "bg-white text-night"
+                  : "bg-brand-600 text-on-brand"
+              : wide
+                ? "text-gray-500"
+                : onNight || onDark
+                ? "text-white/60 hover:text-white"
+                : "text-gray-600 hover:bg-gray-100",
           )}
         >
-          {SHORT[l]}
+          {wide ? FULL[l] : onNight ? CODE[l] : SHORT[l]}
         </button>
       ))}
     </div>

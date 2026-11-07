@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Navigation, PackageOpen, Phone } from "lucide-react";
 import { cn } from "@/components/ui";
 import { formatQty } from "@/lib/catalog";
 import { formatPhone } from "@/lib/phone";
@@ -31,7 +32,7 @@ export function mapLinks(lat: number, lng: number) {
   };
 }
 
-const tile = "flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-center text-sm font-semibold";
+const tile = "flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-center text-sm font-semibold";
 
 // Крупные кнопки «позвонить» и «маршрут»: доставщик нажимает их на ходу, часто одной рукой.
 // Навигация передаётся во внешние карты (ТЗ п. 29–30).
@@ -46,19 +47,19 @@ export async function ActionTiles({ phone, lat, lng, open }: { phone: string | n
     <div className={cn("grid gap-2", open ? "grid-cols-3" : "grid-cols-2")}>
       {phone && (
         <a href={`tel:${phone}`} className={cn(tile, "bg-gray-100 text-ink hover:bg-gray-200")}>
-          <span className="text-xl" aria-hidden>📞</span>
+          <Phone className="size-6" strokeWidth={2} aria-hidden />
           {t("Позвонить")}
         </a>
       )}
       {links && (
         <a href={links.yandex} target="_blank" rel="noreferrer" className={cn(tile, "bg-gray-100 text-ink hover:bg-gray-200")}>
-          <span className="text-xl" aria-hidden>🧭</span>
+          <Navigation className="size-6" strokeWidth={2} aria-hidden />
           {t("Маршрут")}
         </a>
       )}
       {open && (
         <Link href={open} className={cn(tile, "bg-brand-600 text-on-brand hover:bg-brand-500")}>
-          <span className="text-xl" aria-hidden>📦</span>
+          <PackageOpen className="size-6" strokeWidth={2} aria-hidden />
           {t("Открыть")}
         </Link>
       )}
@@ -71,7 +72,7 @@ export async function DeliveryHero({ o, replacements = 0 }: { o: Delivery; repla
   const t = await getT();
   const count = o.items.length;
   return (
-    <section className="rounded-2xl bg-surface p-4 ring-2 ring-brand-600">
+    <section className="animate-rise rounded-3xl bg-surface bg-[radial-gradient(120%_80%_at_100%_0%,rgb(255_210_31/0.10),transparent_60%)] p-5 shadow-[0_12px_32px_-12px_rgb(0_0_0/0.5)] ring-2 ring-brand-600">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold text-gray-500">№{o.number}</span>
         <OrderStatusBadge status={o.status} />
@@ -103,7 +104,7 @@ export async function DeliveryHero({ o, replacements = 0 }: { o: Delivery; repla
 export async function DeliveryRow({ o }: { o: Pick<Delivery, "id" | "number" | "status" | "deliveryAddress" | "deliveryDate" | "total" | "shop"> }) {
   const t = await getT();
   return (
-    <Link href={`/courier/orders/${o.id}`} className="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 ring-1 ring-gray-200 hover:ring-brand-600">
+    <Link href={`/courier/orders/${o.id}`} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-gray-200 hover:ring-brand-600">
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="shrink-0 text-xs font-semibold text-gray-500">№{o.number}</span>

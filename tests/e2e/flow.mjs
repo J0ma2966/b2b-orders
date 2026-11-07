@@ -314,7 +314,7 @@ log("в корзину:", await visible(shop, /Добавлено в корзи�
 await shop.locator("[name=qty]:visible").first().fill("1000");
 await shop.getByRole("button", { name: "В корзину" }).first().click();
 await shop.waitForTimeout(1500);
-log("сверх остатка:", JSON.stringify(await shop.locator(".bg-red-50:visible").first().innerText().catch(() => "")));
+log("сверх остатка:", JSON.stringify(await shop.locator(".bg-red-50:visible, [role=status]:visible").first().innerText().catch(() => "")));
 await shop.goto(`${BASE}/shop/cart/${supplierId}`);
 await shop.waitForTimeout(1200);
 log("подарок в корзине:", await visible(shop, /Подарки по акциям/).count() > 0);
@@ -374,8 +374,10 @@ log("история у магазина:", JSON.stringify((await shop.locator("o
 // Второй заказ магазин отменяет сам
 await shop.goto(`${BASE}/shop/suppliers/${supplierId}/products/${productUrl.split("/").pop()}`);
 await shop.waitForTimeout(800);
-await shop.locator("[name=qty]:visible").nth(1).fill("2");
-await shop.getByRole("button", { name: "В корзину" }).nth(1).click();
+// вторая единица продажи (коробка): выбрать карточку, затем количество в нижней плашке
+await shop.locator("section", { has: shop.getByRole("heading", { name: "Единица продажи" }) }).getByRole("button").nth(1).click();
+await shop.locator("[name=qty]:visible").first().fill("2");
+await shop.getByRole("button", { name: "В корзину" }).first().click();
 await shop.waitForTimeout(1500);
 await shop.goto(`${BASE}/shop/cart/${supplierId}`);
 await shop.getByLabel("Способ оплаты").selectOption("TRANSFER");

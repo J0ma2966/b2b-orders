@@ -115,3 +115,15 @@ export async function favoriteIds(shopId: string, productIds: string[]) {
   const rows = await db.favoriteProduct.findMany({ where: { shopId, productId: { in: productIds } }, select: { productId: true } });
   return new Set(rows.map((r) => r.productId));
 }
+
+// Сколько каждой единицы уже лежит в корзинах магазина — для счётчика «− N +» на карточках витрины
+export async function cartQtyByUnit(shopId: string, unitIds: string[]) {
+  if (unitIds.length === 0) return new Map<string, number>();
+  const rows = await db.orderItem.findMany({
+    where: { productUnitId: { in: unitIds }, order: { shopId, status: "DRAFT" } },
+    select: { productUnitId: true, qty: true },
+  });
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.productUnitId, (m.get(r.productUnitId) ?? 0) + Number(r.qty));
+  return m;
+}

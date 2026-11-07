@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Alert, EmptyState, cn } from "@/components/ui";
 import { ProductCard } from "@/components/shop/product-card";
+import { CategoryTiles, HomeHero, SupplierStrip } from "@/components/shop/home";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop } from "@/lib/territory";
 import { db } from "@/lib/db";
 import { orderStatusFilter } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
-import { activePromotions, favoriteIds, shopFeed, type CatalogFilter, type FeedSort } from "@/lib/shop-catalog";
+import { activePromotions, cartQtyByUnit, favoriteIds, shopFeed, type CatalogFilter, type FeedSort } from "@/lib/shop-catalog";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim().slice(0, 100) : "");
 
@@ -40,7 +41,10 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
           orderBy: { updatedAt: "desc" },
         }),
   ]);
-  const favs = await favoriteIds(shop.id, products.map((p) => p.id));
+  const [favs, inCart] = await Promise.all([
+    favoriteIds(shop.id, products.map((p) => p.id)),
+    cartQtyByUnit(shop.id, products.flatMap((p) => p.units.map((u) => u.id))),
+  ]);
 
   const params = { q, c: category, s: supplierId, f: filter, sort: sort === "new" ? "" : sort };
   const href = (over: Partial<typeof params>) => {
@@ -53,9 +57,16 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
   const pill = (on: boolean) => cn("shrink-0 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap", on ? "bg-brand-600 text-on-brand" : "bg-surface ring-1 ring-black/10");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+      <HomeHero shop={shop} userId={ctx.auth.user.id} q={q} />
+      {!narrowed && suppliers.length > 0 && (
+        <>
+          <CategoryTiles categories={categories} hrefFor={(name) => href({ c: name })} />
+          <SupplierStrip suppliers={suppliers} shopTerritoryId={shop.territoryId} />
+        </>
+      )}
       {(carts.length > 0 || activeCount > 0) && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 hidden gap-2 overflow-x-auto px-4 pb-1 md:flex">
           {carts.map((c) => (
             <Link
               key={c.id}
@@ -63,7 +74,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
               className="flex shrink-0 items-center gap-2 rounded-full bg-accent/15 py-1.5 pr-1.5 pl-3 text-sm ring-1 ring-accent/40 hover:ring-accent"
             >
               <span aria-hidden>🛒</span>
-              <span className="max-w-40 truncate font-medium">{c.supplier.displayName}</span>
+              <span className="max-w-28 truncate font-medium sm:max-w-40">{c.supplier.displayName}</span>
               <span className="font-bold tabular-nums">{t.money(c.total)}</span>
               <span className="rounded-full bg-accent px-2.5 py-0.5 font-semibold text-on-accent">{t("Оформить")}</span>
             </Link>
@@ -80,7 +91,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
 
       <section>
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h1 className="font-display text-xl font-semibold sm:text-2xl">{t("Лента товаров")}</h1>
+          <h2 className="font-display text-xl font-bold sm:text-2xl">{t("Лента товаров")}</h2>
           <Link href="/shop/suppliers" className="shrink-0 text-sm font-medium text-brand-700">{t("Поставщики ({n})", { n: suppliers.length })}</Link>
         </div>
 
@@ -156,6 +167,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
                       promos={promos}
                       favorite={favs.has(p.id)}
                       supplier={{ name: s.displayName, href: base }}
+                      cart={inCart}
                     />
                   );
                 })}

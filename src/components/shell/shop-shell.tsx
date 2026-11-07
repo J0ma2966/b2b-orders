@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { Spinner } from "@/components/ui";
+import { Bell, Search, ShoppingBag, ShoppingCart } from "lucide-react";
+import { cn, Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { db } from "@/lib/db";
 import { liveStamp } from "@/lib/live";
@@ -11,7 +12,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, TabNav, TabNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
-import { navForRole } from "./shop-nav";
+import { navForRole, SHOP_NAV_HIDE_ON } from "./shop-nav";
 import { shopBadges } from "@/lib/nav-badges";
 
 // Витрина магазина: цветная шапка с поиском по всем поставщикам и корзиной, вкладки сверху,
@@ -22,11 +23,12 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
-      <header className="sticky top-0 z-[1001] bg-brand-700 text-white shadow-[0_1px_0_rgb(0_0_0/0.08)]">
+      {/* На телефоне шапки нет: у главной своя большая тёмная шапка, у остальных экранов — заголовок или кнопка «Назад» */}
+      <header className="sticky top-0 z-[1001] hidden bg-night text-white md:block" style={{ viewTransitionName: "app-header" }}>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pt-3 pb-2 md:pb-1">
           <Link href="/shop" className="flex min-w-0 items-center gap-2">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent text-lg text-on-accent" aria-hidden>
-              🛍
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)]" aria-hidden>
+              <ShoppingBag className="size-5" strokeWidth={2.2} />
             </span>
             <span className="min-w-0">
               <span className="block font-display text-[15px] leading-tight font-semibold"><Tr>Магазин</Tr></span>
@@ -44,21 +46,16 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
             </Suspense>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-3 md:hidden">
-          <Suspense>
-            <SearchForm className="flex" />
-          </Suspense>
-        </div>
         <div className="mx-auto hidden max-w-6xl px-2 md:block">
           <Suspense fallback={<TabNavView items={nav} root="/shop" />}>
             <ShopTabNav items={nav} mobileNav={mobileNav} />
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-24 md:pb-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-32 md:pt-5 md:pb-10">
         <Suspense fallback={<Spinner />}>{children}</Suspense>
       </main>
-      <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" />}>
+      <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} />}>
         <ShopBottomNav items={mobileNav} nav={nav} />
       </Suspense>
     </div>
@@ -74,13 +71,14 @@ async function ShopName() {
 async function SearchForm({ className }: { className?: string }) {
   const t = await getT();
   return (
-    <form action="/shop" role="search" className={className}>
+    <form action="/shop" role="search" className={cn("relative", className)}>
+      <Search className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-gray-400" aria-hidden />
       <input
         name="q"
         type="search"
         placeholder={t("Найти товар у всех поставщиков")}
         aria-label={t("Поиск товаров")}
-        className="w-full rounded-full border-0 bg-white px-4 py-2.5 text-base text-ink placeholder:text-gray-500 focus:ring-2 focus:ring-accent focus:outline-none sm:text-sm"
+        className="w-full rounded-2xl border-0 bg-white py-3 pr-4 pl-10 text-base text-ink shadow-[0_2px_8px_rgb(0_0_0/0.12)] placeholder:text-gray-500 focus:ring-2 focus:ring-accent focus:outline-none sm:text-sm"
       />
     </form>
   );
@@ -106,10 +104,10 @@ async function ShopActions() {
     <>
       <LanguageSwitcher onDark />
       <LiveRefresh stamp={stamp} />
-      <Link href="/notifications" className="relative grid size-9 place-items-center rounded-full hover:bg-white/10" aria-label={t("Уведомления")}>
-        <span aria-hidden>🔔</span>
+      <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full bg-white/10 hover:bg-white/20" aria-label={t("Уведомления")}>
+        <Bell className="size-5" aria-hidden />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] font-medium text-white">
+          <span key={unread} className="badge-pop absolute -top-1 -right-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-semibold text-white ring-2 ring-night">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -119,7 +117,7 @@ async function ShopActions() {
         className="hidden items-center gap-2 rounded-full bg-accent py-1.5 pr-3.5 pl-2.5 text-sm font-semibold text-on-accent md:flex"
         aria-label={t("Корзина")}
       >
-        <span aria-hidden>🛒</span>
+        <ShoppingCart className="size-[18px]" aria-hidden />
         {cart.items > 0 ? (
           <span className="tabular-nums">
             {cart.items} · {t.money(cart.total)}
@@ -151,5 +149,5 @@ async function ShopTabNav({ items, mobileNav }: { items: NavItem[]; mobileNav: N
 
 async function ShopBottomNav({ items, nav }: { items: NavItem[]; nav: NavItem[] }) {
   const { ctx, badges } = await loadShopBadges(nav, items);
-  return <BottomNav items={navForRole(items, ctx?.membership.role)} root="/shop" badges={badges?.bottom} />;
+  return <BottomNav items={navForRole(items, ctx?.membership.role)} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} badges={badges?.bottom} />;
 }

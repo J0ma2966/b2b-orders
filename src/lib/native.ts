@@ -56,3 +56,9 @@ export async function shareDownload(href: string) {
   const { uri } = await Filesystem.writeFile({ path: name, data: await blobToBase64(await res.blob()), directory: Directory.Cache });
   await Share.share({ title: name, files: [uri] });
 }
+
+// Лёгкий отклик под пальцем при смене раздела (только в приложении)
+export function tapHaptic() {
+  if (!isNativeApp()) return;
+  import("@capacitor/haptics").then(({ Haptics, ImpactStyle }) => Haptics.impact({ style: ImpactStyle.Light })).catch(() => null);
+}

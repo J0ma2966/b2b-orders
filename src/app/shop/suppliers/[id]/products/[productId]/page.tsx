@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, DefinitionList, PageHeader } from "@/components/ui";
+import { cn } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { formatQty, unitName } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
-import { shopVisibleProduct, shopVisibleUnits, supplierForShop } from "@/lib/shop-catalog";
+import { cartQtyByUnit, favoriteIds, shopVisibleProduct, shopVisibleUnits, supplierForShop } from "@/lib/shop-catalog";
 import { fileUrl } from "@/lib/storage-url";
 import { allowsFraction } from "@/lib/order-core";
-import { AddToCartForm } from "@/components/orders/shop-forms";
+import { FavoriteButton, ProductBuy, type BuyUnit } from "@/components/orders/shop-forms";
+import { Avatar, BackButton, initials, tileColor } from "@/components/shop/ui";
 
 export default async function ShopProductPage({ params }: PageProps<"/shop/suppliers/[id]/products/[productId]">) {
   const [ctx, t] = await Promise.all([requireShop(), getT()]);
@@ -22,51 +23,87 @@ export default async function ShopProductPage({ params }: PageProps<"/shop/suppl
   });
   if (!product) notFound();
   const attrs = Array.isArray(product.attributes) ? (product.attributes as { name: string; value: string }[]) : [];
+  const [inCart, favs] = await Promise.all([cartQtyByUnit(ctx.shop.id, product.units.map((u) => u.id)), favoriteIds(ctx.shop.id, [product.id])]);
+  const photos = product.photoPaths.map((p) => fileUrl(p)!);
+  const main = product.units[0];
+  const units: BuyUnit[] = product.units.map((u) => {
+    const base = u.baseUnitId ? product.units.find((b) => b.id === u.baseUnitId) : null;
+    const label = t(unitName(u));
+    return {
+      id: u.id,
+      label: base && u.baseQty ? t("{unit} по {n} {base}", { unit: label, n: formatQty(u.baseQty), base: t(unitName(base)) }) : label,
+      price: Number(u.price),
+      priceText: t.money(u.price),
+      avail: Math.max(0, Number(u.physicalQty) - Number(u.reservedQty)),
+      inCart: inCart.get(u.id) ?? 0,
+      fraction: allowsFraction(u.kind),
+    };
+  });
+  const facts = [
+    ["Категория", product.category?.name],
+    ["Бренд", product.brand],
+    ["Вес", product.weightKg ? `${formatQty(product.weightKg)} ${t("кг")}` : null],
+    ...attrs.map((a) => [a.name, a.value || t("да")]),
+  ].filter((f): f is [string, string] => !!f[1]);
+  const base = `/shop/suppliers/${supplier.id}`;
   return (
-    <>
-      <PageHeader
-        title={product.name}
-        subtitle={<Link href={`/shop/suppliers/${supplier.id}`} className="text-brand-600">← {supplier.displayName}</Link>}
-      />
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 md:mx-0 md:grid md:grid-cols-2 md:px-0">
-          {product.photoPaths.length === 0 && <div className="aspect-square w-full rounded-xl bg-gray-100" />}
-          {product.photoPaths.map((p) => (
-            <img key={p} src={fileUrl(p)!} alt="" className="aspect-square w-4/5 shrink-0 snap-center rounded-xl object-cover md:w-full" />
+    <div className="space-y-5 md:mx-auto md:max-w-2xl">
+      <section
+        className={cn(
+          "relative -mx-4 -mt-[max(1.25rem,env(safe-area-inset-top))] overflow-hidden rounded-b-[2rem] px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-5 md:mx-0 md:mt-0 md:rounded-[2rem] md:pt-4",
+          tileColor(supplier.displayName),
+        )}
+      >
+        <div className="relative z-10 flex items-center justify-between pt-2">
+          <BackButton href={base} label={t("Назад")} />
+          <FavoriteButton productId={product.id} on={favs.has(product.id)} label={product.name} heart />
+        </div>
+        <div className="mx-auto -mt-4 grid aspect-square w-[78%] max-w-80 place-items-center overflow-hidden rounded-full bg-white/40">
+          {photos[0] ? (
+            <img src={photos[0]} alt="" className="size-full object-cover" />
+          ) : (
+            <span className="font-display text-6xl font-bold text-night/40">{initials(product.name)}</span>
+          )}
+        </div>
+        {photos.length > 1 && (
+          <div className="mt-3 flex justify-center gap-2">
+            {photos.slice(1, 5).map((src) => (
+              <img key={src} src={src} alt="" className="size-12 rounded-xl object-cover ring-2 ring-white/60" />
+            ))}
+          </div>
+        )}
+        <Link href={base} className="mt-3 inline-flex items-center gap-2 rounded-full bg-night py-1.5 pr-4 pl-1.5 text-sm font-bold text-white">
+          <Avatar name={supplier.displayName} className="size-8 rounded-full text-[11px]" />
+          {supplier.displayName}
+        </Link>
+      </section>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-display text-[1.75rem] leading-tight font-bold tracking-tight">{product.name}</h1>
+          {product.description && <p className="mt-1 line-clamp-2 text-gray-500">{product.description}</p>}
+        </div>
+        {main && (
+          <div className="shrink-0 text-right">
+            <div className="font-display text-[1.75rem] leading-tight font-bold tabular-nums">{t.money(main.price).replace(/\s\S+$/, "")}</div>
+            <div className="text-sm font-semibold text-gray-500">{t.money(0).replace(/^0\s/, "")} / {t(unitName(main))}</div>
+          </div>
+        )}
+      </div>
+
+      <ProductBuy supplierId={supplier.id} units={units} canOrder={!supplier.ordersDisabled} />
+
+      {facts.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5">
+          {facts.map(([k, v]) => (
+            <div key={k} className="rounded-[1.25rem] bg-surface px-4 py-3">
+              <div className="text-sm text-gray-500">{t(k)}</div>
+              <div className="font-bold">{v}</div>
+            </div>
           ))}
         </div>
-        <div className="space-y-4">
-          <Card>
-            <ul className="divide-y divide-gray-100">
-              {product.units.map((u) => {
-                const avail = Number(u.physicalQty) - Number(u.reservedQty);
-                return (
-                  <li key={u.id} className="space-y-2 py-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold">{t.money(u.price)} <span className="text-sm font-normal text-gray-500">/ {t(unitName(u))}</span></span>
-                      <span className={avail > 0 ? "text-sm text-gray-600" : "text-sm text-red-600"}>{avail > 0 ? t("в наличии {qty}", { qty: formatQty(avail) }) : t("нет в наличии")}</span>
-                    </div>
-                    {avail > 0 && <AddToCartForm supplierId={supplier.id} unitId={u.id} step={allowsFraction(u.kind) ? "0.001" : "1"} max={avail} />}
-                  </li>
-                );
-              })}
-            </ul>
-            <Link href={`/shop/cart/${supplier.id}`} className="mt-2 block text-sm text-brand-600">{t("Перейти в корзину →")}</Link>
-          </Card>
-          <Card>
-            <DefinitionList
-              items={[
-                ["Категория", product.category?.name],
-                ["Бренд", product.brand],
-                ["Вес", product.weightKg ? `${formatQty(product.weightKg)} ${t("кг")}` : null],
-                ...attrs.map((a) => [a.name, a.value || t("да")] as [string, string]),
-
-              ]}
-            />
-            {product.description && <p className="mt-3 text-sm whitespace-pre-line text-gray-700">{product.description}</p>}
-          </Card>
-        </div>
-      </div>
-    </>
+      )}
+      {product.description && <p className="text-sm whitespace-pre-line text-gray-700">{product.description}</p>}
+    </div>
   );
 }
