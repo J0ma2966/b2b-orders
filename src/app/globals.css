@@ -57,6 +57,21 @@ body {
   --font-display: "Unbounded Variable", "Onest Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Поставщик (приложение и кабинет): сдержанный фиолетовый с белым, как в CRM.
+   Цвета долгов магазинов — свои, не зависят от темы (см. «Долги магазинов» ниже). */
+[data-theme="supplier"] {
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-500: #7c3aed;
+  --color-brand-600: #6d28d9;
+  --color-brand-700: #5b21b6;
+  --color-on-brand: #ffffff;
+  --color-accent: #6d28d9;
+  --color-on-accent: #ffffff;
+  --color-page: #f6f5fa;
+  --color-ink: #1c1830;
+}
+
 /* Доставщик: асфальт и сигнальный жёлтый, как на жилете и дорожных знаках.
    Серая шкала перевёрнута, светлые фоны статусов стали тёмными. */
 [data-theme="courier"] {
@@ -315,4 +330,60 @@ html {
 }
 .toast-in {
   animation: toast-in 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* ── Приложение поставщика ── */
+/* Фиолетовая шапка главной с выручкой */
+.supplier-hero {
+  background:
+    radial-gradient(circle at 92% -10%, rgb(255 255 255 / 0.18), transparent 45%),
+    linear-gradient(160deg, #5b21b6, #7c3aed 70%, #8b5cf6);
+}
+/* Линия выручки рисуется слева направо */
+.spark-line {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: spark-draw 1.2s 0.2s var(--ease-spring) forwards;
+}
+@keyframes spark-draw {
+  to { stroke-dashoffset: 0; }
+}
+/* Блоки страницы появляются по очереди */
+.stagger > * {
+  animation: rise 460ms var(--ease-spring) both;
+}
+.stagger > :nth-child(2) { animation-delay: 40ms; }
+.stagger > :nth-child(3) { animation-delay: 80ms; }
+.stagger > :nth-child(4) { animation-delay: 120ms; }
+.stagger > :nth-child(5) { animation-delay: 160ms; }
+.stagger > :nth-child(6) { animation-delay: 200ms; }
+.stagger > :nth-child(n + 7) { animation-delay: 240ms; }
+/* Полоска «Расчёты с магазинами»: отрезки вырастают слева */
+.grow-x {
+  transform-origin: left;
+  animation: grow-x 900ms var(--ease-spring) both;
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+/* Карточка счёта: смена цвета после оплаты — плавно */
+.balance-hero {
+  transition: background 600ms var(--ease-spring);
+}
+/* Нижняя шторка (оплата долга, корректировка) */
+.sheet-panel {
+  transition: transform 460ms var(--ease-spring);
+}
+.sheet-scrim {
+  transition: opacity 300ms ease;
+}
+/* Переход по ссылке в приложении поставщика: новая страница въезжает справа */
+::view-transition-new(.push-in) {
+  animation: 340ms var(--ease-spring) both vt-from-right;
+}
+@keyframes vt-from-right {
+  from { opacity: 0; transform: translateX(36px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spark-line { stroke-dashoffset: 0; }
 }

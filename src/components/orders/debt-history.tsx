@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowDownLeft, Package, PenLine } from "lucide-react";
 import { Card, EmptyState } from "@/components/ui";
 import { PAYMENT_LABEL } from "@/lib/order-core";
 import { balanceLabel } from "./order-view";
@@ -29,7 +30,37 @@ export async function DebtHistory({ entries, orderHref }: { entries: Entry[]; or
   const t = await getT();
   if (entries.length === 0) return <EmptyState>{t("Операций пока нет")}</EmptyState>;
   return (
-    <Card className="overflow-x-auto p-0 sm:p-0">
+    <>
+    {/* Телефон: лента операций — значок, что произошло, сумма (долг растёт — фиолетовый, оплата — зелёный) */}
+    <Card className="p-0 sm:hidden">
+      <ul className="divide-y divide-gray-100" data-testid="debt-feed">
+        {entries.map((e) => {
+          const amount = Number(e.amount);
+          const Icon = e.type === "CORRECTION" ? PenLine : amount > 0 ? Package : ArrowDownLeft;
+          return (
+            <li key={e.id} className="flex items-center gap-3 px-4 py-3">
+              <span className={amount > 0 ? "grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" : "grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600"} aria-hidden>
+                <Icon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {t(DEBT_TYPE_LABEL[e.type])}
+                  {e.order && <> · <Link className="text-brand-600" href={orderHref(e.order.id)}>№{e.order.number}</Link></>}
+                </span>
+                <span className="block truncate text-xs text-gray-500">
+                  {t.dateTime(e.occurredAt)}{e.paymentMethod ? ` · ${t(PAYMENT_LABEL[e.paymentMethod])}` : ""}{e.comment ? ` · ${t(e.comment)}` : ""}
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className={amount > 0 ? "block text-sm font-bold tabular-nums" : "block text-sm font-bold text-emerald-600 tabular-nums"}>{amount > 0 ? "+" : "−"}{t.money(Math.abs(amount))}</span>
+                <span className="block text-[11px] text-gray-400">{balanceLabel(Number(e.balanceAfter), t)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+    <Card className="hidden overflow-x-auto p-0 sm:block sm:p-0">
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead className="bg-gray-50 text-xs text-gray-500">
           <tr>
@@ -54,5 +85,6 @@ export async function DebtHistory({ entries, orderHref }: { entries: Entry[]; or
         </tbody>
       </table>
     </Card>
+    </>
   );
 }

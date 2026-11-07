@@ -119,3 +119,26 @@ export function groupMultiOverdue<T extends OverdueAccount>(accounts: T[], minSu
     }))
     .sort((a, b) => b.overdueTotal - a.overdueTotal || b.maxDays - a.maxDays);
 }
+
+// Цвет счёта магазина в приложении поставщика: просрочен — красный, долг в срок — жёлтый,
+// переплата (деньги магазина на счёте) — зелёный, расчёт закрыт — нейтральный.
+export type DebtTone = "overdue" | "due" | "prepay" | "none";
+
+export function debtTone(balance: number, overdueAmount = 0): DebtTone {
+  if (balance < -0.005) return "prepay";
+  if (balance <= 0.005) return "none";
+  return overdueAmount > 0 ? "overdue" : "due";
+}
+
+// Порядок в списке: сначала просроченные, затем долги в срок, переплаты и закрытые счета
+export const DEBT_TONE_ORDER: Record<DebtTone, number> = { overdue: 0, due: 1, prepay: 2, none: 3 };
+
+// Итоги по магазинам поставщика для блока «Расчёты с магазинами»: сумма и число магазинов каждого цвета
+export function debtSummary(accounts: { balance: number; tone: DebtTone }[]) {
+  const sum = { overdue: { amount: 0, shops: 0 }, due: { amount: 0, shops: 0 }, prepay: { amount: 0, shops: 0 }, none: { amount: 0, shops: 0 } };
+  for (const a of accounts) {
+    sum[a.tone].amount = r2(sum[a.tone].amount + Math.abs(a.balance));
+    sum[a.tone].shops += 1;
+  }
+  return { ...sum, owed: r2(sum.overdue.amount + sum.due.amount) };
+}

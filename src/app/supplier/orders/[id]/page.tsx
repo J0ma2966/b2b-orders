@@ -4,7 +4,8 @@ import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
 import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedItemForm, OrderStatusForm, ReadyAndAssignForm, ResolveProblemForm } from "@/components/orders/supplier-forms";
-import { paymentDue } from "@/lib/accounts";
+import { paymentDue, supplierDebtStates } from "@/lib/accounts";
+import { DebtFlag, DebtTag, NO_DEBT } from "@/components/supplier/debt";
 import { fileUrl } from "@/lib/storage";
 import { db } from "@/lib/db";
 import { requireActiveSupplier } from "@/lib/auth/current";
@@ -47,10 +48,12 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
   const received = RECEIVED.includes(order.status);
   const account = await db.shopAccount.findUnique({ where: { shopId_supplierId: { shopId: order.shopId, supplierId: order.supplierId } } });
   const open = !CLOSED.includes(order.status);
-  const [due, suggested] = await Promise.all([
+  const [due, suggested, debts] = await Promise.all([
     open ? paymentDue(db, { id: order.id, shopId: order.shopId, supplierId: order.supplierId, total: Number(order.total), placedAt: order.placedAt }) : null,
     assignable || quickReady ? suggestedCourier(ctx.supplier.id, order.shop.territoryId) : null,
+    supplierDebtStates(ctx.supplier.id, { shopIds: [order.shopId] }),
   ]);
+  const debt = debts.get(order.shopId) ?? NO_DEBT;
   // Сам поставщик, если развозит, — первым в списке
   const courierOptions = couriers
     .map((c) => ({ id: c.userId, name: c.user.fullName, active: c.user._count.courierOrders, me: c.userId === ctx.auth.user.id }))
@@ -156,7 +159,9 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
               <h2 className="mb-2 flex items-center gap-2 font-semibold">
                 <Link href={`/supplier/shops/${order.shopId}`} className="hover:underline">{order.shop.name}</Link>
                 <Badge color={SHOP_STATUS_COLOR[order.shop.status]}>{SHOP_STATUS_LABEL[order.shop.status]}</Badge>
+                {debt.tone !== "none" && <DebtTag state={debt} t={t} />}
               </h2>
+              {open && debt.tone !== "overdue" && <DebtFlag state={debt} t={t} className="mb-2" />}
               <DefinitionList
                 items={[
                   ["Адрес", order.deliveryAddress],

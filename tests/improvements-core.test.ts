@@ -178,3 +178,34 @@ describe("счётчики разделов меню", () => {
     expect(formatSku(123456)).toBe("A-123456");
   });
 });
+
+describe("цвет долга магазина в приложении поставщика", () => {
+  it("просрочка — красный, долг в срок — жёлтый, переплата — зелёный", async () => {
+    const { debtTone } = await import("@/lib/finance-core");
+    expect(debtTone(500_000, 200_000)).toBe("overdue");
+    expect(debtTone(500_000, 0)).toBe("due");
+    expect(debtTone(500_000)).toBe("due");
+    expect(debtTone(-150_000)).toBe("prepay");
+    expect(debtTone(0)).toBe("none");
+    expect(debtTone(0.001)).toBe("none");
+  });
+  it("итоги: долг считают только просрочка и долг в срок, переплата отдельно", async () => {
+    const { debtSummary } = await import("@/lib/finance-core");
+    const s = debtSummary([
+      { balance: 4_850_000, tone: "overdue" },
+      { balance: 2_300_000, tone: "overdue" },
+      { balance: 3_120_000, tone: "due" },
+      { balance: -1_200_000, tone: "prepay" },
+      { balance: 0, tone: "none" },
+    ]);
+    expect(s.overdue).toEqual({ amount: 7_150_000, shops: 2 });
+    expect(s.due).toEqual({ amount: 3_120_000, shops: 1 });
+    expect(s.prepay).toEqual({ amount: 1_200_000, shops: 1 });
+    expect(s.owed).toBe(10_270_000);
+  });
+  it("после оплаты больше долга счёт становится зелёным", async () => {
+    const { debtTone } = await import("@/lib/finance-core");
+    const balance = 4_850_000 - 5_000_000;
+    expect(debtTone(balance, 0)).toBe("prepay");
+  });
+});

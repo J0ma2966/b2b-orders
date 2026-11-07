@@ -6,9 +6,11 @@ import { SUPPLIER_MOBILE_NAV, SUPPLIER_MORE, SUPPLIER_NAV } from "@/app/supplier
 import { AppShell } from "./app-shell";
 import { BottomNav, SideNav } from "./nav-links";
 
-// Кабинет поставщика: на компьютере — меню слева, на телефоне и в приложении — нижняя панель и экран «Ещё»
+// Кабинет поставщика: на компьютере — меню слева, на телефоне и в приложении — нижняя панель и экран «Ещё».
+// Тема «supplier» — фиолетовый с белым (globals.css)
 export function SupplierShell({ children }: { children: ReactNode }) {
   return (
+    <div data-theme="supplier" className="flex min-h-full flex-1 flex-col bg-page text-ink">
     <AppShell
       title="Кабинет поставщика"
       root="/supplier"
@@ -20,6 +22,7 @@ export function SupplierShell({ children }: { children: ReactNode }) {
     >
       {children}
     </AppShell>
+    </div>
   );
 }
 

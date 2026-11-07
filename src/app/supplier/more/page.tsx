@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { Card, PageHeader } from "@/components/ui";
+import { Icon } from "@/components/ui/icon";
 import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { logoutAction } from "@/app/(auth)/actions";
@@ -10,7 +12,7 @@ import { supplierBadges } from "@/lib/nav-badges";
 import { SUPPLIER_MOBILE_NAV, SUPPLIER_MORE, SUPPLIER_MORE_GROUPS, SUPPLIER_NAV } from "../nav";
 import { SupplierSwitcher } from "../switcher";
 
-const row = "flex min-h-12 items-center gap-3 px-4 py-3 text-[15px] hover:bg-gray-50";
+const row = "flex min-h-12 items-center gap-3 px-4 py-2.5 text-[15px] hover:bg-brand-50/40";
 
 // «Ещё» в приложении поставщика: все разделы кабинета, режим доставки и личные настройки
 export default async function SupplierMorePage() {
@@ -33,9 +35,9 @@ export default async function SupplierMorePage() {
   return (
     <>
       <PageHeader title="Ещё" />
-      <div className="space-y-4">
+      <div className="stagger space-y-4">
         <Card className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-xl" aria-hidden>🏢</span>
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-600 text-on-brand" aria-hidden><Icon emoji="🏢" className="size-5" /></span>
           <div className="min-w-0">
             <div className="truncate font-semibold">{ctx.supplier.displayName}</div>
             <div className="truncate text-sm text-gray-500">
@@ -74,14 +76,14 @@ export default async function SupplierMorePage() {
                 const i = byHref.get(href)!;
                 return (
                   <Link key={href} href={href} className={row}>
-                    <span className="w-6 text-center" aria-hidden>{i.icon}</span>
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" aria-hidden><Icon emoji={i.icon} className="size-[18px]" /></span>
                     <span className="flex-1">{t(i.label)}</span>
                     {(badges.side[href] ?? 0) > 0 && (
                       <span className="min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] leading-5 font-bold text-on-accent" data-testid="nav-badge">
                         {badges.side[href] > 99 ? "99+" : badges.side[href]}
                       </span>
                     )}
-                    <span className="text-gray-400" aria-hidden>›</span>
+                    <ChevronRight className="size-4 text-gray-300" aria-hidden />
                   </Link>
                 );
               })}
@@ -92,11 +94,11 @@ export default async function SupplierMorePage() {
         <section>
           <h2 className="mb-1.5 px-1 text-xs font-medium tracking-wide text-gray-500 uppercase">{t("Мой профиль")}</h2>
           <Card className="divide-y divide-gray-100 overflow-hidden p-0!">
-            <Link href="/account" className={row}><span className="w-6 text-center" aria-hidden>👤</span><span className="flex-1">{t("Профиль, пароль, уведомления")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
-            <Link href="/notifications" className={row}><span className="w-6 text-center" aria-hidden>🔔</span><span className="flex-1">{t("Уведомления")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
-            <Link href="/privacy" className={row}><span className="w-6 text-center" aria-hidden>🔒</span><span className="flex-1">{t("Политика конфиденциальности")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
+            <Link href="/account" className={row}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" aria-hidden><Icon emoji="👤" className="size-[18px]" /></span><span className="flex-1">{t("Профиль, пароль, уведомления")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
+            <Link href="/notifications" className={row}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" aria-hidden><Icon emoji="🔔" className="size-[18px]" /></span><span className="flex-1">{t("Уведомления")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
+            <Link href="/privacy" className={row}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" aria-hidden><Icon emoji="🔒" className="size-[18px]" /></span><span className="flex-1">{t("Политика конфиденциальности")}</span><span className="text-gray-400" aria-hidden>›</span></Link>
             <form action={logoutAction}>
-              <button className={`${row} w-full text-left text-red-600`}><span className="w-6 text-center" aria-hidden>⏻</span><span className="flex-1">{t("Выйти")}</span></button>
+              <button className={`${row} w-full text-left text-red-600`}><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600" aria-hidden><Icon emoji="⏻" className="size-[18px]" /></span><span className="flex-1">{t("Выйти")}</span></button>
             </form>
           </Card>
         </section>
