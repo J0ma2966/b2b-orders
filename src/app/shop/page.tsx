@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Alert, EmptyState, cn } from "@/components/ui";
 import { ProductCard } from "@/components/shop/product-card";
+import { CategoryTiles, HomeHero, SupplierStrip } from "@/components/shop/home";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
 import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop } from "@/lib/territory";
@@ -56,9 +57,16 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
   const pill = (on: boolean) => cn("shrink-0 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap", on ? "bg-brand-600 text-on-brand" : "bg-surface ring-1 ring-black/10");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
+      <HomeHero shop={shop} userId={ctx.auth.user.id} q={q} />
+      {!narrowed && suppliers.length > 0 && (
+        <>
+          <CategoryTiles categories={categories} hrefFor={(name) => href({ c: name })} />
+          <SupplierStrip suppliers={suppliers} shopTerritoryId={shop.territoryId} />
+        </>
+      )}
       {(carts.length > 0 || activeCount > 0) && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 hidden gap-2 overflow-x-auto px-4 pb-1 md:flex">
           {carts.map((c) => (
             <Link
               key={c.id}
@@ -83,7 +91,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
 
       <section>
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h1 className="font-display text-xl font-semibold sm:text-2xl">{t("Лента товаров")}</h1>
+          <h2 className="font-display text-xl font-bold sm:text-2xl">{t("Лента товаров")}</h2>
           <Link href="/shop/suppliers" className="shrink-0 text-sm font-medium text-brand-700">{t("Поставщики ({n})", { n: suppliers.length })}</Link>
         </div>
 

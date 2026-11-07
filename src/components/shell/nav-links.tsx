@@ -75,8 +75,17 @@ export function TabNavView({ items, root, pathname = "" }: { items: NavItem[]; r
 // плашка активного раздела переезжает под нажатую вкладку. Переход по вкладке помечен типом «tab» —
 // страница сменяется мягким наплывом, а не сдвигом (см. globals.css, «Переходы между страницами»).
 // app — приложение доставщика: панель видна и на компьютере, активный раздел — жёлтая плашка
-export function BottomNav({ items, root, badges, app }: { items: NavItem[]; root: string; badges?: NavBadges; app?: boolean }) {
-  return <BottomNavView items={items} root={root} badges={badges} app={app} pathname={usePathname()} />;
+export type BottomNavOptions = {
+  app?: boolean;
+  // dark — приложение магазина: тёмная панель, активный раздел — салатовая плашка со значком и подписью,
+  // остальные — только значки; плашка плавно «перетекает» между вкладками
+  tone?: "dark";
+  // На этих страницах (префиксы пути) панель уезжает вниз: там своя нижняя плашка (итог корзины, «В корзину»)
+  hideOn?: string[];
+};
+
+export function BottomNav({ items, root, badges, ...opts }: { items: NavItem[]; root: string; badges?: NavBadges } & BottomNavOptions) {
+  return <BottomNavView items={items} root={root} badges={badges} {...opts} pathname={usePathname()} />;
 }
 
 export function BottomNavView({
@@ -84,16 +93,64 @@ export function BottomNavView({
   root,
   badges,
   app,
+  tone,
+  hideOn,
   pathname = "",
 }: {
   items: NavItem[];
   root: string;
   badges?: NavBadges;
-  app?: boolean;
   pathname?: string;
-}) {
+} & BottomNavOptions) {
   const t = useT();
   const active = items.findIndex((item) => isActive(pathname, item.href, root, item.also));
+  const hidden = !!pathname && !!hideOn?.some((p) => pathname.startsWith(p));
+  if (tone === "dark") {
+    return (
+      <nav
+        aria-hidden={hidden || undefined}
+        className={cn(
+          "bottom-nav-dark pointer-events-none fixed inset-x-0 bottom-0 z-[1000] bg-linear-to-t from-page from-30% to-transparent px-3 pt-6 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:hidden",
+          hidden && "translate-y-full opacity-0",
+        )}
+      >
+        <div
+          className={cn("relative mx-auto flex max-w-xl gap-1 rounded-[1.75rem] bg-night p-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.45)]", !hidden && "pointer-events-auto")}
+          style={{ viewTransitionName: "bottom-nav" }}
+        >
+          {items.map((item, i) => {
+            const on = i === active;
+            const badge = badges?.[item.href] ?? 0;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                transitionTypes={["tab"]}
+                tabIndex={hidden ? -1 : undefined}
+                onClick={() => !on && tapHaptic()}
+                aria-current={on ? "page" : undefined}
+                aria-label={t(item.label)}
+                className={cn(
+                  "tab-pill tab-item relative flex h-[3.25rem] min-w-0 items-center justify-center gap-2 rounded-[1.25rem] text-sm font-semibold",
+                  on ? "grow-[2.6] bg-lime text-night" : "grow text-white/70 hover:text-white",
+                )}
+              >
+                <span className="tab-icon relative" data-on={on || undefined}>
+                  <Icon emoji={item.icon} className="size-[22px]" strokeWidth={on ? 2.2 : 1.8} />
+                  {badge > 0 && (
+                    <span key={badge} data-testid="nav-badge" className="badge-pop absolute -top-2 -right-2.5 min-w-[18px] rounded-full bg-coral px-1 text-center text-[10px] leading-[18px] font-bold text-white ring-2 ring-night">
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
+                </span>
+                {on && <span className="tab-label truncate">{t(item.label)}</span>}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
   return (
     <nav
       className={cn(
@@ -129,7 +186,7 @@ export function BottomNavView({
               <span className="tab-icon relative" data-on={on || undefined}>
                 <Icon emoji={item.icon} className="size-[22px]" strokeWidth={on ? 2.3 : 1.8} />
                 {badge > 0 && (
-                  <span key={badge} className="badge-pop absolute -top-1.5 -right-2.5 min-w-[18px] rounded-full bg-accent px-1 text-center text-[10px] leading-[18px] font-bold text-on-accent ring-2 ring-surface">
+                  <span key={badge} data-testid="nav-badge" className="badge-pop absolute -top-1.5 -right-2.5 min-w-[18px] rounded-full bg-accent px-1 text-center text-[10px] leading-[18px] font-bold text-on-accent ring-2 ring-surface">
                     {badge > 99 ? "99+" : badge}
                   </span>
                 )}

@@ -16,6 +16,19 @@
   --color-surface: #ffffff;
   --color-ink: #111827;
 
+  /* Палитра приложения магазина (макет «Приложение для магазинов»): ночь, салатовый, коралл и пастель плиток */
+  --color-night: #121714;
+  --color-night-2: #1f2622;
+  --color-lime: #c6ef66;
+  --color-coral: #ff7a59;
+  --color-coral-soft: #ffe2d8;
+  --color-tile-yellow: #fdd25e;
+  --color-tile-pink: #ffbcd0;
+  --color-tile-blue: #b1cffd;
+  --color-tile-mint: #b9ead1;
+  --color-tile-violet: #d8cafd;
+  --color-tile-peach: #ffd8b4;
+
   --font-sans: "Onest Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-display: "Onest Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
@@ -29,17 +42,18 @@ body {
   color: var(--color-ink);
 }
 
-/* Магазин: зелень базара и шафран для корзины и акций */
+/* Магазин: ночной чёрный и салатовый, тёплый светлый фон, пастельные плитки (макет «Приложение для магазинов») */
 [data-theme="shop"] {
-  --color-brand-50: #e9f5ee;
-  --color-brand-100: #cbe9d6;
-  --color-brand-500: #1f9a5c;
-  --color-brand-600: #157f4b;
-  --color-brand-700: #0e5f38;
-  --color-accent: #f2a516;
-  --color-on-accent: #2a1c00;
-  --color-page: #f1f5f0;
-  --color-ink: #13241a;
+  --color-brand-50: #f1fadc;
+  --color-brand-100: #e4f6b8;
+  --color-brand-500: #a9d63e;
+  --color-brand-600: #c6ef66;
+  --color-brand-700: #3d5a00;
+  --color-on-brand: #121714;
+  --color-accent: #c6ef66;
+  --color-on-accent: #121714;
+  --color-page: #f0f0ea;
+  --color-ink: #121714;
   --font-display: "Unbounded Variable", "Onest Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -158,6 +172,35 @@ html {
   100% { transform: none; }
 }
 
+/* Полоски прогресса (минимальная сумма заказа, лимит долга) заполняются плавно */
+.progress-fill {
+  transition: width 600ms var(--ease-out);
+  animation: progress-in 700ms var(--ease-out) both;
+}
+@keyframes progress-in {
+  from { width: 0; }
+}
+
+/* Тёмная панель магазина: активная вкладка расширяется в салатовую плашку с подписью */
+.tab-pill {
+  flex-basis: 0;
+  transition:
+    flex-grow 420ms var(--ease-spring),
+    background-color 220ms ease,
+    color 220ms ease;
+}
+.tab-label {
+  animation: tab-label-in 320ms var(--ease-out) both;
+}
+@keyframes tab-label-in {
+  from { opacity: 0; transform: translateX(-6px); }
+}
+.bottom-nav-dark {
+  transition:
+    transform 360ms var(--ease-spring),
+    opacity 240ms ease;
+}
+
 /* Счётчик на карточке товара: «+» раскрывается в «− N +», число «щёлкает» при каждом изменении */
 .stepper-in {
   transform-origin: right center;
@@ -222,6 +265,12 @@ html {
 }
 ::view-transition-new(.page-in) {
   animation: 300ms var(--ease-out) 40ms both vt-rise;
+}
+::view-transition-new(.back-in) {
+  animation: 300ms var(--ease-out) 40ms both vt-from-left;
+}
+@keyframes vt-from-left {
+  from { opacity: 0; transform: translateX(-28px); }
 }
 ::view-transition-new(.tab-in) {
   animation: 240ms var(--ease-out) 40ms both vt-fade-in;

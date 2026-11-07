@@ -12,7 +12,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, TabNav, TabNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
-import { navForRole } from "./shop-nav";
+import { navForRole, SHOP_NAV_HIDE_ON } from "./shop-nav";
 
 // Витрина магазина: цветная шапка с поиском по всем поставщикам и корзиной, вкладки сверху,
 // на телефоне — нижнее меню как в приложении. Данные магазина подгружаются потоком.
@@ -22,10 +22,8 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
-      <header
-        className="sticky top-0 z-[1001] rounded-b-[1.75rem] bg-brand-700 bg-[radial-gradient(120%_140%_at_0%_0%,rgb(255_255_255/0.10),transparent_55%)] text-white shadow-[0_8px_24px_-12px_rgb(14_95_56/0.55)] md:rounded-none"
-        style={{ viewTransitionName: "app-header" }}
-      >
+      {/* На телефоне шапки нет: у главной своя большая тёмная шапка, у остальных экранов — заголовок или кнопка «Назад» */}
+      <header className="sticky top-0 z-[1001] hidden bg-night text-white md:block" style={{ viewTransitionName: "app-header" }}>
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pt-3 pb-2 md:pb-1">
           <Link href="/shop" className="flex min-w-0 items-center gap-2">
             <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)]" aria-hidden>
@@ -47,21 +45,16 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
             </Suspense>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-3 md:hidden">
-          <Suspense>
-            <SearchForm className="flex" />
-          </Suspense>
-        </div>
         <div className="mx-auto hidden max-w-6xl px-2 md:block">
           <Suspense fallback={<TabNavView items={nav} root="/shop" />}>
             <ShopTabNav items={nav} />
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-28 md:pb-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-32 md:pt-5 md:pb-10">
         <Suspense fallback={<Spinner />}>{children}</Suspense>
       </main>
-      <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" />}>
+      <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} />}>
         <ShopBottomNav items={mobileNav} />
       </Suspense>
     </div>
@@ -113,7 +106,7 @@ async function ShopActions() {
       <Link href="/notifications" className="relative grid size-10 place-items-center rounded-full bg-white/10 hover:bg-white/20" aria-label={t("Уведомления")}>
         <Bell className="size-5" aria-hidden />
         {unread > 0 && (
-          <span key={unread} className="badge-pop absolute -top-1 -right-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-semibold text-white ring-2 ring-brand-700">
+          <span key={unread} className="badge-pop absolute -top-1 -right-1 min-w-5 rounded-full bg-red-600 px-1 text-center text-[11px] leading-5 font-semibold text-white ring-2 ring-night">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -147,5 +140,13 @@ async function ShopTabNav({ items }: { items: NavItem[] }) {
 async function ShopBottomNav({ items }: { items: NavItem[] }) {
   const ctx = await getShopContext();
   const cart = ctx ? await cartSummary(ctx.shop.id) : null;
-  return <BottomNav items={navForRole(items, ctx?.membership.role)} root="/shop" badges={cart ? { "/shop/cart": cart.items } : undefined} />;
+  return (
+    <BottomNav
+      items={navForRole(items, ctx?.membership.role)}
+      root="/shop"
+      tone="dark"
+      hideOn={SHOP_NAV_HIDE_ON}
+      badges={cart ? { "/shop/cart": cart.items } : undefined}
+    />
+  );
 }
