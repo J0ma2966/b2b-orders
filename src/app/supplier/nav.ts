@@ -21,9 +21,10 @@ export const SUPPLIER_NAV: NavItem[] = [
 ];
 
 // Телефон (приложение): четыре главных раздела внизу, остальное — в «Ещё».
+// Магазины с долгами — внизу: деньги важнее всего; доставки — карточкой на главной и в «Ещё».
 // Подписи короче, чтобы помещались и по-узбекски.
-const MAIN = ["/supplier", "/supplier/orders", "/supplier/delivery", "/supplier/stock"];
-const SHORT: Record<string, string> = { "/supplier": "Главная", "/supplier/delivery": "Доставки" };
+const MAIN = ["/supplier", "/supplier/orders", "/supplier/shops", "/supplier/stock"];
+const SHORT: Record<string, string> = { "/supplier": "Главная", "/supplier/shops": "Магазины", "/supplier/stock": "Склад" };
 export const SUPPLIER_MORE = "/supplier/more";
 export const SUPPLIER_MOBILE_NAV: NavItem[] = [
   ...MAIN.map((href) => {
@@ -42,6 +43,6 @@ export const SUPPLIER_MOBILE_NAV: NavItem[] = [
 // Разделы на экране «Ещё», по смыслу
 export const SUPPLIER_MORE_GROUPS: { title: string; items: string[] }[] = [
   { title: "Товары", items: ["/supplier/catalog", "/supplier/bonuses", "/supplier/replacements", "/supplier/returned"] },
-  { title: "Деньги", items: ["/supplier/shops", "/supplier/cash", "/supplier/reports", "/supplier/commission"] },
-  { title: "Компания", items: ["/supplier/profile", "/supplier/team", "/supplier/territory", "/supplier/map", "/supplier/audit"] },
+  { title: "Деньги", items: ["/supplier/cash", "/supplier/reports", "/supplier/commission"] },
+  { title: "Компания", items: ["/supplier/delivery", "/supplier/profile", "/supplier/team", "/supplier/territory", "/supplier/map", "/supplier/audit"] },
 ];

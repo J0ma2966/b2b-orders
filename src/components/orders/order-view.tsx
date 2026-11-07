@@ -129,24 +129,24 @@ export async function OrdersList<R extends OrderRow>({
 }) {
   const t = await getT();
   return (
-    <Card className="p-0 sm:p-0">
+    <Card className="overflow-hidden p-0!">
       <ul className="divide-y divide-gray-100">
         {rows.map((o) => (
           <li key={o.id} className="flex items-stretch">
             {selectForm && (
-              <label className="flex shrink-0 cursor-pointer items-center pl-4">
+              <label className="hidden shrink-0 cursor-pointer items-center pl-4 sm:flex">
                 <input type="checkbox" form={selectForm} name="ids[]" value={o.id} className="size-4" aria-label={t("Заказ №{n}", { n: o.number })} />
               </label>
             )}
-            <Link href={href(o.id)} className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50">
-              <div className="min-w-0">
+            <Link href={href(o.id)} className="flex min-w-0 flex-1 items-start justify-between gap-3 px-4 py-3 hover:bg-gray-50">
+              <div className="min-w-0 flex-1">
                 <div className="font-medium">№{o.number} · {party(o)}</div>
                 <div className="text-xs text-gray-500">
                   {t.dateTime(o.placedAt)} · {t.money(o.total)}
                 </div>
                 {extra?.(o)}
               </div>
-              <OrderStatusBadge status={o.status} />
+              <span className="shrink-0"><OrderStatusBadge status={o.status} /></span>
             </Link>
           </li>
         ))}

@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { creditLeft, debtAging, groupMultiOverdue, requiredPayment, type CreditTerms } from "./finance-core";
+import { creditLeft, debtAging, debtTone, groupMultiOverdue, requiredPayment, type CreditTerms, type DebtTone } from "./finance-core";
 import { DELIVERY_ACTIVE, PRE_DELIVERY } from "./order-core";
 
 type Client = Prisma.TransactionClient | typeof db;
@@ -91,4 +91,34 @@ export async function multiOverdueShops(opts: { shopId?: string; now?: Date } = 
     shop: shopById.get(g.shopId)!,
     accounts: g.accounts.map((a) => ({ ...a, supplier: supplierById.get(a.supplierId)! })),
   }));
+}
+
+export type ShopDebtState = { shopId: string; balance: number; tone: DebtTone; overdueAmount: number; overdueDays: number; dueDate: Date | null };
+
+// Счета всех магазинов поставщика с цветом долга (приложение поставщика: главная, список магазинов, заказы).
+// Срок и просрочка считаются только у долгов с отсрочкой оплаты — как в accountState.
+export async function supplierDebtStates(supplierId: string, opts: { shopIds?: string[]; now?: Date } = {}) {
+  const now = opts.now ?? new Date();
+  const accounts = await db.shopAccount.findMany({
+    where: { supplierId, balance: { not: 0 }, ...(opts.shopIds && { shopId: { in: opts.shopIds } }) },
+    select: { id: true, shopId: true, balance: true, paymentTermDays: true },
+  });
+  const states = await Promise.all(
+    accounts.map(async (a): Promise<ShopDebtState> => {
+      const balance = num(a.balance);
+      let aging: ReturnType<typeof debtAging> = null;
+      if (balance > 0 && a.paymentTermDays !== null) {
+        const charges = await db.debtEntry.findMany({
+          where: { accountId: a.id, amount: { gt: 0 } },
+          select: { amount: true, occurredAt: true },
+          orderBy: { occurredAt: "desc" },
+          take: 500,
+        });
+        aging = debtAging(balance, charges.map((c) => ({ amount: num(c.amount), at: c.occurredAt })), a.paymentTermDays, now);
+      }
+      const overdueAmount = aging?.overdueAmount ?? 0;
+      return { shopId: a.shopId, balance, tone: debtTone(balance, overdueAmount), overdueAmount, overdueDays: aging?.overdueDays ?? 0, dueDate: aging?.dueDate ?? null };
+    }),
+  );
+  return new Map(states.map((s) => [s.shopId, s]));
 }

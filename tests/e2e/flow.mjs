@@ -475,11 +475,15 @@ log("долг у магазина:", JSON.stringify((await shop.locator("main").
 // погашение долга
 await sup.goto(`${BASE}${shopHref}`);
 await sup.waitForTimeout(800);
-const payForm = sup.locator("form", { has: sup.getByRole("button", { name: "Зарегистрировать погашение" }) });
+// оплата — в шторке «Принять оплату»; под суммой видно, каким станет счёт
+await sup.getByRole("button", { name: "Принять оплату" }).click();
+const payForm = sup.getByTestId("pay-sheet");
 await payForm.locator("[name=amount]").fill("20000");
 await payForm.locator("[name=comment]").fill("Наличными в офисе");
-await sup.getByRole("button", { name: "Зарегистрировать погашение" }).click();
+log("после оплаты будет:", await payForm.getByTestId("payment-after").innerText());
+await payForm.getByRole("button", { name: "Подтвердить оплату" }).click();
 await sup.waitForTimeout(1500);
+log("шторка закрылась:", (await payForm.getAttribute("data-open")) === null);
 await sup.reload();
 await sup.waitForTimeout(800);
 await shot(sup, "29-supplier-shop-debt");

@@ -39,15 +39,55 @@ await page.waitForURL(`${BASE}/supplier`, { timeout: 15000 });
 // Нижняя панель: пока страница догружается потоком, в DOM бывает и её заглушка — берём видимую
 const bottom = page.locator("nav.fixed:visible").last();
 await bottom.waitFor();
-for (const label of [L("Главная", "Bosh sahifa"), L("Заказы", "Buyurtmalar"), L("Доставки", "Yetkazishlar"), L("Остатки", "Qoldiqlar"), L("Ещё", "Yana")]) {
+for (const label of [L("Главная", "Bosh sahifa"), L("Заказы", "Buyurtmalar"), L("Магазины", "Doʻkonlar"), L("Склад", "Ombor"), L("Ещё", "Yana")]) {
   await bottom.getByText(label, { exact: true }).waitFor({ timeout: 5000 }).catch(() => assert.fail(`в нижней панели нет «${label}»`));
 }
 // Длинное верхнее меню на телефоне скрыто — разделы в нижней панели и «Ещё»
 assert.equal(await page.locator("header nav").first().isVisible(), false, "на телефоне видно верхнее меню разделов");
 log("нижняя панель: OK");
+// Главная: выручка за сегодня, расчёты с магазинами по цветам, «Мои доставки» (поставщик развозит сам)
+await page.getByTestId("revenue-today").waitFor();
+const money = page.getByTestId("shop-money");
+for (const tone of ["overdue", "due", "prepay"]) assert.equal(await money.locator(`[data-tone=${tone}]`).count(), 1, `на главной нет строки ${tone}`);
+await page.getByTestId("my-deliveries").waitFor();
+log("главная: выручка, расчёты с магазинами, мои доставки: OK");
+await page.waitForTimeout(1200);
 await shot("home");
 
-await bottom.getByText(L("Остатки", "Qoldiqlar"), { exact: true }).click();
+// Магазины: итоги по цветам, список с цветом долга, карточка и шторка оплаты с предпросмотром
+await bottom.getByText(L("Магазины", "Doʻkonlar"), { exact: true }).click();
+await page.waitForURL(`${BASE}/supplier/shops`);
+for (const tone of ["overdue", "due", "prepay"]) await page.getByTestId(`sum-${tone}`).waitFor();
+const rows = page.getByTestId("shop-row");
+assert.ok((await rows.count()) > 0, "в списке магазинов пусто");
+const tones = await rows.evaluateAll((els) => els.map((e) => e.dataset.tone));
+const order = { overdue: 0, due: 1, prepay: 2, none: 3 };
+assert.deepEqual(tones, [...tones].sort((a, b) => order[a] - order[b]), `магазины не по порядку цвета: ${tones}`);
+assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, "магазины шире экрана");
+log("магазины по цветам долга:", tones.join(", "));
+await page.waitForTimeout(800);
+await shot("shops");
+await rows.first().click();
+await page.waitForURL(/\/supplier\/shops\/.+/);
+const hero = page.getByTestId("balance-hero");
+await hero.waitFor();
+const heroTone = await hero.getAttribute("data-tone");
+assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, "карточка магазина шире экрана");
+assert.equal(heroTone, tones[0], "цвет карточки не совпадает со списком");
+await page.getByRole("button", { name: L("Принять оплату", "Toʻlovni qabul qilish") }).click();
+const sheet = page.getByTestId("pay-sheet");
+await sheet.locator("[name=amount]").waitFor({ state: "visible" });
+await sheet.locator("[name=amount]").fill("999999999");
+assert.equal(await sheet.getByTestId("payment-after").getAttribute("data-tone"), "prepay", "переплата не зелёная в предпросмотре");
+assert.equal(await sheet.locator("[name=amount]").inputValue(), "999 999 999", "сумма не разбита по разрядам");
+await page.waitForTimeout(600);
+await shot("pay-sheet");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(500);
+assert.equal(await sheet.getAttribute("data-open"), null, "шторка не закрылась");
+log(`карточка магазина (${heroTone}) и шторка оплаты: OK`);
+
+await bottom.getByText(L("Склад", "Ombor"), { exact: true }).click();
 await page.waitForURL(`${BASE}/supplier/stock`);
 await page.locator("h1").first().waitFor();
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -57,7 +97,7 @@ await shot("stock");
 
 await bottom.getByText(L("Ещё", "Yana"), { exact: true }).click();
 await page.waitForURL(`${BASE}/supplier/more`);
-for (const href of ["/supplier/catalog", "/supplier/shops", "/supplier/team", "/supplier/reports", "/account"]) {
+for (const href of ["/supplier/catalog", "/supplier/delivery", "/supplier/team", "/supplier/reports", "/account"]) {
   await page.locator(`main a[href="${href}"]`).first().waitFor({ timeout: 5000 }).catch((e) => assert.fail(`на экране «Ещё» нет ${href}: ${e.message.split("\n")[0]}`));
 }
 await shot("more");

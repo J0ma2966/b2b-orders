@@ -9,6 +9,7 @@ import {
   Gift,
   House,
   LayoutDashboard,
+  Lock,
   Menu,
   LogOut,
   Map,
@@ -67,6 +68,7 @@ const BY_EMOJI: Record<string, LucideIcon> = {
   "📜": ScrollText,
   "⚙️": Settings,
   "🚨": Siren,
+  "🔒": Lock,
 };
 
 export function Icon({ emoji, className, strokeWidth = 2 }: { emoji?: string; className?: string; strokeWidth?: number }) {

@@ -55,6 +55,12 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
                       ? t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })
                       : `${t("Физический")} ${formatQty(u.physicalQty)} · ${t("Резерв")} ${formatQty(u.reservedQty)}`}
                   </span>
+                  {!u.baseUnit && u.lowStockThreshold !== null && Number(u.lowStockThreshold) > 0 && (
+                    // Запас относительно порога: полоска заполнена при тройном пороге и больше
+                    <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-gray-100" aria-hidden>
+                      <span className={`progress-fill block h-full rounded-full ${stockBar(avail, Number(u.lowStockThreshold))}`} style={{ width: `${Math.max(4, Math.min(100, Math.round((avail / (Number(u.lowStockThreshold) * 3)) * 100)))}%` }} />
+                    </span>
+                  )}
                 </span>
                 <span className={`shrink-0 text-right font-semibold tabular-nums ${stockTone(avail, u.lowStockThreshold)}`}>
                   {formatQty(avail)}
@@ -115,4 +121,8 @@ export default async function StockPage({ searchParams }: PageProps<"/supplier/s
 
 function stockTone(avail: number, threshold: unknown) {
   return avail <= 0 ? "text-red-600" : threshold !== null && avail < Number(threshold) ? "text-yellow-700" : "";
+}
+
+function stockBar(avail: number, threshold: number) {
+  return avail <= 0 || avail < threshold / 2 ? "bg-red-600" : avail < threshold ? "bg-amber-500" : "bg-brand-500";
 }
