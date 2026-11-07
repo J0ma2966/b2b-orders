@@ -3,6 +3,7 @@
 import { Field, Input, Select, Textarea } from "@/components/ui";
 import type { FormState } from "@/lib/forms";
 import { useT } from "@/lib/i18n/client";
+import { PhotoInput } from "@/components/ui/photo-input";
 
 export type ProductDefaults = Partial<Record<"name" | "description" | "brand" | "sku" | "categoryId" | "weightKg" | "attributes", string>> & {
   isAvailable?: boolean;
@@ -62,9 +63,7 @@ export function ProductFields({
           {t("Можно заменить по заявке")}
         </label>
       </div>
-      <Field label="Фотографии" name="photos" error={e.photos} hint="До 8 фото, JPG/PNG/WEBP до 10 МБ каждое">
-        <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
-      </Field>
+      <PhotoInput name="photos" label="Фотографии" error={e.photos} hint="До 8 фото, JPG/PNG/WEBP до 10 МБ каждое" max={8} />
     </div>
   );
 }

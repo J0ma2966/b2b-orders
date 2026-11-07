@@ -11,6 +11,7 @@ import type { TerritoryOption } from "@/components/territory/types";
 import { initialFormState } from "@/lib/forms";
 import { updateShopProfileAction } from "../actions";
 import { useT } from "@/lib/i18n/client";
+import { PhotoInput } from "@/components/ui/photo-input";
 
 export function ShopProfileForm({ territories, defaults }: { territories: TerritoryOption[]; defaults: Record<string, string> }) {
   const t = useT();
@@ -42,9 +43,7 @@ export function ShopProfileForm({ territories, defaults }: { territories: Territ
         <Input name="address" defaultValue={v.address} required />
       </Field>
       <MapPicker defaultValue={{ lat: Number(v.lat), lng: Number(v.lng) }} error={e.lat?.[0]} />
-      <Field label="Добавить фото" name="photo" error={e.photo}>
-        <Input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
-      </Field>
+      <PhotoInput name="photo" label="Добавить фото" error={e.photo} />
       <SubmitButton>{t("Сохранить")}</SubmitButton>
     </ActionForm>
   );
