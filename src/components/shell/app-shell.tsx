@@ -13,6 +13,7 @@ export function AppShell({
   nav,
   mobileNav,
   bottom,
+  side,
   context,
   children,
 }: {
@@ -22,6 +23,8 @@ export function AppShell({
   mobileNav?: NavItem[];
   // Своя нижняя панель (серверный компонент, например со счётчиками); пока грузится — mobileNav без счётчиков
   bottom?: ReactNode;
+  // Своё меню слева (серверный компонент со счётчиками); пока грузится — nav без счётчиков
+  side?: ReactNode;
   context?: ReactNode;
   children: ReactNode;
 }) {
@@ -48,7 +51,7 @@ export function AppShell({
         </div>
         <div className={mobileNav ? "hidden md:block lg:hidden" : "lg:hidden"}>
           <Suspense fallback={<SideNavView items={nav} root={root} />}>
-            <SideNav items={nav} root={root} />
+            {side ?? <SideNav items={nav} root={root} />}
           </Suspense>
         </div>
       </header>
@@ -56,7 +59,7 @@ export function AppShell({
         <aside className="hidden w-56 shrink-0 lg:block">
           <div className="sticky top-20">
             <Suspense fallback={<SideNavView items={nav} root={root} />}>
-              <SideNav items={nav} root={root} />
+              {side ?? <SideNav items={nav} root={root} />}
             </Suspense>
           </div>
         </aside>

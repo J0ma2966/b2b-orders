@@ -1,4 +1,8 @@
 import { AppShell } from "@/components/shell/app-shell";
+import { SideNav } from "@/components/shell/nav-links";
+import { getAuth } from "@/lib/auth/current";
+import { db } from "@/lib/db";
+import { unreadBySection } from "@/lib/nav-badges";
 
 const NAV = [
   { href: "/admin", label: "Обзор", icon: "📊" },
@@ -21,9 +25,20 @@ const NAV = [
   { href: "/admin/settings", label: "Настройки", icon: "⚙️" },
 ];
 
+// Счётчики: непрочитанные уведомления по разделам, у «Уведомлений» — все непрочитанные
+async function AdminSideNav() {
+  const auth = await getAuth();
+  if (!auth) return <SideNav items={NAV} root="/admin" />;
+  const [badges, unread] = await Promise.all([
+    unreadBySection(auth.user.id, NAV.map((i) => i.href)),
+    db.notification.count({ where: { userId: auth.user.id, readAt: null } }),
+  ]);
+  return <SideNav items={NAV} root="/admin" badges={{ ...badges, "/notifications": unread }} />;
+}
+
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
-    <AppShell title="Админ платформы" root="/admin" nav={NAV}>
+    <AppShell title="Админ платформы" root="/admin" nav={NAV} side={<AdminSideNav />}>
       {children}
     </AppShell>
   );

@@ -132,6 +132,8 @@ model Supplier {
   contactPerson  String
   description    String?
   logoPath       String?
+  // Счётчик автоматических артикулов товаров (A-00001, A-00002…), см. lib/sku.ts
+  skuSeq         Int            @default(0)
   // Главный офис
   officeTerritoryId String?     // город/район офиса
   officeTerritory   Territory?  @relation(fields: [officeTerritoryId], references: [id])
@@ -373,7 +375,7 @@ model Product {
   name        String
   description String?
   brand       String?
-  sku         String?   // артикул поставщика
+  sku         String?   // артикул поставщика; пустой при создании — присваивается автоматически
   weightKg    Decimal?  @db.Decimal(10, 3)
   // Характеристики: [{ name, value }]
   attributes  Json      @default("[]")

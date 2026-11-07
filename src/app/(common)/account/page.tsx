@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Card, DefinitionList, PageHeader } from "@/components/ui";
+import { Button, Card, DefinitionList, PageHeader } from "@/components/ui";
+import { logoutAction } from "@/app/(auth)/actions";
 import { requireAuth } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
@@ -52,6 +53,10 @@ export default async function AccountPage() {
           </div>
         </Card>
       </div>
+      {/* В мобильном приложении шапка узкая — выход всегда есть здесь, в профиле любой роли */}
+      <form action={logoutAction} className="mt-4">
+        <Button variant="secondary" className="w-full text-red-600 sm:w-auto">⏻ Выйти из аккаунта</Button>
+      </form>
     </>
   );
 }

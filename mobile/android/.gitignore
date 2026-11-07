@@ -62,7 +62,8 @@ captures/
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Берётся из Firebase (docs/mobile.md) или секрета GOOGLE_SERVICES_JSON в сборке GitHub Actions, в репозиторий не кладём
+app/google-services.json
 
 # Freeline
 freeline.py

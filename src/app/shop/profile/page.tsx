@@ -11,27 +11,38 @@ import { fileUrl } from "@/lib/storage-url";
 import { formatPhone } from "@/lib/phone";
 import { ShopProfileForm } from "./form";
 import { getT } from "@/lib/i18n/server";
+import { unreadBySection } from "@/lib/nav-badges";
+import { SHOP_NAV } from "@/components/shell/shop-nav";
 
-// Профиль магазина в стиле макета: лаймовая шапка, язык, меню разделов, выход, ниже — данные магазина
+// Профиль магазина в стиле макета: лаймовая шапка, язык, меню разделов, выход, ниже — данные магазина.
+// Кружок у пункта — непрочитанные уведомления раздела (их сумма — на «Профиле» в нижней панели).
 export default async function ShopProfilePage() {
   const t = await getT();
   const ctx = await requireShop();
   const s = ctx.shop;
   const owner = ctx.membership.role === "OWNER";
   const points = ctx.memberships.length;
-  const [territories, territory, suppliers, unread] = await Promise.all([
+  const [territories, territory, suppliers, unreadTotal, unread] = await Promise.all([
     getTerritoryOptions(),
     db.territory.findUnique({ where: { id: s.territoryId }, select: { name: true } }),
     db.shopAccount.count({ where: { shopId: s.id } }),
     db.notification.count({ where: { userId: ctx.auth.user.id, readAt: null } }),
+    unreadBySection(ctx.auth.user.id, [...SHOP_NAV.map((i) => i.href), "/shop/team"]),
   ]);
   const menu: { href: string; icon: LucideIcon; tile: string; title: string; sub?: string; badge?: number; show?: boolean }[] = [
-    { href: "/shop/points", icon: MapPin, tile: "bg-tile-yellow", title: t("Мои точки"), sub: [territory?.name, s.address].filter(Boolean).join(", "), badge: points > 1 ? points : undefined },
-    { href: "/shop/suppliers", icon: Truck, tile: "bg-tile-blue", title: t("Мои поставщики"), badge: suppliers || undefined },
-    { href: "/notifications", icon: Bell, tile: "bg-tile-pink", title: t("Уведомления"), badge: unread || undefined },
-    { href: "/shop/replacements", icon: Repeat2, tile: "bg-tile-mint", title: t("Замены") },
-    { href: "/shop/team", icon: Users, tile: "bg-tile-violet", title: t("Сотрудники"), show: owner },
-    { href: "/shop/documents", icon: FileText, tile: "bg-tile-peach", title: t("Документы") },
+    {
+      href: "/shop/points",
+      icon: MapPin,
+      tile: "bg-tile-yellow",
+      title: points > 1 ? t("Мои точки ({n})", { n: points }) : t("Мои точки"),
+      sub: [territory?.name, s.address].filter(Boolean).join(", "),
+      badge: unread["/shop/points"],
+    },
+    { href: "/shop/suppliers", icon: Truck, tile: "bg-tile-blue", title: t("Мои поставщики"), sub: suppliers ? t("Работаете с {n}", { n: suppliers }) : undefined, badge: unread["/shop/suppliers"] },
+    { href: "/notifications", icon: Bell, tile: "bg-tile-pink", title: t("Уведомления"), badge: unreadTotal },
+    { href: "/shop/replacements", icon: Repeat2, tile: "bg-tile-mint", title: t("Замены"), badge: unread["/shop/replacements"] },
+    { href: "/shop/team", icon: Users, tile: "bg-tile-violet", title: t("Сотрудники"), show: owner, badge: unread["/shop/team"] },
+    { href: "/shop/documents", icon: FileText, tile: "bg-tile-peach", title: t("Документы"), badge: unread["/shop/documents"] },
     { href: "/account", icon: Settings, tile: "bg-page", title: t("Настройки"), sub: t("Пароль, push-уведомления") },
   ];
 
@@ -76,7 +87,7 @@ export default async function ShopProfilePage() {
                 {m.sub && <span className="block truncate text-sm text-gray-500">{m.sub}</span>}
               </span>
               {m.badge ? (
-                <span className="grid h-8 min-w-8 place-items-center rounded-full bg-night px-2 text-sm font-bold text-lime tabular-nums">{m.badge > 99 ? "99+" : m.badge}</span>
+                <span className="grid h-8 min-w-8 place-items-center rounded-full bg-night px-2 text-sm font-bold text-lime tabular-nums" data-testid="nav-badge">{m.badge > 99 ? "99+" : m.badge}</span>
               ) : (
                 <ChevronRight className="size-5 text-gray-400" aria-hidden />
               )}

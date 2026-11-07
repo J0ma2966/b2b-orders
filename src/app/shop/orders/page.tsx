@@ -2,11 +2,12 @@ import { ExportLink } from "@/components/ui/export-link";
 import Link from "next/link";
 import { EmptyState, cn } from "@/components/ui";
 import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
-import { ActiveOrderCard, OrderRows } from "@/components/shop/order-tracker";
+import { ActiveOrderCard, OrderRows, orderMarks } from "@/components/shop/order-tracker";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { orderStatusFilter } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
+import { FlashToast } from "@/components/ui/toast";
 
 // Заказы магазина (макет): «Активные · N» / «История»; верхний заказ в работе — крупной тёмной карточкой
 export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/orders">) {
@@ -30,6 +31,8 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
   // Крупно — заказ, который уже в пути, иначе самый свежий
   const hero = status === "active" && page === 1 ? (rows.find((o) => o.status === "IN_TRANSIT") ?? rows[0]) : null;
   const rest = rows.filter((o) => o !== hero);
+  // Метки «Изменён поставщиком» / «Есть обновления» гаснут, когда заказ открыт
+  const marks = await orderMarks(ctx.auth.user.id, rows.map((o) => o.id));
   const tab = (key: string, label: string) => (
     <Link
       href={key === "active" ? "/shop/orders" : `/shop/orders?status=${key}`}
@@ -49,14 +52,17 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
         {tab("active", `${t("Активные")} · ${activeCount}`)}
         {tab("closed", t("История"))}
       </nav>
+      {typeof sp.placed === "string" && Number(sp.placed) > 0 && (
+        <FlashToast param="placed" tone="success" title={t("Оформлено заказов: {n}", { n: Number(sp.placed) })} body={t("Товар зарезервирован, поставщики получили уведомления")} />
+      )}
       {rows.length === 0 ? (
         <EmptyState>
           {t("Заказов нет.")} <Link href="/shop/suppliers" className="font-semibold text-brand-700 underline">{t("Выбрать поставщика")}</Link>
         </EmptyState>
       ) : (
         <div className="space-y-2.5">
-          {hero && <ActiveOrderCard o={hero} />}
-          <OrderRows rows={rest} />
+          {hero && <ActiveOrderCard o={hero} mark={marks.get(hero.id)} />}
+          <OrderRows rows={rest} marks={marks} />
         </div>
       )}
       <Pagination page={page} total={total} basePath="/shop/orders" params={{ status: status === "active" ? "" : status }} />

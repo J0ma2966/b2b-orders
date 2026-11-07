@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { cn } from "@/components/ui";
 import { FileText, Phone, Truck } from "lucide-react";
-import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/lib/order-core";
+import { db } from "@/lib/db";
+import { ORDER_CHANGED, ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/lib/order-core";
 import { Avatar } from "./ui";
 
 // Крупная дата в карточке заказа: «7 ноября» / «7-noyabr»
@@ -72,34 +73,38 @@ export async function OrderTracker({ status, compact = false }: { status: OrderS
 
 type TrackRow = { id: string; number: number | null; status: OrderStatus; placedAt: Date | null; total: { toString(): string }; supplier: { displayName: string } };
 
-// Заказы магазина: карточка с поставщиком, суммой и путём заказа
-export async function ShopOrderCards({ rows }: { rows: TrackRow[] }) {
+// Непрочитанные уведомления пользователя по заказам: «Изменён» (поставщик поменял состав) или «Обновлён» (новый статус).
+// Гаснут, когда пользователь открывает заказ (SeenTracker).
+export async function orderMarks(userId: string, orderIds: string[]) {
+  const notes = await db.notification.findMany({
+    where: { userId, readAt: null, entity: "Order", entityId: { in: orderIds } },
+    select: { entityId: true, type: true },
+  });
+  const marks = new Map<string, Mark>();
+  for (const n of notes) {
+    if (n.type === ORDER_CHANGED) marks.set(n.entityId!, "changed");
+    else if (!marks.has(n.entityId!)) marks.set(n.entityId!, "updated");
+  }
+  return marks;
+}
+
+type Mark = "changed" | "updated";
+
+// Метка на карточке заказа: «Изменён поставщиком» (жёлтая) или «Есть обновления»
+async function OrderMark({ mark, dark }: { mark?: Mark; dark?: boolean }) {
+  if (!mark) return null;
   const t = await getT();
   return (
-    <ul className="grid gap-3 md:grid-cols-2">
-      {rows.map((o) => (
-        <li key={o.id}>
-          <Link href={`/shop/orders/${o.id}`} className="block rounded-2xl bg-surface p-4 ring-1 ring-black/5 hover:ring-brand-500">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate font-semibold">{o.supplier.displayName}</div>
-                <div className="text-xs text-gray-500">
-                  №{o.number} · {t.dateTime(o.placedAt)}
-                </div>
-              </div>
-              <div className="shrink-0 text-right font-bold tabular-nums">{t.money(o.total)}</div>
-            </div>
-            <div className="mt-4">
-              {STEP_OF[o.status] !== undefined ? (
-                <OrderTracker status={o.status} />
-              ) : (
-                <span className="text-sm text-gray-500">{t(ORDER_STATUS_LABEL[o.status])}</span>
-              )}
-            </div>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <span
+      data-testid={mark === "changed" ? "order-changed" : "order-updated"}
+      className={cn(
+        "inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold",
+        mark === "changed" ? "bg-yellow-300 text-night" : dark ? "bg-white/10 text-lime" : "bg-brand-50 text-brand-700",
+      )}
+    >
+      <span className={cn("size-2 shrink-0 rounded-full", mark === "changed" ? "bg-night" : dark ? "bg-lime" : "bg-brand-700")} aria-hidden />
+      <span className="truncate">{t(mark === "changed" ? "Изменён поставщиком" : "Есть обновления")}</span>
+    </span>
   );
 }
 
@@ -121,15 +126,20 @@ const BAR_OF: Partial<Record<OrderStatus, number>> = {
 
 type HeroOrder = TrackRow & { deliveryDate: Date | null; supplier: { displayName: string; phone: string }; _count: { items: number } };
 
-export async function ActiveOrderCard({ o }: { o: HeroOrder }) {
+export async function ActiveOrderCard({ o, mark }: { o: HeroOrder; mark?: Mark }) {
   const t = await getT();
   const step = BAR_OF[o.status] ?? 0;
   const trouble = TROUBLE.includes(o.status);
   return (
-    <section className="relative overflow-hidden rounded-[2rem] bg-night p-5 text-white">
+    <section className={cn("relative overflow-hidden rounded-[2rem] bg-night p-5 text-white", mark === "changed" && "ring-4 ring-yellow-300")}>
       <span aria-hidden className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-white/[0.05]" />
       <div className="relative flex items-start justify-between gap-3">
         <Link href={`/shop/orders/${o.id}`} className="min-w-0">
+          {mark && (
+            <div className="mb-2">
+              <OrderMark mark={mark} dark />
+            </div>
+          )}
           <div className="truncate text-sm text-white/60">№ {o.number} · {o.supplier.displayName}</div>
           <div className="mt-0.5 font-semibold tabular-nums">
             {t("{n} позиций", { n: o._count.items })} · {t.money(o.total)}
@@ -164,22 +174,26 @@ export async function ActiveOrderCard({ o }: { o: HeroOrder }) {
   );
 }
 
-export async function OrderRows({ rows }: { rows: TrackRow[] }) {
+export async function OrderRows({ rows, marks }: { rows: TrackRow[]; marks: Map<string, Mark> }) {
   const t = await getT();
   return (
     <ul className="space-y-2.5">
-      {rows.map((o) => (
-        <li key={o.id}>
-          <Link href={`/shop/orders/${o.id}`} className="flex items-center gap-3 rounded-[1.5rem] bg-surface p-3.5">
-            <Avatar name={o.supplier.displayName} className="size-14 text-base" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-display text-[17px] leading-tight font-bold">{o.supplier.displayName}</span>
-              <span className="block truncate text-sm text-gray-500 tabular-nums">№ {o.number} · {t.money(o.total)}</span>
-            </span>
-            <StatusChip status={o.status} />
-          </Link>
-        </li>
-      ))}
+      {rows.map((o) => {
+        const mark = marks.get(o.id);
+        return (
+          <li key={o.id}>
+            <Link href={`/shop/orders/${o.id}`} className={cn("flex items-center gap-3 rounded-[1.5rem] bg-surface p-3.5", mark === "changed" && "ring-2 ring-yellow-400")}>
+              <Avatar name={o.supplier.displayName} className="size-14 text-base" />
+              <span className="min-w-0 flex-1">
+                {mark && <OrderMark mark={mark} />}
+                <span className="block truncate font-display text-[17px] leading-tight font-bold">{o.supplier.displayName}</span>
+                <span className="block truncate text-sm text-gray-500 tabular-nums">№ {o.number} · {t.money(o.total)}</span>
+              </span>
+              <StatusChip status={o.status} />
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

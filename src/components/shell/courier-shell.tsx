@@ -13,6 +13,7 @@ import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
 import { OfflineSync } from "@/components/orders/offline-sync";
+import { unreadBySection } from "@/lib/nav-badges";
 
 export const COURIER_NAV: NavItem[] = [
   { href: "/courier", label: "Доставки", icon: "🚚", also: ["/courier/orders/"] },
@@ -55,7 +56,7 @@ export function CourierShell({ children }: { children: ReactNode }) {
         <Suspense fallback={<Spinner />}>{children}</Suspense>
       </main>
       <Suspense fallback={<BottomNavView items={COURIER_NAV} root="/courier" app />}>
-        <BottomNav items={COURIER_NAV} root="/courier" app />
+        <CourierBottomNav />
       </Suspense>
     </div>
   );
@@ -101,4 +102,11 @@ async function CourierOfflineSync() {
   const auth = await getAuth();
   if (!auth) return null;
   return <OfflineSync userId={auth.user.id} />;
+}
+
+// Счётчики разделов: непрочитанные уведомления (назначения, замены, касса — в «Доставки»)
+async function CourierBottomNav() {
+  const auth = await getAuth();
+  const badges = auth ? await unreadBySection(auth.user.id, COURIER_NAV.map((i) => i.href)) : undefined;
+  return <BottomNav items={COURIER_NAV} root="/courier" badges={badges} app />;
 }

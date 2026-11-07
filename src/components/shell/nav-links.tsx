@@ -15,12 +15,22 @@ function isActive(pathname: string, href: string, root: string, also: string[] =
   return href === root ? pathname === root : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function SideNav({ items, root }: { items: NavItem[]; root: string }) {
-  return <SideNavView items={items} root={root} pathname={usePathname()} />;
+export function SideNav({ items, root, badges }: { items: NavItem[]; root: string; badges?: NavBadges }) {
+  return <SideNavView items={items} root={root} badges={badges} pathname={usePathname()} />;
+}
+
+// Счётчик раздела в меню слева и во вкладках витрины
+function CountPill({ n, className }: { n: number; className?: string }) {
+  if (n <= 0) return null;
+  return (
+    <span className={cn("ml-auto min-w-5 rounded-full px-1.5 text-center text-[11px] leading-5 font-bold tabular-nums", className ?? "bg-accent text-on-accent")} data-testid="nav-badge">
+      {n > 99 ? "99+" : n}
+    </span>
+  );
 }
 
 // Без подсветки — пока путь не известен (пререндер динамических маршрутов)
-export function SideNavView({ items, root, pathname = "" }: { items: NavItem[]; root: string; pathname?: string }) {
+export function SideNavView({ items, root, badges, pathname = "" }: { items: NavItem[]; root: string; badges?: NavBadges; pathname?: string }) {
   const t = useT();
   return (
     <nav className="flex gap-1 overflow-x-auto px-2 pb-2 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
@@ -35,6 +45,7 @@ export function SideNavView({ items, root, pathname = "" }: { items: NavItem[]; 
         >
           <Icon emoji={item.icon} className="size-[18px] opacity-80" />
           {t(item.label)}
+          <CountPill n={badges?.[item.href] ?? 0} />
         </Link>
       ))}
     </nav>
@@ -42,11 +53,11 @@ export function SideNavView({ items, root, pathname = "" }: { items: NavItem[]; 
 }
 
 // Вкладки витрины магазина под цветной шапкой (компьютер и планшет)
-export function TabNav({ items, root }: { items: NavItem[]; root: string }) {
-  return <TabNavView items={items} root={root} pathname={usePathname()} />;
+export function TabNav({ items, root, badges }: { items: NavItem[]; root: string; badges?: NavBadges }) {
+  return <TabNavView items={items} root={root} badges={badges} pathname={usePathname()} />;
 }
 
-export function TabNavView({ items, root, pathname = "" }: { items: NavItem[]; root: string; pathname?: string }) {
+export function TabNavView({ items, root, badges, pathname = "" }: { items: NavItem[]; root: string; badges?: NavBadges; pathname?: string }) {
   const t = useT();
   return (
     <nav className="flex gap-1 overflow-x-auto">
@@ -59,11 +70,12 @@ export function TabNavView({ items, root, pathname = "" }: { items: NavItem[]; r
             transitionTypes={["tab"]}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "shrink-0 border-b-[3px] px-3 pt-2 pb-2.5 text-sm whitespace-nowrap",
+              "flex shrink-0 items-center gap-1.5 border-b-[3px] px-3 pt-2 pb-2.5 text-sm whitespace-nowrap",
               active ? "border-accent font-semibold text-white" : "border-transparent text-white/75 hover:text-white",
             )}
           >
             {t(item.label)}
+            <CountPill n={badges?.[item.href] ?? 0} />
           </Link>
         );
       })}

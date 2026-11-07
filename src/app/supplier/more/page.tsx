@@ -6,7 +6,8 @@ import { logoutAction } from "@/app/(auth)/actions";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { SUPPLIER_ROLE_LABEL } from "@/lib/statuses";
-import { SUPPLIER_MORE_GROUPS, SUPPLIER_NAV } from "../nav";
+import { supplierBadges } from "@/lib/nav-badges";
+import { SUPPLIER_MOBILE_NAV, SUPPLIER_MORE, SUPPLIER_MORE_GROUPS, SUPPLIER_NAV } from "../nav";
 import { SupplierSwitcher } from "../switcher";
 
 const row = "flex min-h-12 items-center gap-3 px-4 py-3 text-[15px] hover:bg-gray-50";
@@ -16,9 +17,18 @@ export default async function SupplierMorePage() {
   const [ctx, t] = await Promise.all([requireSupplier(["OWNER", "ADMIN"]), getT()]);
   const me = ctx.membership;
   const active = ctx.supplier.status === "ACTIVE";
-  const mine = me.delivers && active
-    ? await db.order.count({ where: { supplierId: ctx.supplier.id, courierId: ctx.auth.user.id, status: { in: ["ASSIGNED", "IN_TRANSIT"] } } })
-    : 0;
+  const [mine, badges] = await Promise.all([
+    me.delivers && active
+      ? db.order.count({ where: { supplierId: ctx.supplier.id, courierId: ctx.auth.user.id, status: { in: ["ASSIGNED", "IN_TRANSIT"] } } })
+      : 0,
+    supplierBadges(ctx.auth.user.id, ctx.supplier.id, {
+      active,
+      delivers: me.delivers,
+      allHrefs: SUPPLIER_NAV.map((i) => i.href),
+      mobileHrefs: SUPPLIER_MOBILE_NAV.map((i) => i.href),
+      overflowHref: SUPPLIER_MORE,
+    }),
+  ]);
   const byHref = new Map(SUPPLIER_NAV.map((i) => [i.href, i]));
   return (
     <>
@@ -66,6 +76,11 @@ export default async function SupplierMorePage() {
                   <Link key={href} href={href} className={row}>
                     <span className="w-6 text-center" aria-hidden>{i.icon}</span>
                     <span className="flex-1">{t(i.label)}</span>
+                    {(badges.side[href] ?? 0) > 0 && (
+                      <span className="min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] leading-5 font-bold text-on-accent" data-testid="nav-badge">
+                        {badges.side[href] > 99 ? "99+" : badges.side[href]}
+                      </span>
+                    )}
                     <span className="text-gray-400" aria-hidden>›</span>
                   </Link>
                 );

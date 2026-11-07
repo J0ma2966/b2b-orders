@@ -13,6 +13,7 @@ import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, TabNav, TabNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
 import { navForRole, SHOP_NAV_HIDE_ON } from "./shop-nav";
+import { shopBadges } from "@/lib/nav-badges";
 
 // Витрина магазина: цветная шапка с поиском по всем поставщикам и корзиной, вкладки сверху,
 // на телефоне — нижнее меню как в приложении. Данные магазина подгружаются потоком.
@@ -47,7 +48,7 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
         </div>
         <div className="mx-auto hidden max-w-6xl px-2 md:block">
           <Suspense fallback={<TabNavView items={nav} root="/shop" />}>
-            <ShopTabNav items={nav} />
+            <ShopTabNav items={nav} mobileNav={mobileNav} />
           </Suspense>
         </div>
       </header>
@@ -55,7 +56,7 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
         <Suspense fallback={<Spinner />}>{children}</Suspense>
       </main>
       <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} />}>
-        <ShopBottomNav items={mobileNav} />
+        <ShopBottomNav items={mobileNav} nav={nav} />
       </Suspense>
     </div>
   );
@@ -132,21 +133,21 @@ async function ShopActions() {
   );
 }
 
-async function ShopTabNav({ items }: { items: NavItem[] }) {
+// Счётчики разделов: корзина — позиции, остальное — непрочитанные уведомления раздела
+async function loadShopBadges(nav: NavItem[], mobileNav: NavItem[]) {
   const ctx = await getShopContext();
-  return <TabNav items={navForRole(items, ctx?.membership.role)} root="/shop" />;
+  if (!ctx) return { ctx, badges: null };
+  const items = navForRole(nav, ctx.membership.role);
+  const badges = await shopBadges(ctx.auth.user.id, ctx.shop.id, items.map((i) => i.href), mobileNav.map((i) => i.href));
+  return { ctx, badges };
 }
 
-async function ShopBottomNav({ items }: { items: NavItem[] }) {
-  const ctx = await getShopContext();
-  const cart = ctx ? await cartSummary(ctx.shop.id) : null;
-  return (
-    <BottomNav
-      items={navForRole(items, ctx?.membership.role)}
-      root="/shop"
-      tone="dark"
-      hideOn={SHOP_NAV_HIDE_ON}
-      badges={cart ? { "/shop/cart": cart.items } : undefined}
-    />
-  );
+async function ShopTabNav({ items, mobileNav }: { items: NavItem[]; mobileNav: NavItem[] }) {
+  const { ctx, badges } = await loadShopBadges(items, mobileNav);
+  return <TabNav items={navForRole(items, ctx?.membership.role)} root="/shop" badges={badges?.side} />;
+}
+
+async function ShopBottomNav({ items, nav }: { items: NavItem[]; nav: NavItem[] }) {
+  const { ctx, badges } = await loadShopBadges(nav, items);
+  return <BottomNav items={navForRole(items, ctx?.membership.role)} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} badges={badges?.bottom} />;
 }

@@ -108,6 +108,10 @@ export function canAssignCourier(status: OrderStatus) {
 }
 
 // Принудительную продажу можно добавить до передачи доставщику (ТЗ п. 24).
+// Тип уведомления магазину: поставщик изменил состав заказа (принудительная продажа).
+// Пока уведомление не прочитано, на карточке заказа у магазина стоит метка «Изменён».
+export const ORDER_CHANGED = "order.changed";
+
 export function canEditForced(status: OrderStatus) {
   return ["PLACED", "ACCEPTED", "ASSEMBLING", "READY"].includes(status);
 }
