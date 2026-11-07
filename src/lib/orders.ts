@@ -14,6 +14,7 @@ import { delivererWhere } from "@/lib/supplier-roles";
 import {
   canAssignCourier,
   canEditForced,
+  ORDER_CHANGED,
   orderTotal,
   ORDER_STATUS_LABEL,
   planBonuses,
@@ -555,7 +556,8 @@ export async function addForcedItem(supplierId: string, orderId: string, unitId:
       });
       const total = await recalcTotal(tx, order.id);
       await addEvent(tx, order.id, { type: "item.forced_added", actorRole, data: { itemId: item.id, name: item.productName, unit: item.unitLabel, qty, price: num(unit.price) } }, actor);
-      await notifyShop(order.shopId, shopNote(order, "добавлена позиция", `${unit.product.name} — ${formatQty(qty)} ${unitName(unit)}, сумма заказа ${formatMoney(total)}`), tx);
+      // Магазин получает push и метку «Изменён» на карточке заказа (пока не откроет заказ)
+      await notifyShop(order.shopId, { ...shopNote(order, "поставщик добавил товар", `${unit.product.name} — ${formatQty(qty)} ${unitName(unit)}, сумма заказа ${formatMoney(total)}`), type: ORDER_CHANGED }, tx);
     });
   } catch (e) {
     if (e instanceof StockError) throw new OrderError("Недостаточно доступного остатка");
@@ -576,7 +578,7 @@ export async function removeForcedItem(supplierId: string, itemId: string, actor
     await tx.orderItem.delete({ where: { id: item.id } });
     await recalcTotal(tx, order.id);
     await addEvent(tx, order.id, { type: "item.forced_removed", actorRole, data: { name: item.productName, unit: item.unitLabel, qty: num(item.qty) } }, actor);
-    await notifyShop(order.shopId, shopNote(order, "убрана позиция", `${item.productName} — ${formatQty(item.qty)} ${item.unitLabel}`), tx);
+    await notifyShop(order.shopId, { ...shopNote(order, "поставщик убрал товар", `${item.productName} — ${formatQty(item.qty)} ${item.unitLabel}`), type: ORDER_CHANGED }, tx);
   });
 }
 

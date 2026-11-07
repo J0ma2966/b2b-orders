@@ -6,6 +6,8 @@ import { safePath } from "./push-path";
 
 export type PushMessage = { title: string; body: string; url: string };
 
+export const ANDROID_CHANNEL = "orders";
+
 const b64url = (data: Buffer | string) => Buffer.from(data).toString("base64url");
 
 // Сервисный аккаунт Firebase → JWT для обмена на токен доступа Google OAuth (RS256)
@@ -39,7 +41,8 @@ export function fcmBody(token: string, m: PushMessage) {
       token,
       notification: { title: m.title, body: m.body },
       data: { url: safePath(m.url) },
-      android: { priority: "HIGH", ttl: "3600s", notification: { sound: "default" } },
+      // Канал «orders» с высокой важностью — уведомление всплывает поверх экрана (создаёт приложение, native-push.ts)
+      android: { priority: "HIGH", ttl: "3600s", notification: { sound: "default", channel_id: ANDROID_CHANNEL } },
     },
   };
 }

@@ -8,7 +8,8 @@ import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
-import { CLOSED, PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
+import { CLOSED, ORDER_CHANGED, PAYMENT_LABEL, RECEIVED, shopCanCancel, shopCanRequestCancel } from "@/lib/order-core";
+import { FlashToast } from "@/components/ui/toast";
 import { orderEvents } from "@/lib/orders";
 import { isTracked, OrderTracker } from "@/components/shop/order-tracker";
 
@@ -21,7 +22,15 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
     include: { supplier: true, courier: true, items: { include: { bonusPromotion: true }, orderBy: { createdAt: "asc" } } },
   });
   if (!order || order.shopId !== ctx.shop.id || order.status === "DRAFT") notFound();
-  const events = await orderEvents(order.id);
+  const [events, changes] = await Promise.all([
+    orderEvents(order.id),
+    // Что поставщик поменял, пока магазин не смотрел (уведомление гаснет при открытии заказа)
+    db.notification.findMany({
+      where: { userId: ctx.auth.user.id, readAt: null, type: ORDER_CHANGED, entity: "Order", entityId: order.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, title: true, body: true },
+    }),
+  ]);
   const placedEvent = events.find((e) => e.fromStatus === "DRAFT");
   const qr = order.status === "IN_TRANSIT" && order.qrToken && !order.qrUsedAt ? await QRCode.toDataURL(`B2B-ORDER:${order.qrToken}`, { width: 512, margin: 1 }) : null;
   const owner = ctx.membership.role === "OWNER";
@@ -39,6 +48,24 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         }
       />
       <div className="space-y-4">
+        {sp.placed && (
+          <FlashToast
+            param="placed"
+            tone="success"
+            title={t("Заказ №{n} оформлен", { n: order.number })}
+            body={t("Товар зарезервирован, поставщик получил уведомление")}
+          />
+        )}
+        {changes.length > 0 && (
+          <Alert tone="warning">
+            <div className="font-semibold" data-testid="order-changed-alert">{t("Поставщик изменил заказ")}</div>
+            <ul className="mt-1 list-disc pl-5">
+              {changes.map((c) => (
+                <li key={c.id} className="first-letter:uppercase">{t(c.title.replace(/^Заказ №\d+: /, ""))}{c.body ? `: ${t(c.body)}` : ""}</li>
+              ))}
+            </ul>
+          </Alert>
+        )}
         {sp.placed && <Alert tone="success">{t("Заказ оформлен, товар зарезервирован. Поставщик получил уведомление.")}</Alert>}
         {sp.placed && placedEvent?.comment && <Alert tone="warning">{placedEvent.comment}</Alert>}
         {order.cancelReason && (

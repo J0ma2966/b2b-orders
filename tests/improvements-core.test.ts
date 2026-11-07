@@ -3,6 +3,8 @@ import { creditLeft, debtAging, requiredPayment } from "@/lib/finance-core";
 import { deliveryDateOptions, isoWeekday, planRoute, tashkentDay, yandexRouteUrl } from "@/lib/order-core";
 import { buildXlsx, readXlsx, zip } from "@/lib/xlsx";
 import { parseImportTable } from "@/lib/catalog-import-core";
+import { countBySection, mergeMax, sectionOf, seenLinks, withOverflow } from "@/lib/nav-badges-core";
+import { formatSku } from "@/lib/sku-core";
 
 describe("оплата при получении (Л1)", () => {
   it("без кредита — вся сумма, с учётом переплаты", () => {
@@ -140,5 +142,39 @@ describe("П7: разбор загрузки каталога", () => {
   });
   it("без столбца «Название» — понятная ошибка", () => {
     expect(parseImportTable([["Цена"], [1]]).errors[0]).toContain("Нет столбца «Название»");
+  });
+});
+
+describe("счётчики разделов меню", () => {
+  const hrefs = ["/shop", "/shop/orders", "/shop/cart", "/shop/debts", "/shop/profile"];
+  it("ссылка относится к самому точному разделу", () => {
+    expect(sectionOf("/shop/orders/abc", hrefs)).toBe("/shop/orders");
+    expect(sectionOf("/shop/orders?status=x", hrefs)).toBe("/shop/orders");
+    expect(sectionOf("/shop/cart/sup1", hrefs)).toBe("/shop/cart");
+    expect(sectionOf("/shop", hrefs)).toBe("/shop");
+    expect(sectionOf("/shop/unknown", hrefs)).toBe("/shop");
+    expect(sectionOf("/shopping", hrefs)).toBeNull();
+    expect(sectionOf("https://evil.uz/shop", hrefs)).toBeNull();
+    expect(sectionOf(null, hrefs)).toBeNull();
+    expect(sectionOf("/courier", ["/supplier", "/supplier/delivery"], { "/courier": "/supplier/delivery" })).toBe("/supplier/delivery");
+    expect(sectionOf("/courier/cash", ["/supplier", "/supplier/delivery"], { "/courier": "/supplier/delivery" })).toBe("/supplier/delivery");
+  });
+
+  it("подсчёт, максимум и перенос скрытых разделов в «Ещё»", () => {
+    const b = countBySection(["/shop/orders/1", "/shop/orders/2", "/shop/debts", null], hrefs);
+    expect(b).toEqual({ "/shop/orders": 2, "/shop/debts": 1 });
+    expect(mergeMax({ a: 2, b: 0 }, { a: 1, c: 3 })).toEqual({ a: 2, c: 3 });
+    expect(withOverflow(b, hrefs, ["/shop", "/shop/orders", "/shop/cart", "/shop/profile"], "/shop/profile")).toEqual({ "/shop/orders": 2, "/shop/debts": 1, "/shop/profile": 1 });
+    expect(withOverflow({ "/shop/orders": 1 }, hrefs, hrefs, "/shop/profile")).toEqual({ "/shop/orders": 1 });
+  });
+
+  it("страница закрывает уведомления, которые ведут ровно на неё", () => {
+    expect(seenLinks("/shop/orders/1")).toEqual(["/shop/orders/1", "/shop/orders/1?", "/shop/orders/1#"]);
+    expect(seenLinks("/shop/orders/1?placed=1")[0]).toBe("/shop/orders/1");
+  });
+
+  it("автоматический артикул", () => {
+    expect(formatSku(1)).toBe("A-00001");
+    expect(formatSku(123456)).toBe("A-123456");
   });
 });

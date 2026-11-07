@@ -190,7 +190,7 @@ export async function checkoutAllAction(_prev: FormState, formData: FormData): P
   const r = await checkoutAll(ctx.shop, { paymentMethod: d.paymentMethod, comment: d.comment, deliveryAddress: d.deliveryAddress, contactName: d.contactName, contactPhone: phone });
   for (const id of r.placed) await writeAudit({ entity: "Order", entityId: id, action: "place", actorRole: "SHOP", shopId: ctx.shop.id });
   revalidatePath("/shop", "layout");
-  if (r.problems.length === 0) redirect("/shop/orders");
+  if (r.problems.length === 0) redirect(`/shop/orders?placed=${r.placed.length}`);
   if (r.placed.length === 0) return { error: "Ни один заказ не оформлен:", details: r.problems, values: formValues(formData) };
   return { ok: true, message: `Оформлено заказов: ${r.placed.length}. Остальные остались в корзине:`, details: r.problems };
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/components/ui";
-import { ORDER_STATUS_LABEL } from "@/lib/order-core";
+import { db } from "@/lib/db";
+import { ORDER_CHANGED, ORDER_STATUS_LABEL } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
 import type { OrderStatus } from "@/generated/prisma/enums";
 
@@ -63,14 +64,46 @@ export async function OrderTracker({ status, compact = false }: { status: OrderS
 
 type TrackRow = { id: string; number: number | null; status: OrderStatus; placedAt: Date | null; total: { toString(): string }; supplier: { displayName: string } };
 
+// Непрочитанные уведомления пользователя по заказам: «Изменён» (поставщик поменял состав) или «Обновлён» (новый статус).
+// Гаснут, когда пользователь открывает заказ (SeenTracker).
+async function orderMarks(userId: string, orderIds: string[]) {
+  const notes = await db.notification.findMany({
+    where: { userId, readAt: null, entity: "Order", entityId: { in: orderIds } },
+    select: { entityId: true, type: true },
+  });
+  const marks = new Map<string, "changed" | "updated">();
+  for (const n of notes) {
+    if (n.type === ORDER_CHANGED) marks.set(n.entityId!, "changed");
+    else if (!marks.has(n.entityId!)) marks.set(n.entityId!, "updated");
+  }
+  return marks;
+}
+
 // Заказы магазина: карточка с поставщиком, суммой и путём заказа
-export async function ShopOrderCards({ rows }: { rows: TrackRow[] }) {
-  const t = await getT();
+export async function ShopOrderCards({ rows, userId }: { rows: TrackRow[]; userId: string }) {
+  const [t, marks] = await Promise.all([getT(), orderMarks(userId, rows.map((r) => r.id))]);
   return (
     <ul className="grid gap-3 md:grid-cols-2">
-      {rows.map((o) => (
+      {rows.map((o) => {
+        const mark = marks.get(o.id);
+        return (
         <li key={o.id}>
-          <Link href={`/shop/orders/${o.id}`} className="block rounded-2xl bg-surface p-4 ring-1 ring-black/5 hover:ring-brand-500">
+          <Link
+            href={`/shop/orders/${o.id}`}
+            className={cn("block rounded-2xl bg-surface p-4 ring-1 hover:ring-brand-500", mark === "changed" ? "ring-2 ring-yellow-400" : "ring-black/5")}
+          >
+            {mark && (
+              <div
+                data-testid={mark === "changed" ? "order-changed" : "order-updated"}
+                className={cn(
+                  "mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                  mark === "changed" ? "bg-yellow-100 text-yellow-800" : "bg-brand-50 text-brand-700",
+                )}
+              >
+                <span className={cn("size-2 rounded-full", mark === "changed" ? "bg-yellow-500" : "bg-brand-600")} aria-hidden />
+                {t(mark === "changed" ? "Изменён поставщиком" : "Есть обновления")}
+              </div>
+            )}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-semibold">{o.supplier.displayName}</div>
@@ -89,7 +122,8 @@ export async function ShopOrderCards({ rows }: { rows: TrackRow[] }) {
             </div>
           </Link>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

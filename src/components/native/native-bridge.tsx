@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isNativeApp, nativePlatform, shareDownload } from "@/lib/native";
 import { safePath } from "@/lib/push-path";
+import { showToast } from "@/components/ui/toast";
 
 // Поведение сайта внутри мобильного приложения: ссылки, выгрузки, переход по нажатию на push.
 // В обычном браузере ничего не делает.
@@ -44,6 +45,14 @@ export function NativeBridge() {
       handles.push(
         PushNotifications.addListener("pushNotificationActionPerformed", (a) => {
           router.push(safePath((a.notification.data as { url?: string } | undefined)?.url));
+        }),
+        // Push пришёл, когда приложение открыто: Android сам его не показывает (iOS показывает баннер),
+        // поэтому — всплывающее сообщение с переходом по нажатию; страница и счётчики обновляются
+        PushNotifications.addListener("pushNotificationReceived", (n) => {
+          if (nativePlatform() === "android" && n.title) {
+            showToast({ title: n.title, body: n.body, tone: "info", href: safePath((n.data as { url?: string } | undefined)?.url) });
+          }
+          router.refresh();
         }),
       );
     });

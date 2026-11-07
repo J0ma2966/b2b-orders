@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { orderStatusFilter, ORDER_FILTERS } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
+import { FlashToast } from "@/components/ui/toast";
 
 export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/orders">) {
   const [ctx, t] = await Promise.all([requireShop(), getT()]);
@@ -22,6 +23,9 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
   return (
     <>
       <PageHeader title="Заказы" actions={<ExportLink href={`/api/export/shop/orders?status=${status}`} />} />
+      {typeof sp.placed === "string" && Number(sp.placed) > 0 && (
+        <FlashToast param="placed" tone="success" title={t("Оформлено заказов: {n}", { n: Number(sp.placed) })} body={t("Товар зарезервирован, поставщики получили уведомления")} />
+      )}
       <FilterBar search={false} status={status} statuses={ORDER_FILTERS} allLabel="Все заказы" />
       {rows.length === 0 ? (
         <EmptyState>
@@ -29,7 +33,7 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
 
         </EmptyState>
       ) : (
-        <ShopOrderCards rows={rows} />
+        <ShopOrderCards rows={rows} userId={ctx.auth.user.id} />
       )}
       <Pagination page={page} total={total} basePath="/shop/orders" params={{ status }} />
     </>

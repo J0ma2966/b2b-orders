@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import { db } from "@/lib/db";
 import { getSupplierContext } from "@/lib/auth/current";
+import { supplierBadges } from "@/lib/nav-badges";
 import { SupplierSwitcher } from "@/app/supplier/switcher";
-import { SUPPLIER_MOBILE_NAV, SUPPLIER_NAV } from "@/app/supplier/nav";
+import { SUPPLIER_MOBILE_NAV, SUPPLIER_MORE, SUPPLIER_NAV } from "@/app/supplier/nav";
 import { AppShell } from "./app-shell";
-import { BottomNav } from "./nav-links";
+import { BottomNav, SideNav } from "./nav-links";
 
 // Кабинет поставщика: на компьютере — меню слева, на телефоне и в приложении — нижняя панель и экран «Ещё»
 export function SupplierShell({ children }: { children: ReactNode }) {
@@ -15,6 +15,7 @@ export function SupplierShell({ children }: { children: ReactNode }) {
       nav={SUPPLIER_NAV}
       mobileNav={SUPPLIER_MOBILE_NAV}
       bottom={<SupplierBottomNav />}
+      side={<SupplierSideNav />}
       context={<SupplierSwitcher />}
     >
       {children}
@@ -22,14 +23,26 @@ export function SupplierShell({ children }: { children: ReactNode }) {
   );
 }
 
-// Счётчики: заказы, которые ждут ответа, и мои доставки (если поставщик развозит сам)
-async function SupplierBottomNav() {
+// Счётчики: заказы, которые ждут ответа, мои доставки (если поставщик развозит сам)
+// и непрочитанные уведомления по разделам; «Ещё» собирает разделы, которых нет в нижней панели
+async function loadSupplierBadges() {
   const ctx = await getSupplierContext();
-  if (!ctx || ctx.supplier.status !== "ACTIVE" || ctx.membership.role === "COURIER") return <BottomNav items={SUPPLIER_MOBILE_NAV} root="/supplier" />;
-  const supplierId = ctx.supplier.id;
-  const [waiting, mine] = await Promise.all([
-    db.order.count({ where: { supplierId, status: { in: ["PLACED", "NEEDS_CONFIRMATION", "DELIVERY_PROBLEM"] } } }),
-    ctx.membership.delivers ? db.order.count({ where: { supplierId, courierId: ctx.auth.user.id, status: { in: ["ASSIGNED", "IN_TRANSIT"] } } }) : 0,
-  ]);
-  return <BottomNav items={SUPPLIER_MOBILE_NAV} root="/supplier" badges={{ "/supplier/orders": waiting, "/supplier/delivery": mine }} />;
+  if (!ctx || ctx.membership.role === "COURIER") return null;
+  return supplierBadges(ctx.auth.user.id, ctx.supplier.id, {
+    active: ctx.supplier.status === "ACTIVE",
+    delivers: ctx.membership.delivers,
+    allHrefs: SUPPLIER_NAV.map((i) => i.href),
+    mobileHrefs: SUPPLIER_MOBILE_NAV.map((i) => i.href),
+    overflowHref: SUPPLIER_MORE,
+  });
+}
+
+async function SupplierBottomNav() {
+  const badges = await loadSupplierBadges();
+  return <BottomNav items={SUPPLIER_MOBILE_NAV} root="/supplier" badges={badges?.bottom} />;
+}
+
+async function SupplierSideNav() {
+  const badges = await loadSupplierBadges();
+  return <SideNav items={SUPPLIER_NAV} root="/supplier" badges={badges?.side} />;
 }

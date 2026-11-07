@@ -40,8 +40,8 @@ export function ProductFields({
         <Field label="Бренд" name="brand" error={e.brand}>
           <Input name="brand" defaultValue={v.brand} />
         </Field>
-        <Field label="Артикул" name="sku" error={e.sku}>
-          <Input name="sku" defaultValue={v.sku} />
+        <Field label="Артикул" name="sku" error={e.sku} hint="Оставьте пустым — присвоим автоматически">
+          <Input name="sku" defaultValue={v.sku} placeholder="A-00001" />
         </Field>
         <Field label="Вес, кг" name="weightKg" error={e.weightKg}>
           <Input name="weightKg" inputMode="decimal" defaultValue={v.weightKg} />
