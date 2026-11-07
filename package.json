@@ -15,7 +15,8 @@
     "postinstall": "prisma generate",
     "mobile:sync": "node scripts/mobile-prepare.mjs && cap sync",
     "mobile:android": "npm run mobile:sync -- android && cap open android",
-    "mobile:ios": "npm run mobile:sync -- ios && cap open ios"
+    "mobile:ios": "npm run mobile:sync -- ios && cap open ios",
+    "seed:demo": "tsx scripts/seed-demo/seed.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.0",
