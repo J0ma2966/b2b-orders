@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         // Свои плагины регистрируются до запуска моста
         registerPlugin(PrintPlugin.class);
         registerPlugin(DevServerPlugin.class);
+        registerPlugin(PushStatusPlugin.class);
         // Отладочная сборка: адрес сервера, выбранный на телефоне (локальная сеть)
         CapConfig devConfig = DevServerPlugin.savedConfig(this);
         if (devConfig != null) config = devConfig;

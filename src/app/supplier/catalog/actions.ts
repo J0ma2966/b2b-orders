@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { nextSku } from "@/lib/sku";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { diffFields, writeAudit } from "@/lib/audit";
 import { applyStock, StockError } from "@/lib/stock";
@@ -150,7 +151,9 @@ export async function createProductAction(_prev: FormState, formData: FormData):
   }
 
   const product = await db.$transaction(async (tx) => {
-    const p = await tx.product.create({ data: { ...data, supplierId: ctx.supplier.id, photoPaths } });
+    // Артикул не указан — присваиваем следующий по порядку (A-00001…)
+    const sku = data.sku ?? (await nextSku(tx, ctx.supplier.id));
+    const p = await tx.product.create({ data: { ...data, sku, supplierId: ctx.supplier.id, photoPaths } });
     for (const [i, row] of units.rows.entries()) {
       const unit = await tx.productUnit.create({
         data: { productId: p.id, kind: row.kind, customName: row.customName, price: row.price, sortOrder: i },
@@ -195,7 +198,8 @@ export async function updateProductAction(_prev: FormState, formData: FormData):
     throw e;
   }
   const photoPaths = [...product.photoPaths.filter((p) => !remove.has(p)), ...added].slice(0, MAX_PHOTOS);
-  const next = { ...data, photoPaths };
+  // Артикул стёрли — товар получает новый автоматический (у товара артикул есть всегда)
+  const next = { ...data, sku: data.sku ?? (await nextSku(db, ctx.supplier.id)), photoPaths };
   const changes = diffFields(product as unknown as Record<string, unknown>, next, [
     "name", "description", "brand", "sku", "categoryId", "weightKg", "attributes", "isAvailable", "allowReplacement", "photoPaths",
   ]);

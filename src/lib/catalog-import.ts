@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { nextSku } from "@/lib/sku";
 import { applyStock, currentActor, lockStockUnits } from "@/lib/stock";
 import { changeUnitPrice } from "@/lib/pricing";
 import { unitName } from "@/lib/catalog";
@@ -79,7 +80,8 @@ export async function applyImport(supplierId: string, rows: ImportRow[], fileNam
             categories.set(r.category.toLowerCase(), c);
             categoryId = c.id;
           }
-          const p = await tx.product.create({ data: { supplierId, name: r.name, sku: r.sku, brand: r.brand, description: r.description, categoryId } });
+          const sku = r.sku ?? (await nextSku(tx, supplierId));
+          const p = await tx.product.create({ data: { supplierId, name: r.name, sku, brand: r.brand, description: r.description, categoryId } });
           product = { ...p, units: [] };
           made.set(productKey(r), product);
         }

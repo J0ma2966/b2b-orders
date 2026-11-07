@@ -5,21 +5,29 @@ import { getTerritoryOptions } from "@/lib/territory";
 import { fileUrl } from "@/lib/storage-url";
 import { ShopProfileForm } from "./form";
 import { getT } from "@/lib/i18n/server";
+import { unreadBySection } from "@/lib/nav-badges";
+import { SHOP_NAV } from "@/components/shell/shop-nav";
+
+// Непрочитанные уведомления раздела — те же, что у пункта «Профиль» в нижней панели
+function Count({ n }: { n?: number }) {
+  if (!n) return null;
+  return <span className="ml-1.5 min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] leading-5 font-bold text-on-accent" data-testid="nav-badge">{n > 99 ? "99+" : n}</span>;
+}
 
 export default async function ShopProfilePage() {
   const t = await getT();
   const ctx = await requireShop();
   const s = ctx.shop;
   const owner = ctx.membership.role === "OWNER";
-  const territories = await getTerritoryOptions();
+  const [territories, unread] = await Promise.all([getTerritoryOptions(), unreadBySection(ctx.auth.user.id, SHOP_NAV.map((i) => i.href))]);
   return (
     <>
       <PageHeader title="Профиль магазина" actions={<>
-        <ButtonLink href="/shop/points" variant="secondary">{t("📍 Мои точки")}</ButtonLink>
-        <ButtonLink href="/shop/replacements" variant="secondary">{t("🔁 Замены")}</ButtonLink>
-        {owner && <ButtonLink href="/shop/debts" variant="secondary">{t("💰 Задолженность")}</ButtonLink>}
-        {owner && <ButtonLink href="/shop/team" variant="secondary">{t("👥 Сотрудники")}</ButtonLink>}
-        <ButtonLink href="/shop/documents" variant="secondary">{t("🧾 Документы")}</ButtonLink>
+        <ButtonLink href="/shop/points" variant="secondary">{t("📍 Мои точки")}<Count n={unread["/shop/points"]} /></ButtonLink>
+        <ButtonLink href="/shop/replacements" variant="secondary">{t("🔁 Замены")}<Count n={unread["/shop/replacements"]} /></ButtonLink>
+        {owner && <ButtonLink href="/shop/debts" variant="secondary">{t("💰 Задолженность")}<Count n={unread["/shop/debts"]} /></ButtonLink>}
+        {owner && <ButtonLink href="/shop/team" variant="secondary">{t("👥 Сотрудники")}<Count n={unread["/shop/team"]} /></ButtonLink>}
+        <ButtonLink href="/shop/documents" variant="secondary">{t("🧾 Документы")}<Count n={unread["/shop/documents"]} /></ButtonLink>
         <ButtonLink href="/account" variant="secondary">{t("⚙️ Настройки")}</ButtonLink>
         <form action={logoutAction}>
           <Button variant="secondary" className="text-red-600">⏻ Выйти</Button>

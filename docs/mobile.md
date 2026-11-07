@@ -76,10 +76,29 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 | Платформа | Что нужно | Переменные `.env` |
 |---|---|---|
-| Android | Проект Firebase → добавить Android-приложение `uz.b2borders.app` → скачать `google-services.json` в `mobile/android/app/`; Project settings → Service accounts → Generate new private key | `FCM_SERVICE_ACCOUNT_FILE` (или `FCM_SERVICE_ACCOUNT` — JSON строкой) |
+| Android | Проект Firebase → добавить Android-приложение `uz.b2borders.app` → скачать `google-services.json` в `mobile/android/app/` (или в секрет `GOOGLE_SERVICES_JSON` для сборки в GitHub Actions); Project settings → Service accounts → Generate new private key | `FCM_SERVICE_ACCOUNT_FILE` (или `FCM_SERVICE_ACCOUNT` — JSON строкой) |
 | iOS | Apple Developer → Keys → новый ключ с APNs → файл `.p8`, Key ID; Team ID — в Membership | `APNS_KEY_FILE`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_PRODUCTION=1` для TestFlight/App Store |
 
-Без этих ключей приложение работает, только системные push не приходят (уведомления в колокольчике есть всегда). Токен устройства привязан к сессии входа (`DeviceToken.sessionId`, каскадное удаление): после «Выйти» на телефоне уведомления на него больше не приходят. Недействительные токены (приложение удалено) сервер удаляет сам по ответу FCM/APNs.
+Без этих ключей приложение работает, только системные push не приходят (уведомления в колокольчике и счётчики разделов есть всегда). Токен устройства привязан к сессии входа (`DeviceToken.sessionId`, каскадное удаление): после «Выйти» на телефоне уведомления на него больше не приходят. Недействительные токены (приложение удалено) сервер удаляет сам по ответу FCM/APNs.
+
+#### Firebase для Android по шагам
+
+1. Откройте <https://console.firebase.google.com> под Google-аккаунтом → **Create a project** (название любое, например `b2b-orders`; Google Analytics можно выключить).
+2. На странице проекта нажмите значок **Android** («Add app») → *Android package name*: `uz.b2borders.app` (ровно так, иначе push не придут) → *Register app*.
+3. Скачайте **google-services.json** (кнопка *Download google-services.json*). Остальные шаги мастера (Gradle) пропустите — в проекте уже настроено.
+4. Файл нужен **приложению**:
+   - сборка в GitHub Actions (APK из артефактов `android-debug-apk`, `android-wifi-test-apk`): репозиторий → **Settings → Secrets and variables → Actions → New repository secret**, имя `GOOGLE_SERVICES_JSON`, значение — всё содержимое файла. Затем перезапустите сборку **Actions → Mobile → Run workflow**. В журнале шага «Firebase для push» должно быть «приложение uz.b2borders.app найдено»;
+   - сборка на своём компьютере: положите файл в `mobile/android/app/google-services.json` (в git он не попадает).
+5. Ключ нужен **серверу** (он отправляет push): Firebase → ⚙ **Project settings → Service accounts → Generate new private key** → скачается JSON. Положите его рядом с сервером, например `secrets/firebase-sa.json`, и в `.env` укажите `FCM_SERVICE_ACCOUNT_FILE="secrets/firebase-sa.json"`. Перезапустите сервер. Этот файл секретный: никому не пересылайте и не кладите в репозиторий.
+6. Установите новый APK. При первом входе приложение спросит разрешение на уведомления (Android 13+) — ответьте «Разрешить». Проверка: **Профиль → «Включить push на этом устройстве»** — должно ответить «Push включён на этом устройстве», а в строке «Устройств с push» стать 1.
+
+Что видит пользователь: уведомление в шторке со значком коробки и звуком (канал «Заказы и уведомления» с высокой важностью); нажатие открывает нужную страницу. Если приложение открыто, push показывается всплывающим сообщением вверху экрана, а страница и счётчики обновляются сами.
+
+Защита от неполной настройки: если на сервере нет ключа — приложение не спрашивает разрешение; если APK собран без `google-services.json` — приложение это определяет (плагин `PushStatus`) и не вызывает регистрацию, которая без Firebase роняет приложение.
+
+### Счётчики разделов
+
+Число на пункте нижней панели, меню слева, вкладках витрины, экране «Ещё» и в профиле магазина — непрочитанные уведомления этого раздела (раздел определяется по ссылке уведомления, `src/lib/nav-badges-core.ts`). Особые счётчики: корзина — число позиций; у поставщика «Заказы» — заказы, ждущие ответа, «Доставки» — свои доставки. Пункт «Ещё» (поставщик) и «Профиль» (магазин) суммируют разделы, которые не поместились в нижнюю панель. Открыл страницу, на которую ведёт уведомление, — оно прочитано и счётчик гаснет (`SeenTracker`).
 
 ## Требования магазинов
 

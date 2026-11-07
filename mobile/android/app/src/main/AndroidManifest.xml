@@ -30,6 +30,18 @@
 
         </activity>
 
+        <!-- Push (Firebase): значок в строке состояния, цвет и канал по умолчанию.
+             Канал «orders» создаёт приложение при первом запуске (src/components/native/native-push.ts) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/ic_launcher_background" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="orders" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

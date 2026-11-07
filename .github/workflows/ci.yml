@@ -73,6 +73,8 @@ jobs:
           E2E_OUT=/tmp/e2e node tests/e2e/mobile-compliance.mjs
           E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs ru
           E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs uz
+          E2E_OUT=/tmp/e2e node tests/e2e/badges.mjs ru
+          E2E_OUT=/tmp/e2e node tests/e2e/badges.mjs uz
       - uses: actions/upload-artifact@v4
         if: always()
         with:

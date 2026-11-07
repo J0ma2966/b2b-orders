@@ -1115,6 +1115,8 @@ const uz: Record<string, string> = {
   "г. Ташкент": "Toshkent sh.",
   "да": "ha",
   "добавлена позиция": "pozitsiya qoʻshildi",
+  "поставщик добавил товар": "yetkazib beruvchi mahsulot qoʻshdi",
+  "поставщик убрал товар": "yetkazib beruvchi mahsulotni olib tashladi",
   "долг {0}": "qarz {0}",
   "долг {sum}": "qarz {sum}",
   "долг по заказу {sum}": "buyurtma boʻyicha qarz {sum}",
@@ -1697,6 +1699,18 @@ const uz: Record<string, string> = {
   "Убрать фото": "Fotoni olib tashlash",
   "⏻ Выйти": "⏻ Chiqish",
   "⏻ Выйти из аккаунта": "⏻ Akkauntdan chiqish",
+  // Индикаторы разделов, тост оформления, принудительная продажа, артикул, push
+  "Заказ №{n} оформлен": "Buyurtma №{n} rasmiylashtirildi",
+  "Товар зарезервирован, поставщик получил уведомление": "Mahsulot band qilindi, yetkazib beruvchiga xabar yuborildi",
+  "Поставщик изменил заказ": "Yetkazib beruvchi buyurtmani oʻzgartirdi",
+  "Оформлено заказов: {n}": "Rasmiylashtirilgan buyurtmalar: {n}",
+  "Товар зарезервирован, поставщики получили уведомления": "Mahsulot band qilindi, yetkazib beruvchilarga xabar yuborildi",
+  "Оставьте пустым — присвоим автоматически": "Boʻsh qoldiring — avtomatik beriladi",
+  "Приложение собрано без Firebase (google-services.json), push недоступен": "Ilova Firebase’siz (google-services.json) yigʻilgan, push ishlamaydi",
+  "Заказы и уведомления": "Buyurtmalar va bildirishnomalar",
+  "Изменён поставщиком": "Yetkazib beruvchi oʻzgartirgan",
+  "Есть обновления": "Yangilanish bor",
+  "Не удалось подобрать свободный артикул": "Boʻsh artikul topilmadi",
 };
 
 export default uz;

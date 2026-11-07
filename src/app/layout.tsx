@@ -9,6 +9,8 @@ import { NativeBridge } from "@/components/native/native-bridge";
 import { NativePushSync } from "@/components/native/native-push-sync";
 import { getAuth } from "@/lib/auth/current";
 import { nativePushConfigured } from "@/lib/native-push";
+import { ToastHost } from "@/components/ui/toast";
+import { SeenTracker } from "@/components/shell/seen-tracker";
 import { I18nProvider } from "@/lib/i18n/client";
 import { getLocale, getT } from "@/lib/i18n/server";
 
@@ -50,6 +52,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Suspense>
         <SwRegister />
         <NativeBridge />
+        <ToastHost />
+        <Suspense>
+          <SeenTracker />
+        </Suspense>
         <Suspense>
           <NativeSession />
         </Suspense>
