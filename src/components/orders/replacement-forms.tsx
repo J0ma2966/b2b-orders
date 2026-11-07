@@ -12,6 +12,7 @@ import { assignReplacementAction, creditReplacementAction, decideReplacementActi
 import { completeReplacementAction } from "@/app/courier/replacements/actions";
 import type { ReturnedStatus } from "@/generated/prisma/enums";
 import { useT } from "@/lib/i18n/client";
+import { PhotoInput } from "@/components/ui/photo-input";
 
 export function NewReplacementForm({ orderId, items }: { orderId: string; items: { id: string; label: string }[] }) {
   const t = useT();
@@ -42,9 +43,7 @@ export function NewReplacementForm({ orderId, items }: { orderId: string; items:
       <Field label="Комментарий" name="comment" error={fe.comment}>
         <Textarea name="comment" defaultValue={v.comment} />
       </Field>
-      <Field label="Фото" name="photos" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое">
-        <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple capture="environment" />
-      </Field>
+      <PhotoInput name="photos" label="Фото" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое" max={4} />
       <Field label="Видео" name="videos" hint="MP4, WEBM, MOV до 50 МБ">
         <Input name="videos" type="file" accept="video/mp4,video/webm,video/quicktime" />
       </Field>
@@ -123,9 +122,7 @@ export function CompleteReplacementForm({ id }: { id: string }) {
     <ActionForm action={action} pending={pending} className="space-y-3">
       <FormMessage state={state} />
       <input type="hidden" name="id" value={id} />
-      <Field label="Фото забранного товара" name="photos" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое">
-        <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple capture="environment" />
-      </Field>
+      <PhotoInput name="photos" label="Фото забранного товара" hint="До 4 фото, JPG/PNG/WEBP до 10 МБ каждое" max={4} />
       <Field label="Комментарий" name="comment">
         <Input name="comment" />
       </Field>

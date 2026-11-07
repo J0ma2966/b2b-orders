@@ -12,6 +12,7 @@ import type { TerritoryOption } from "@/components/territory/types";
 import { initialFormState } from "@/lib/forms";
 import { useT } from "@/lib/i18n/client";
 import { registerShopAction } from "../actions";
+import { PhotoInput } from "@/components/ui/photo-input";
 
 export function ShopRegisterForm({ territories, loggedIn }: { territories: TerritoryOption[]; loggedIn: boolean }) {
   const t = useT();
@@ -51,9 +52,7 @@ export function ShopRegisterForm({ territories, loggedIn }: { territories: Terri
 
           <MapPicker defaultValue={point} error={e.lat?.[0]} />
         </div>
-        <Field label="Фото магазина" name="photo" error={e.photo} hint="JPG, PNG или WEBP до 10 МБ">
-          <Input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
-        </Field>
+        <PhotoInput name="photo" label="Фото магазина" error={e.photo} hint="JPG, PNG или WEBP до 10 МБ" />
       </fieldset>
       <PrivacyNote />
       <SubmitButton className="w-full sm:w-auto" pendingText="Регистрируем…">{t("Зарегистрировать магазин")}</SubmitButton>

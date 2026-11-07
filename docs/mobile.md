@@ -112,7 +112,7 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 | Пункт | Статус |
 |---|---|
-| Target API | `targetSdkVersion 36` (Android 16), `minSdk 24` — выше требования Play (35 для новых приложений) |
+| Target API | `targetSdkVersion 36` (Android 16), `minSdk 26` (Android 8.0, нужен сканеру QR) — выше требования Play (35 для новых приложений) |
 | Формат | Android App Bundle (`bundleRelease`), Play App Signing |
 | Data safety | Те же типы данных, что в App Privacy: Personal info (Name, Phone, Address), Location (Approximate, Precise), Photos and videos, Financial info (Purchase history, Other), Device IDs. Данные шифруются при передаче — да; пользователь может запросить удаление — да, ссылка `https://<домен>/account-deletion` |
 | Разрешения | INTERNET, CAMERA, ACCESS_COARSE/FINE_LOCATION (только при использовании), POST_NOTIFICATIONS (Android 13+), VIBRATE (вибрация при считывании QR). Фоновой геолокации нет |

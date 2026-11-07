@@ -11,6 +11,7 @@ import { distributePayment, requiredPayment, type CreditTerms } from "@/lib/fina
 import { confirmDeliveryAction, problemAction, startDeliveryAction } from "@/app/courier/actions";
 import { QrScanner } from "./qr-scanner";
 import { useT } from "@/lib/i18n/client";
+import { PhotoInput } from "@/components/ui/photo-input";
 import {
   announceQueue,
   browserStore,
@@ -88,9 +89,7 @@ export function ProblemForm({ orderId, allowNotDelivered }: { orderId: string; a
       <Field label="Пояснение" name="note" error={state.fieldErrors?.note} hint="Обязательно для «Другое»">
         <Textarea name="note" defaultValue={state.values?.note} placeholder={t("Например: не отвечают по телефону")} />
       </Field>
-      <Field label="Фото" name="photos" error={state.fieldErrors?.photos} hint="До 3 фото: закрытая дверь, вывеска">
-        <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple />
-      </Field>
+      <PhotoInput name="photos" label="Фото" error={state.fieldErrors?.photos} hint="До 3 фото: закрытая дверь, вывеска" max={3} />
       <div className="flex flex-wrap gap-2">
         <SubmitButton variant="secondary" name="kind" value="problem" pendingText="…">{t("Сообщить поставщику")}</SubmitButton>
         {allowNotDelivered && (

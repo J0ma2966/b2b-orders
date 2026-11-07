@@ -1685,6 +1685,18 @@ const uz: Record<string, string> = {
   "Включите, чтобы доставлять заказы из этого же приложения": "Buyurtmalarni shu ilovadan yetkazish uchun yoqing",
   "Профиль, пароль, уведомления": "Profil, parol, bildirishnomalar",
   "Деньги": "Pul",
+  "Нет доступа к камере. Разрешите камеру приложению в настройках телефона или введите код, который магазин видит под QR.": "Kameraga ruxsat yoʻq. Telefon sozlamalarida ilovaga kamerani ruxsat bering yoki doʻkon QR ostida koʻradigan kodni kiriting.",
+  "Нет доступа к камере. Разрешите камеру сайту в настройках браузера или введите код, который магазин видит под QR.": "Kameraga ruxsat yoʻq. Brauzer sozlamalarida saytga kamerani ruxsat bering yoki doʻkon QR ostida koʻradigan kodni kiriting.",
+  "Камера в браузере работает только по HTTPS. Введите код, который магазин видит под QR.": "Brauzerda kamera faqat HTTPS orqali ishlaydi. Doʻkon QR ostida koʻradigan kodni kiriting.",
+  "Чтобы сканировать QR, обновите приложение. Пока введите код, который магазин видит под QR.": "QR skanerlash uchun ilovani yangilang. Hozircha doʻkon QR ostida koʻradigan kodni kiriting.",
+  "Наведите камеру на QR-код на телефоне магазина": "Kamerani doʻkon telefonidagi QR-kodga qarating",
+  "Открываю камеру…": "Kamera ochilmoqda…",
+  "Не больше {n} фото": "{n} tadan ortiq foto boʻlmasin",
+  "📷 Снять фото": "📷 Suratga olish",
+  "🖼 Из галереи": "🖼 Galereyadan",
+  "Убрать фото": "Fotoni olib tashlash",
+  "⏻ Выйти": "⏻ Chiqish",
+  "⏻ Выйти из аккаунта": "⏻ Akkauntdan chiqish",
 };
 
 export default uz;

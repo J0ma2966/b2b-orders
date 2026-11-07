@@ -1,4 +1,5 @@
-import { ButtonLink, Card, PageHeader } from "@/components/ui";
+import { Button, ButtonLink, Card, PageHeader } from "@/components/ui";
+import { logoutAction } from "@/app/(auth)/actions";
 import { requireShop } from "@/lib/auth/current";
 import { getTerritoryOptions } from "@/lib/territory";
 import { fileUrl } from "@/lib/storage-url";
@@ -20,6 +21,9 @@ export default async function ShopProfilePage() {
         {owner && <ButtonLink href="/shop/team" variant="secondary">{t("👥 Сотрудники")}</ButtonLink>}
         <ButtonLink href="/shop/documents" variant="secondary">{t("🧾 Документы")}</ButtonLink>
         <ButtonLink href="/account" variant="secondary">{t("⚙️ Настройки")}</ButtonLink>
+        <form action={logoutAction}>
+          <Button variant="secondary" className="text-red-600">⏻ Выйти</Button>
+        </form>
       </>} />
       <Card className="max-w-2xl">
         {s.photoPaths.length > 0 && (
