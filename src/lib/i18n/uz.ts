@@ -914,6 +914,7 @@ const uz: Record<string, string> = {
   "Согласовать и зарезервировать": "Kelishish va band qilish",
   "Согласовать отмену": "Bekor qilishga rozilik berish",
   "Создан супер-администратор {0}": "Super-administrator yaratildi: {0}",
+  "Временный пароль: {0} (сменить при первом входе; задать свой — SUPERADMIN_PASSWORD)": "Vaqtinchalik parol: {0} (birinchi kirishda almashtiring; oʻzingiznikini SUPERADMIN_PASSWORD orqali bering)",
   "Создана": "Yaratilgan",
   "Создать акцию": "Aksiya yaratish",
   "Создать товар": "Mahsulot yaratish",
