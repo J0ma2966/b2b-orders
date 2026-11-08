@@ -67,7 +67,7 @@ await admin.waitForTimeout(2000);
 await admin.waitForURL(/account\/password|\/admin$/, { timeout: 15000, waitUntil: "commit" });
 log("админ после входа:", admin.url());
 if (admin.url().includes("account/password")) {
-await admin.getByLabel("Текущий пароль").fill("admin12345");
+await admin.getByLabel("Текущий пароль").fill(process.env.ADMIN_PW ?? "superadmin-1");
 await admin.locator("[name=password]:visible").fill("superadmin-1");
 await admin.getByLabel("Повторите новый пароль").fill("superadmin-1");
 await admin.getByRole("button", { name: "Сменить пароль" }).click();
