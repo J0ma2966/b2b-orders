@@ -38,7 +38,7 @@ jobs:
       UPLOAD_DIR: ./storage/uploads
       JOBS_DISABLED: "1"
       SUPERADMIN_PHONE: "+998900000000"
-      SUPERADMIN_PASSWORD: ""
+      SUPERADMIN_PASSWORD: superadmin-1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,7 +69,7 @@ jobs:
           npm run start > /tmp/server.log 2>&1 &
           npx --yes wait-on@8.0.3 -t 60000 http-get://localhost:3000/login
           mkdir -p /tmp/e2e
-          E2E_OUT=/tmp/e2e ADMIN_PW=admin12345 node tests/e2e/flow.mjs
+          E2E_OUT=/tmp/e2e node tests/e2e/flow.mjs
           E2E_OUT=/tmp/e2e node tests/e2e/mobile-compliance.mjs
           E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs ru
           E2E_OUT=/tmp/e2e node tests/e2e/supplier-app.mjs uz

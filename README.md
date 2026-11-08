@@ -21,9 +21,9 @@ npm run db:seed               # территории Узбекистана, к�
 npm run dev
 ```
 
-Проверка на телефоне в своей Wi‑Fi сети (APK, тестовые учётные записи `npx tsx scripts/local-demo.ts`): [docs/local-wifi.md](docs/local-wifi.md).
+Проверка на телефоне в своей Wi‑Fi сети (APK): [docs/local-wifi.md](docs/local-wifi.md).
 
-Супер-админ по умолчанию: `+998900000000` / `admin12345`, при первом входе система попросит сменить пароль. В продакшене задайте `SUPERADMIN_PASSWORD`.
+Супер-админ: телефон `SUPERADMIN_PHONE` (по умолчанию `+998900000000`), пароль — `SUPERADMIN_PASSWORD`. Если пароль не задан, `npm run db:seed` создаёт случайный, печатает его один раз и просит сменить при первом входе. Пароля по умолчанию нет.
 
 В продакшене приложение работает за обратным прокси (nginx и т. п.), который дописывает адрес клиента в конец `X-Forwarded-For` (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). Лимит попыток входа и журнал берут последний адрес из этого заголовка, поэтому без прокси подменить его может сам клиент.
 
@@ -67,8 +67,9 @@ npm run dev
 
 ```bash
 TEST_DATABASE_URL=postgresql://…/b2b_test npx vitest run   # модульные и интеграционные тесты
-npm run build && npm start                                  # затем на свежей БД:
-ADMIN_PW=admin12345 CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/flow.mjs
+npm run build && npm start                                  # затем на свежей БД (только для проверки!):
+SUPERADMIN_PASSWORD=superadmin-1 npm run db:seed
+CHROMIUM_PATH=/opt/pw-browsers/chromium node tests/e2e/flow.mjs
 ```
 
 Перевод: `node scripts/i18n-check.mjs --missing` — строки без узбекского перевода; `DATABASE_URL=… node tests/e2e/uz-scan.mjs` после сквозного сценария обходит все страницы на узбекском и печатает оставшуюся кириллицу.
