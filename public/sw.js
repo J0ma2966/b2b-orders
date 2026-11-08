@@ -1,6 +1,6 @@
 // Service worker: установка PWA, push-уведомления (ТЗ п. 57) и работа доставщика без сети (Д4)
 const PAGES = "courier-pages-v1";
-const STATIC = "static-v1";
+const STATIC = "static-v2";
 const KEEP = [PAGES, STATIC];
 // Без сети открываются список доставок и страницы заказов доставщика
 const OFFLINE_PAGE = /^\/courier(\/orders\/[^/]+)?\/?$/;
@@ -8,6 +8,8 @@ const COURIER = /^\/courier(\/|$)/;
 const ORDER_PAGE = /^\/courier\/orders\/[^/]+\/?$/;
 const STATIC_FILE = /^\/_next\/static\//;
 const MAX_STATIC = 400;
+// Режим разработки (sw.js?dev=1): имена /_next/static/* не меняются при правке кода — не кэшируем их
+const DEV = new URL(self.location.href).searchParams.has("dev");
 const WARM_EVERY = 5 * 60_000;
 const warmedAt = new Map();
 
@@ -15,7 +17,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) =>
   e.waitUntil(
     (async () => {
-      for (const k of await caches.keys()) if (!KEEP.includes(k)) await caches.delete(k);
+      for (const k of await caches.keys()) if (!KEEP.includes(k) || (DEV && k === STATIC)) await caches.delete(k);
       await self.clients.claim();
     })(),
   ),
@@ -43,6 +45,7 @@ async function trimStatic(cache) {
 
 // Скрипты и стили сохранённой страницы — чтобы без сети она не только показывалась, но и работала
 async function cacheAssets(html) {
+  if (DEV) return;
   const cache = await caches.open(STATIC);
   const urls = new Set(html.match(/\/_next\/static\/[^"'\s)\\]+/g) || []);
   for (const u of urls) {
@@ -101,7 +104,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (req.mode === "navigate" && COURIER.test(url.pathname)) return event.respondWith(page(event));
-  if (STATIC_FILE.test(url.pathname)) return event.respondWith(staticFile(event));
+  if (!DEV && STATIC_FILE.test(url.pathname)) return event.respondWith(staticFile(event));
 });
 
 // Страница просит заранее сохранить список доставок и заказы из него
