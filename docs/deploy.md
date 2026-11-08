@@ -38,7 +38,7 @@ type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@152.228.112.228 "mkdir -p ~
 На сервере (после `ssh`):
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/J0ma2966/b2b-orders/main/deploy/install.sh
+curl -4 -fsSLO https://raw.githubusercontent.com/J0ma2966/b2b-orders/main/deploy/install.sh
 bash install.sh
 ```
 

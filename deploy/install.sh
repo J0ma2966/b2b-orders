@@ -59,6 +59,15 @@ else
   ok ".env уже есть — настройки берутся из него"
 fi
 
+# У части VPS IPv6 есть в системе, но не ведёт в интернет: curl, apt и npm тогда зависают.
+# Если по IPv6 GitHub недоступен, а по IPv4 доступен, просим систему предпочитать IPv4.
+if ! curl -6 -fsS -o /dev/null --max-time 6 https://github.com 2>/dev/null \
+   && curl -4 -fsS -o /dev/null --max-time 10 https://github.com 2>/dev/null \
+   && ! grep -q '^precedence ::ffff:0:0/96' /etc/gai.conf 2>/dev/null; then
+  echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
+  ok "IPv6 не работает — сервер будет ходить в интернет по IPv4"
+fi
+
 say "Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
