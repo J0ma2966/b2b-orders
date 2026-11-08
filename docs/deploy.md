@@ -27,9 +27,11 @@ ssh root@152.228.112.228
 Вход по ключу вместо пароля (по желанию, безопаснее). На ноутбуке в PowerShell:
 
 ```powershell
-ssh-keygen -t ed25519            # Enter на все вопросы
-type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@152.228.112.228 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+ssh-keygen -t ed25519            # Enter на все вопросы (пароль ключа — пустой)
+$k = Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub; ssh root@152.228.112.228 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '$k' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo KEY_ADDED"
 ```
+
+Ключ передаётся внутри команды, а не через `type … | ssh`: в PowerShell конвейер закрывает запрос пароля, и ssh выходит молча.
 
 После этого `ssh root@152.228.112.228` пускает без пароля.
 
@@ -137,6 +139,10 @@ Push в браузере работают сразу. Для системных 
 
 **Сайт не открывается.** `systemctl status b2b-orders` и `journalctl -u b2b-orders -n 50` покажут ошибку.
 Если служба работает, проверьте `nginx -t` и `ufw status` (должны быть открыты `OpenSSH` и `Nginx Full`).
+
+**Установка зависла на первом же скачивании, `apt-get update` не проходит.** У сервера закрыт исходящий интернет.
+Проверка: `curl -4 -sS -m 10 -o /dev/null -w "%{http_code}\n" https://archive.ubuntu.com` должна вывести код (200/301), а не ошибку.
+Откройте исходящие соединения (80, 443, DNS 53) в firewall / security group в панели хостинга или попросите поддержку.
 
 **Сертификат не выдался.** Обычно домен ещё не указывает на сервер, или провайдер закрыл порт 80
 в своей панели (firewall/security group) — откройте 80 и 443 там. Повтор: `certbot --nginx -d ДОМЕН --redirect --hsts`.
