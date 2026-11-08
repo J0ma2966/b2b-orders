@@ -5,8 +5,9 @@
 #
 # Скрипт спросит домен, почту и данные владельца платформы. Можно передать их заранее:
 #   sudo DOMAIN=app.example.uz EMAIL=admin@example.uz bash install.sh
-# Без домена (DOMAIN пустой) платформа откроется по http://IP-сервера — только для проверки:
-# без HTTPS вход работает, но данные идут открытым текстом.
+# Пока своего домена нет, берётся бесплатный адрес 1-2-3-4.sslip.io (он всегда указывает на IP 1.2.3.4),
+# и для него тоже выпускается настоящий сертификат HTTPS. Свой домен потом — docs/deploy.md.
+# DOMAIN=none — совсем без домена и HTTPS, по http://IP (только для проверки).
 #
 # Что делает: Node.js 22, PostgreSQL, nginx, сертификат Let's Encrypt, пользователь b2b,
 # код в /opt/b2b-orders, база с случайным паролем, .env с ключами push и CRON_SECRET,
@@ -39,11 +40,15 @@ ask() { # ask VAR "Вопрос" [по умолчанию]
   [ -n "${!var:-}" ] || printf -v "$var" '%s' "$def"
 }
 
+public_ip() { curl -fsS -4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}'; }
+
 if [ ! -f "$APP_DIR/.env" ]; then
   say "Настройки"
-  ask DOMAIN "Домен платформы (например app.example.uz; пусто — пока без домена)"
+  SSLIP="$(public_ip | tr . -).sslip.io"
+  ask DOMAIN "Домен платформы (Enter — бесплатный адрес $SSLIP)" "$SSLIP"
   DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
-  [ -z "$DOMAIN" ] || ask EMAIL "Почта для Let's Encrypt (придут напоминания о сертификате)"
+  [ "$DOMAIN" != none ] || DOMAIN=""
+  [ -z "$DOMAIN" ] || ask EMAIL "Почта для Let's Encrypt (напоминания о сертификате; можно пусто)"
   ask SUPERADMIN_PHONE "Телефон супер-админа" "+998900000000"
   ask LEGAL_OPERATOR_NAME "Владелец платформы для страницы конфиденциальности (ИП/ООО)"
   ask LEGAL_CONTACT_EMAIL "Почта для связи" "${EMAIL:-}"
@@ -53,7 +58,6 @@ else
   EMAIL="${EMAIL:-$(grep -oP '^CERTBOT_EMAIL="?\K[^"]*' "$APP_DIR/.env" || true)}"
   ok ".env уже есть — настройки берутся из него"
 fi
-if [ -n "$DOMAIN" ] && [ -z "${EMAIL:-}" ]; then die "для HTTPS нужна почта: EMAIL=… sudo bash install.sh"; fi
 
 say "Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
@@ -174,7 +178,8 @@ ok "открыты только SSH, 80 и 443"
 
 if [ -n "$DOMAIN" ]; then
   say "Сертификат HTTPS для $DOMAIN"
-  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect --hsts; then
+  if [ -n "${EMAIL:-}" ]; then CERT_MAIL=(-m "$EMAIL"); else CERT_MAIL=(--register-unsafely-without-email); fi
+  if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos "${CERT_MAIL[@]}" --redirect --hsts; then
     ok "HTTPS включён, сертификат продлевается сам"
   else
     printf '\n\033[33m! Сертификат не получен. Проверьте, что A-запись %s указывает на IP этого сервера,\n  и повторите: sudo certbot --nginx -d %s --redirect --hsts\033[0m\n' "$DOMAIN" "$DOMAIN"
@@ -184,7 +189,7 @@ fi
 say "Первая резервная копия"
 /usr/local/sbin/b2b-backup && ok "копии в $BACKUP_DIR, дальше каждую ночь в 03:30"
 
-IP="$(curl -fsS -4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+IP="$(public_ip)"
 say "Готово"
 echo "  Адрес:        ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
 echo "  Супер-админ:  $(grep -oP '^SUPERADMIN_PHONE="?\K[^"]*' "$APP_DIR/.env")"
