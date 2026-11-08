@@ -54,7 +54,9 @@ export default async function PickingPage({ searchParams }: PageProps<"/document
       {lines.length === 0 ? (
         <p className="mt-6 text-center text-gray-500">{t("Нет заказов для сборки")}</p>
       ) : (
-        <table className="mt-4 w-full border-collapse border border-gray-400 text-left">
+        // На телефоне таблица прокручивается сама, страница не уезжает вбок
+        <div className="mt-4 overflow-x-auto print:overflow-visible">
+        <table className="w-full border-collapse border border-gray-400 text-left">
           <thead>
             <tr className="bg-gray-100 text-xs">
               <th className="w-8 border border-gray-400 px-1 py-1">✓</th>
@@ -80,6 +82,7 @@ export default async function PickingPage({ searchParams }: PageProps<"/document
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </>
   );
