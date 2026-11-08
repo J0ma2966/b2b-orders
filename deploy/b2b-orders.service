@@ -1,0 +1,24 @@
+[Unit]
+Description=B2B orders platform (Next.js)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=b2b
+Group=b2b
+WorkingDirectory=/opt/b2b-orders
+Environment=NODE_ENV=production
+# Настройки читаются из /opt/b2b-orders/.env (Next.js загружает его сам)
+ExecStart=/opt/b2b-orders/node_modules/.bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+# Защита: служба не видит чужие домашние папки и не может менять систему
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/b2b-orders /var/lib/b2b-orders
+
+[Install]
+WantedBy=multi-user.target
