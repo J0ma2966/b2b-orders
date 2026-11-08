@@ -34,7 +34,9 @@ async function run(role, lang, device) {
   let current = "";
   const tag = () => `${role.name}/${lang}/${device} ${current}`;
   page.on("console", (m) => {
-    if (m.type() === "error" && !IGNORE.some((r) => r.test(m.text()))) add(tag(), `console: ${m.text().slice(0, 200)}`);
+    // Чужие ресурсы (плитки карты OpenStreetMap) от нас не зависят
+    const external = /Failed to load resource/.test(m.text()) && !(m.location().url ?? "").startsWith(BASE);
+    if (m.type() === "error" && !external && !IGNORE.some((r) => r.test(m.text()))) add(tag(), `console: ${m.text().slice(0, 200)}`);
   });
   page.on("pageerror", (e) => add(tag(), `pageerror: ${e.message.slice(0, 200)}`));
   page.on("response", (r) => {
@@ -67,7 +69,7 @@ async function run(role, lang, device) {
         })
         .slice(0, 3)
         .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).split(" ").slice(0, 3).join(".")} «${(el.textContent ?? "").trim().slice(0, 30)}»`);
-      const broken = [...document.images].filter((i) => i.complete && i.naturalWidth === 0 && i.src && !i.src.startsWith("data:")).map((i) => i.src);
+      const broken = [...document.images].filter((i) => i.complete && i.naturalWidth === 0 && i.src.startsWith(location.origin)).map((i) => i.src);
       return { overflow: de.scrollWidth > de.clientWidth + 2, wide, broken };
     });
     if (device === "phone" && check.overflow) add(tag(), `горизонтальная прокрутка: ${check.wide.join("; ")}`);
