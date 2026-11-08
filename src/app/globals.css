@@ -242,6 +242,36 @@ html {
   to { background-position: 0 0; }
 }
 
+/* Полоска загрузки при переходе (src/components/shell/nav-progress.tsx): цвет раздела, ползёт и замедляется,
+   по готовности добегает до конца и гаснет. «Силуэт» страницы проявляется мягко. */
+.nav-progress {
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  background: var(--color-brand-500);
+  box-shadow: 0 0 8px var(--color-brand-500);
+  border-radius: 0 2px 2px 0;
+  transform: scaleX(0.85);
+  animation: nav-progress 8s cubic-bezier(0.1, 0.8, 0.2, 1) both;
+}
+@keyframes nav-progress {
+  from { transform: scaleX(0.08); }
+}
+.nav-progress-done {
+  transform: scaleX(1);
+  opacity: 0;
+  animation: none;
+  transition:
+    transform 200ms var(--ease-out),
+    opacity 200ms 120ms ease;
+}
+.nav-pending {
+  animation: rise var(--duration-enter) var(--ease-out) both;
+}
+main:has(> .nav-pending) > :not(.nav-pending) {
+  visibility: hidden;
+}
+
 /* Появление блоков (всплывающие сообщения, раскрытые панели) */
 .animate-rise {
   animation: rise var(--duration-enter) var(--ease-out) both;

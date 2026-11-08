@@ -12,6 +12,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
+import { NavPendingOverlay, NavProgressBar } from "./nav-progress";
 import { OfflineSync } from "@/components/orders/offline-sync";
 import { unreadBySection } from "@/lib/nav-badges";
 
@@ -28,6 +29,7 @@ export const COURIER_NAV: NavItem[] = [
 export function CourierShell({ children }: { children: ReactNode }) {
   return (
     <div data-theme="courier" className="flex min-h-full flex-1 flex-col bg-page font-sans text-ink">
+      <NavProgressBar />
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
@@ -49,11 +51,12 @@ export function CourierShell({ children }: { children: ReactNode }) {
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-32">
+      <main className="relative mx-auto w-full max-w-xl flex-1 px-4 pt-4 pb-32">
         <Suspense>
           <CourierOfflineSync />
         </Suspense>
         <Suspense fallback={<Spinner />}>{children}</Suspense>
+        <NavPendingOverlay />
       </main>
       <Suspense fallback={<BottomNavView items={COURIER_NAV} root="/courier" app />}>
         <CourierBottomNav />
