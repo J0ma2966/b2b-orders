@@ -87,6 +87,7 @@ if [ ! -d "$APP_DIR/.git" ]; then
   install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR"
   sudo -u "$APP_USER" git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 fi
+install -d -o "$APP_USER" -g "$APP_USER" -m 700 "$APP_DIR/secrets"
 ok "код в $APP_DIR ($(sudo -u "$APP_USER" git -C "$APP_DIR" log --oneline -1))"
 
 say "База данных PostgreSQL"
@@ -153,10 +154,11 @@ install -m 644 "$APP_DIR/deploy/b2b-orders-backup.service" /etc/systemd/system/b
 install -m 644 "$APP_DIR/deploy/b2b-orders-backup.timer" /etc/systemd/system/b2b-orders-backup.timer
 install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/sbin/b2b-backup
 install -m 755 "$APP_DIR/deploy/update.sh" /usr/local/sbin/b2b-update
+install -m 755 "$APP_DIR/deploy/set-domain.sh" /usr/local/sbin/b2b-set-domain
 systemctl daemon-reload
 systemctl enable --now b2b-orders.service b2b-orders-backup.timer
 systemctl restart b2b-orders.service
-for _ in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" && break; sleep 2; done
+for _ in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" || die "приложение не отвечает: journalctl -u b2b-orders -n 50"
 ok "приложение работает на 127.0.0.1:$PORT"
 

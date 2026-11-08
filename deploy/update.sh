@@ -30,9 +30,10 @@ as_app npm run db:deploy
 as_app npm run build
 echo "==> Перезапуск"
 systemctl restart b2b-orders
-for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/login && break; sleep 2; done
+for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/login 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null http://127.0.0.1:3000/login && echo "Готово: работает $NEW" || { echo "Сайт не отвечает: sudo journalctl -u b2b-orders -n 50" >&2; exit 1; }
 
 # Скрипты из репозитория могли измениться — ставим свежие
 install -m 755 deploy/backup.sh /usr/local/sbin/b2b-backup
 install -m 755 deploy/update.sh /usr/local/sbin/b2b-update
+install -m 755 deploy/set-domain.sh /usr/local/sbin/b2b-set-domain
