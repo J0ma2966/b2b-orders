@@ -28,7 +28,7 @@ async function main() {
   });
 
   const phone = process.env.SUPERADMIN_PHONE ?? "+998900000000";
-  const { password, mustChange, generated } = initialSuperadminPassword(process.env.SUPERADMIN_PASSWORD);
+  const { password, mustChange } = initialSuperadminPassword(process.env.SUPERADMIN_PASSWORD);
   const admin = await db.user.findUnique({ where: { phone } });
   if (!admin) {
     await db.user.create({
@@ -41,7 +41,6 @@ async function main() {
       },
     });
     console.log(`Создан супер-администратор ${phone}`);
-    if (generated) console.log(`Временный пароль: ${password}  (сменить при первом входе; задать свой — SUPERADMIN_PASSWORD)`);
   }
 }
 

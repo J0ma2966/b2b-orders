@@ -35,9 +35,7 @@ export default async function ShippingPage({ searchParams }: PageProps<"/documen
               {o.paymentMethod ? ` · ${t(PAYMENT_LABEL[o.paymentMethod])}` : ""}
             </p>
           </div>
-          {/* На телефоне таблица прокручивается сама, страница не уезжает вбок */}
-          <div className="mt-4 overflow-x-auto print:overflow-visible">
-          <table className="w-full border-collapse border border-gray-400 text-left">
+          <table className="mt-4 w-full border-collapse border border-gray-400 text-left">
             <thead>
               <tr className="bg-gray-100 text-xs">
                 {["№", "Наименование", "Ед.", "Кол-во", "Цена", "Сумма"].map((h) => (
@@ -62,7 +60,6 @@ export default async function ShippingPage({ searchParams }: PageProps<"/documen
               </tr>
             </tbody>
           </table>
-          </div>
           <p className="mt-3 font-medium">{t("Получить при доставке не менее: {sum}", { sum: t.money(dues[n].required) })}</p>
           <div className="mt-10 grid grid-cols-2 gap-8">
             <div>{t("Отпустил:")} ____________</div>
