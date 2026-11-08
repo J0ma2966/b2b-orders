@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { normalizeInn } from "@/lib/inn";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
-import { createSession } from "@/lib/auth/session";
+import { createSession, requestMeta } from "@/lib/auth/session";
+import { isLocalNetworkHost } from "@/lib/auth/cookie-secure";
 import { getAuth } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { notifySuperAdmins } from "@/lib/notify";
@@ -39,6 +40,8 @@ const accountSchema = z
   .refine((d) => d.password === d.password2, { path: ["password2"], message: "Пароли не совпадают" });
 
 // Создаёт учётную запись или берёт текущую, если пользователь уже вошёл.
+const REGISTRATIONS_PER_HOUR = 10;
+
 async function resolveAccount(formData: FormData) {
   const auth = await getAuth();
   if (auth) {
@@ -47,6 +50,14 @@ async function resolveAccount(formData: FormData) {
   }
   const parsed = parseForm(accountSchema, formData);
   if (!parsed.success) return { error: invalid(parsed.error, formData) };
+  // Защита от массовой регистрации ботами: не больше 10 новых учётных записей в час с одного адреса.
+  // Локальные адреса не ограничиваем: это проверка в своей сети или прокси без X-Forwarded-For —
+  // тогда у всех один адрес, и лимит закрыл бы регистрацию для всех.
+  const { ip } = await requestMeta();
+  if (ip && !isLocalNetworkHost(ip.replace(/^::ffff:/, ""))) {
+    const recent = await db.auditLog.count({ where: { action: "register", ip, createdAt: { gte: new Date(Date.now() - 3600_000) } } });
+    if (recent >= REGISTRATIONS_PER_HOUR) return { error: { error: "Слишком много регистраций с этого адреса. Попробуйте через час.", values: formValues(formData) } as FormState };
+  }
   const exists = await db.user.findUnique({ where: { phone: parsed.data.loginPhone } });
   if (exists) {
     return {

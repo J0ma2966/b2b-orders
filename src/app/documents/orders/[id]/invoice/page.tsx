@@ -23,7 +23,9 @@ export default async function InvoicePage({ params }: PageProps<"/documents/orde
         <p><span className="text-gray-500">{t("Поставщик:")}</span> {o.supplier.legalName}, {t("ИНН")} {o.supplier.inn}, {o.supplier.legalAddress}, {t("тел.")} {formatPhone(o.supplier.phone)}</p>
         <p><span className="text-gray-500">{t("Получатель:")}</span> {o.shop.name}{o.shop.inn ? `, ${t("ИНН")} ${o.shop.inn}` : ""}, {o.deliveryAddress}, {t("тел.")} {formatPhone(o.contactPhone ?? o.shop.phone)}</p>
       </div>
-      <table className="mt-4 w-full border-collapse border border-gray-400 text-left">
+      {/* На телефоне таблица прокручивается сама, страница не уезжает вбок */}
+      <div className="mt-4 overflow-x-auto print:overflow-visible">
+      <table className="w-full border-collapse border border-gray-400 text-left">
         <thead>
           <tr className="bg-gray-100 text-xs">
             {["№", "Наименование", "Ед.", "Заказано", "Передано", "Принято", "Не принято", "Цена", "Сумма"].map((h) => (
@@ -54,6 +56,7 @@ export default async function InvoicePage({ params }: PageProps<"/documents/orde
           </tr>
         </tbody>
       </table>
+      </div>
       <div className="mt-10 grid grid-cols-2 gap-8">
         <div>{t("Передал:")} ____________ {t.person(o.courier?.fullName)}</div>
         <div>{t("Принял:")} ____________ {o.contactName}</div>

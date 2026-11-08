@@ -897,6 +897,7 @@ const uz: Record<string, string> = {
   "Скрыть": "Yashirish",
   "Скрыть поставщика": "Yetkazib beruvchini yashirish",
   "Слишком много неудачных попыток. Попробуйте через 15 минут.": "Muvaffaqiyatsiz urinishlar juda koʻp. 15 daqiqadan soʻng qayta urinib koʻring.",
+  "Слишком много регистраций с этого адреса. Попробуйте через час.": "Bu manzildan roʻyxatdan oʻtishlar juda koʻp. Bir soatdan soʻng qayta urinib koʻring.",
   "Сменить пароль": "Parolni oʻzgartirish",
   "Снижение цены на 30% и более": "Narxning 30% va undan koʻproq pasayishi",
   "Снижение цены на {0}%": "Narxni {0}% ga tushirish",
