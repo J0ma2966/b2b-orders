@@ -14,7 +14,11 @@ export function ActionForm({
 }: Omit<ComponentProps<"form">, "action" | "onSubmit"> & { action: (fd: FormData) => void; pending?: boolean }) {
   return (
     <PendingContext value={pending}>
+      {/* method="post": если JavaScript ещё не загрузился (медленная сеть, старый телефон), браузер
+          отправит форму сам. По умолчанию это GET, и телефон с паролем попали бы в адресную строку,
+          историю браузера и журналы сервера. POST кладёт их в тело запроса. */}
       <form
+        method="post"
         {...props}
         onSubmit={(e) => {
           e.preventDefault();
