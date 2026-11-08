@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n/client";
 import { isNativeApp } from "@/lib/native";
 import { registerNativePush, type NativePushConfig } from "@/components/native/native-push";
 import { savePushSubscriptionAction, setPushEnabledAction } from "./push-actions";
+import { SW_URL } from "@/components/sw-register";
 
 function keyToBytes(base64: string) {
   const pad = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -31,7 +32,7 @@ export function PushSettings({ enabled, devices, publicKey, native }: { enabled:
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return setMessage("Браузер не поддерживает push. На iPhone добавьте приложение на главный экран.");
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return setMessage("Уведомления запрещены в настройках браузера");
-    const reg = await navigator.serviceWorker.register("/sw.js");
+    const reg = await navigator.serviceWorker.register(SW_URL);
     await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(publicKey) });
     const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
