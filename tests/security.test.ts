@@ -13,9 +13,14 @@ describe("адрес клиента для лимита входа", () => {
 
 describe("пароль первого супер-администратора", () => {
   it("пустое SUPERADMIN_PASSWORD из .env.example не даёт пустой пароль", () => {
-    expect(initialSuperadminPassword("")).toEqual({ password: "admin12345", mustChange: true });
-    expect(initialSuperadminPassword("  ")).toEqual({ password: "admin12345", mustChange: true });
-    expect(initialSuperadminPassword(undefined)).toEqual({ password: "admin12345", mustChange: true });
-    expect(initialSuperadminPassword("S3cret-pass")).toEqual({ password: "S3cret-pass", mustChange: false });
+    for (const empty of ["", "  ", undefined]) {
+      const r = initialSuperadminPassword(empty);
+      expect(r.mustChange).toBe(true);
+      expect(r.generated).toBe(true);
+      expect(r.password).toMatch(/^[\w-]{12}$/);
+      expect(r.password).not.toBe("admin12345");
+    }
+    expect(initialSuperadminPassword("").password).not.toBe(initialSuperadminPassword("").password);
+    expect(initialSuperadminPassword("S3cret-pass")).toEqual({ password: "S3cret-pass", mustChange: false, generated: false });
   });
 });

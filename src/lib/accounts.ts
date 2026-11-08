@@ -103,22 +103,28 @@ export async function supplierDebtStates(supplierId: string, opts: { shopIds?: s
     where: { supplierId, balance: { not: 0 }, ...(opts.shopIds && { shopId: { in: opts.shopIds } }) },
     select: { id: true, shopId: true, balance: true, paymentTermDays: true },
   });
-  const states = await Promise.all(
-    accounts.map(async (a): Promise<ShopDebtState> => {
-      const balance = num(a.balance);
-      let aging: ReturnType<typeof debtAging> = null;
-      if (balance > 0 && a.paymentTermDays !== null) {
-        const charges = await db.debtEntry.findMany({
-          where: { accountId: a.id, amount: { gt: 0 } },
-          select: { amount: true, occurredAt: true },
-          orderBy: { occurredAt: "desc" },
-          take: 500,
-        });
-        aging = debtAging(balance, charges.map((c) => ({ amount: num(c.amount), at: c.occurredAt })), a.paymentTermDays, now);
-      }
-      const overdueAmount = aging?.overdueAmount ?? 0;
-      return { shopId: a.shopId, balance, tone: debtTone(balance, overdueAmount), overdueAmount, overdueDays: aging?.overdueDays ?? 0, dueDate: aging?.dueDate ?? null };
-    }),
-  );
+  // Начисления всех счетов с отсрочкой — одним запросом (у крупного поставщика тысячи магазинов),
+  // по 500 последних на счёт, как в accountState
+  const termIds = accounts.filter((a) => num(a.balance) > 0 && a.paymentTermDays !== null).map((a) => a.id);
+  const rows = termIds.length
+    ? await db.$queryRaw<{ accountId: string; amount: Prisma.Decimal; occurredAt: Date }[]>`
+        SELECT "accountId", amount, "occurredAt" FROM (
+          SELECT "accountId", amount, "occurredAt",
+                 row_number() OVER (PARTITION BY "accountId" ORDER BY "occurredAt" DESC) AS rn
+          FROM "DebtEntry" WHERE "accountId" = ANY(${termIds}) AND amount > 0
+        ) t WHERE rn <= 500 ORDER BY "occurredAt" DESC`
+    : [];
+  const charges = new Map<string, { amount: number; at: Date }[]>();
+  for (const r of rows) {
+    const list = charges.get(r.accountId) ?? [];
+    list.push({ amount: num(r.amount), at: r.occurredAt });
+    charges.set(r.accountId, list);
+  }
+  const states = accounts.map((a): ShopDebtState => {
+    const balance = num(a.balance);
+    const aging = balance > 0 && a.paymentTermDays !== null ? debtAging(balance, charges.get(a.id) ?? [], a.paymentTermDays, now) : null;
+    const overdueAmount = aging?.overdueAmount ?? 0;
+    return { shopId: a.shopId, balance, tone: debtTone(balance, overdueAmount), overdueAmount, overdueDays: aging?.overdueDays ?? 0, dueDate: aging?.dueDate ?? null };
+  });
   return new Map(states.map((s) => [s.shopId, s]));
 }
