@@ -11,7 +11,7 @@
 #
 # Что делает: Node.js 22, PostgreSQL, nginx, сертификат Let's Encrypt, пользователь b2b,
 # код в /opt/b2b-orders, база с случайным паролем, .env с ключами push и CRON_SECRET,
-# миграции, территории и супер-админ, сборка, служба systemd, ежедневные резервные копии, firewall.
+# миграции, территории и супер-админ, сборка, служба systemd, ежедневные резервные копии, проверки для Telegram, firewall.
 # Повторный запуск безопасен: существующие .env, база и пароли не трогаются.
 set -euo pipefail
 
@@ -72,6 +72,8 @@ say "Системные пакеты"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y -q ca-certificates curl git gnupg nginx postgresql ufw openssl
+# 7-Zip — зашифрованные архивы резервных копий для Telegram (на Ubuntu 22.04 пакет называется p7zip-full)
+apt-get install -y -q 7zip 2>/dev/null || apt-get install -y -q p7zip-full
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y -q nodejs
@@ -160,12 +162,19 @@ ok "сборка готова"
 say "Служба systemd"
 install -m 644 "$APP_DIR/deploy/b2b-orders.service" /etc/systemd/system/b2b-orders.service
 install -m 644 "$APP_DIR/deploy/b2b-orders-backup.service" /etc/systemd/system/b2b-orders-backup.service
-install -m 644 "$APP_DIR/deploy/b2b-orders-backup.timer" /etc/systemd/system/b2b-orders-backup.timer
+for u in b2b-orders-backup b2b-orders-monitor b2b-orders-daily; do
+  install -m 644 "$APP_DIR/deploy/$u.service" "/etc/systemd/system/$u.service"
+  install -m 644 "$APP_DIR/deploy/$u.timer" "/etc/systemd/system/$u.timer"
+done
 install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/sbin/b2b-backup
 install -m 755 "$APP_DIR/deploy/update.sh" /usr/local/sbin/b2b-update
 install -m 755 "$APP_DIR/deploy/set-domain.sh" /usr/local/sbin/b2b-set-domain
+install -m 755 "$APP_DIR/deploy/notify.sh" /usr/local/sbin/b2b-notify
+install -m 755 "$APP_DIR/deploy/monitor.sh" /usr/local/sbin/b2b-monitor
+install -m 755 "$APP_DIR/deploy/telegram.sh" /usr/local/sbin/b2b-telegram
 systemctl daemon-reload
-systemctl enable --now b2b-orders.service b2b-orders-backup.timer
+# Проверки и сводка работают и без Telegram (тогда просто молчат), а после sudo b2b-telegram setup пишут в канал
+systemctl enable --now b2b-orders.service b2b-orders-backup.timer b2b-orders-monitor.timer b2b-orders-daily.timer
 systemctl restart b2b-orders.service
 for _ in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" || die "приложение не отвечает: journalctl -u b2b-orders -n 50"
@@ -209,4 +218,6 @@ if echo "$SEED_OUT" | grep -qi 'парол'; then
   echo "$SEED_OUT" | grep -i 'парол' | sed 's/^/    /'
 fi
 echo "  Обновление:   sudo b2b-update"
+if [ -s /etc/b2b-orders/telegram.env ]; then echo "  Telegram:     подключён (sudo b2b-telegram status)"
+else echo "  Telegram:     логи и копии в канал — sudo b2b-telegram setup (docs/deploy.md, раздел 9)"; fi
 echo "  Журнал:       sudo journalctl -u b2b-orders -f"

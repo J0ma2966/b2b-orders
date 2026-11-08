@@ -1,0 +1,7 @@
+[Unit]
+Description=B2B orders: сводка за сутки в Telegram
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/b2b-monitor daily
