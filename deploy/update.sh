@@ -37,21 +37,9 @@ systemctl restart b2b-orders
 for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/login 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null http://127.0.0.1:3000/login && echo "Готово: работает $NEW" || { echo "Сайт не отвечает: sudo journalctl -u b2b-orders -n 50" >&2; exit 1; }
 
-# Скрипты и таймеры из репозитория могли измениться — ставим свежие
-install -m 755 deploy/backup.sh /usr/local/sbin/b2b-backup
-install -m 755 deploy/update.sh /usr/local/sbin/b2b-update
-install -m 755 deploy/set-domain.sh /usr/local/sbin/b2b-set-domain
-install -m 755 deploy/notify.sh /usr/local/sbin/b2b-notify
-install -m 755 deploy/monitor.sh /usr/local/sbin/b2b-monitor
-install -m 755 deploy/telegram.sh /usr/local/sbin/b2b-telegram
-install -m 755 deploy/set-admin-phone.sh /usr/local/sbin/b2b-set-admin-phone
+# Команды b2b-* и таймеры — из свежего кода: новые команды появляются после первого же обновления
+bash deploy/install-commands.sh
 command -v 7z >/dev/null || command -v 7zz >/dev/null || apt-get install -y -q 7zip >/dev/null 2>&1 || apt-get install -y -q p7zip-full >/dev/null 2>&1 || true
-for u in b2b-orders-backup b2b-orders-monitor b2b-orders-daily; do
-  install -m 644 "deploy/$u.service" "/etc/systemd/system/$u.service"
-  install -m 644 "deploy/$u.timer" "/etc/systemd/system/$u.timer"
-done
-systemctl daemon-reload
-systemctl enable --now b2b-orders-monitor.timer b2b-orders-daily.timer >/dev/null 2>&1
 /usr/local/sbin/b2b-monitor maintenance 0
 echo "$(date '+%d.%m %H:%M') · $OLD → $NEW" > /var/lib/b2b-orders-monitor/update_info
 notify --quiet "⬆️ Платформа обновлена: $OLD → $NEW
