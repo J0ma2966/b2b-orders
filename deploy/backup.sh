@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Резервная копия: база (pg_dump) и загруженные фото/логотипы. Хранятся KEEP_DAYS дней (по умолчанию 14).
 #   sudo b2b-backup
-# Если подключён Telegram (sudo b2b-telegram setup), копия уходит ещё и в канал: архив 7z с паролем (AES-256),
-# разбитый на части по 45 МБ (лимит Telegram для ботов — 50 МБ). Об ошибке копии приходит сообщение.
+# Если подключён Telegram (sudo b2b-telegram setup), база уходит ещё и в канал: архив 7z с паролем (AES-256),
+# разбитый на части по 45 МБ. В базе — заказы, финансы, долги и оплаты, чеки и отчёты (они строятся из базы).
+# Фото (товары, логотипы, фото проблем и возвратов) в канал по умолчанию не идут: TELEGRAM_SEND_PHOTOS=1 включает (лимит Telegram для ботов — 50 МБ). Об ошибке копии приходит сообщение.
 # Восстановление — docs/deploy.md, разделы 5 и 9.
 set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/b2b-orders}"
@@ -41,7 +42,7 @@ if [ -z "$SEVENZ" ] || [ ! -s "$PASS_FILE" ]; then
   exit 0
 fi
 
-MAX_MB="${TELEGRAM_BACKUP_MAX_MB:-500}" # фото больше этого размера в канал не шлём (только предупреждение)
+MAX_MB="${TELEGRAM_BACKUP_MAX_MB:-500}" # при TELEGRAM_SEND_PHOTOS=1 фото больше этого размера в канал не шлём
 TMP="$(mktemp -d "$BACKUP_DIR/.telegram.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 PW="$(cat "$PASS_FILE")"
@@ -63,13 +64,15 @@ SENT=() FAILED=()
 if pack "b2b-db_$STAMP" "$BACKUP_DIR/db_$STAMP.dump" && send_parts "b2b-db_$STAMP" "🗄 База $STAMP"; then
   SENT+=("база $DB_SIZE"); else FAILED+=("база"); fi
 UP_BYTES="$(stat -c %s "$BACKUP_DIR/uploads_$STAMP.tar.gz")"
-if [ "$UP_BYTES" -gt $((MAX_MB * 1024 * 1024)) ]; then
+if [ "${TELEGRAM_SEND_PHOTOS:-0}" != 1 ]; then
+  : # фото в канал не нужны — они остаются в копиях на сервере
+elif [ "$UP_BYTES" -gt $((MAX_MB * 1024 * 1024)) ]; then
   SKIPPED="фото ($UP_SIZE) больше $MAX_MB МБ — лежат только на сервере, скачайте их к себе (docs/deploy.md, раздел 5)"
 elif pack "b2b-uploads_$STAMP" "$BACKUP_DIR/uploads_$STAMP.tar.gz" && send_parts "b2b-uploads_$STAMP" "🖼 Фото $STAMP"; then
   SENT+=("фото $UP_SIZE"); else FAILED+=("фото"); fi
 
 if [ ${#FAILED[@]} -eq 0 ]; then
-  echo "база $DB_SIZE, фото $UP_SIZE · в канале ✓" > "$STATE_DIR/backup_info"
+  echo "$(IFS=,; echo "${SENT[*]}" | sed 's/,/, /g') в канале ✓$([ "${TELEGRAM_SEND_PHOTOS:-0}" = 1 ] || echo ", фото $UP_SIZE на сервере")" > "$STATE_DIR/backup_info"
   notify --quiet "✅ Резервная копия $STAMP: $(IFS=,; echo "${SENT[*]}" | sed 's/,/, /g') — в канале выше. Архивы открываются паролем, который хранится у вас (в канал он не отправляется).${SKIPPED:+
 ⚠️ $SKIPPED}"
 else

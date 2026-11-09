@@ -68,16 +68,20 @@ setup() {
   [[ "$chat" =~ ^-?[0-9]+$|^@[A-Za-z0-9_]{5,}$ ]] || { echo "Непохоже на id канала: $chat" >&2; exit 1; }
 
   umask 077
-  local keep_send keep_max
+  local keep_send keep_max keep_photos
   keep_send="$( [ -r "$CONF" ] && (. "$CONF"; echo "${TELEGRAM_SEND_BACKUPS:-1}") || echo 1)"
   keep_max="$( [ -r "$CONF" ] && (. "$CONF"; echo "${TELEGRAM_BACKUP_MAX_MB:-500}") || echo 500)"
+  keep_photos="$( [ -r "$CONF" ] && (. "$CONF"; echo "${TELEGRAM_SEND_PHOTOS:-0}") || echo 0)"
   cat > "$CONF" <<ENV
 # Telegram для логов и резервных копий (sudo b2b-telegram setup). Только root. В чат и git не копировать.
 TELEGRAM_BOT_TOKEN="$TOKEN"
 TELEGRAM_CHAT_ID="$chat"
 # 0 — копии в канал не отправлять, только сообщение о них
 TELEGRAM_SEND_BACKUPS="$keep_send"
-# Фото больше этого размера (МБ) в канал не отправляются — только база и предупреждение
+# 1 — отправлять в канал и фото (товары, логотипы, фото проблем и возвратов). По умолчанию только база:
+# в ней заказы, финансы, долги, оплаты, чеки и отчёты. Фото всё равно копируются на сервере (14 дней)
+TELEGRAM_SEND_PHOTOS="$keep_photos"
+# Фото больше этого размера (МБ) в канал не отправляются, даже при TELEGRAM_SEND_PHOTOS=1
 TELEGRAM_BACKUP_MAX_MB="$keep_max"
 # Подпись сервера в сообщениях (по умолчанию домен из .env)
 TELEGRAM_LABEL=""
@@ -106,7 +110,7 @@ status() {
     # shellcheck disable=SC1090
     . "$CONF"; TOKEN="$TELEGRAM_BOT_TOKEN"
     echo "Бот: @$(api getMe | json 'j.result&&j.result.username' || echo '?'), канал: $TELEGRAM_CHAT_ID"
-    echo "Копии в канал: $([ "${TELEGRAM_SEND_BACKUPS:-1}" = 0 ] && echo нет || echo "да (фото до ${TELEGRAM_BACKUP_MAX_MB:-500} МБ)")"
+    echo "Копии в канал: $([ "${TELEGRAM_SEND_BACKUPS:-1}" = 0 ] && echo нет || echo "база$([ "${TELEGRAM_SEND_PHOTOS:-0}" = 1 ] && echo " и фото до ${TELEGRAM_BACKUP_MAX_MB:-500} МБ")")"
   else
     echo "Telegram не подключён: sudo b2b-telegram setup"
   fi
