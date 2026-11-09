@@ -28,6 +28,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Вошедший пользователь, открывший главную (это и стартовый экран мобильного приложения), сразу
+  // попадает в кабинет своей роли, а не на страницу регистрации. Здесь только проверка cookie без
+  // базы: сессию и роль проверяет /start, он же отвечает переадресацией (адрес в ней относительный).
+  // Именно правило в конфиге, а не rewrite в src/proxy.ts: тот строит абсолютный адрес
+  // (https://localhost:3000/start), а сервер за nginx слушает 127.0.0.1 — Next.js считал адрес
+  // чужим, пытался проксировать его по HTTPS на обычный HTTP-порт и отдавал ошибку 500.
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/", has: [{ type: "cookie", key: "b2b_session" }], destination: "/start" }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
