@@ -29,22 +29,22 @@ export default async function AdminStockPage({ searchParams }: PageProps<"/admin
       <FilterBar q={q} status={status} statuses={[["reserved", "Есть резерв"], ["empty", "Закончились"]]} allLabel="Все" placeholder="Товар или поставщик" />
       {rows.length === 0 ? <EmptyState>{t("Нет данных")}</EmptyState> : (
         <Card className="overflow-x-auto p-0 sm:p-0">
-          <table className="w-full min-w-[600px] text-sm">
+          <table className="stack-table w-full text-sm sm:min-w-[600px]">
             <thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="px-4 py-2 text-left">{t("Товар")}</th><th className="px-2 text-left">{t("Поставщик")}</th><th className="px-2 text-right">{t("Физический")}</th><th className="px-2 text-right">{t("Резерв")}</th><th className="px-4 text-right">{t("Доступно")}</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {rows.map((u) => (
                 <tr key={u.id}>
-                  <td className="px-4 py-2">{u.product.name} · {t(unitName(u))}</td>
-                  <td className="px-2">{u.product.supplier.displayName}</td>
+                  <td className="px-4 py-2 font-medium sm:font-normal">{u.product.name} · {t(unitName(u))}</td>
+                  <td data-label={t("Поставщик")} className="px-2">{u.product.supplier.displayName}</td>
                   {u.baseUnit ? (
-                    <td colSpan={2} className="px-2 text-right text-xs text-gray-500">{t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })}</td>
+                    <td colSpan={2} data-label={t("Фасовка")} className="px-2 text-right text-xs text-gray-500">{t("1 = {n} {unit}", { n: formatQty(u.baseQty!), unit: t(unitName(u.baseUnit)) })}</td>
                   ) : (
                     <>
-                      <td className="px-2 text-right">{formatQty(u.physicalQty)}</td>
-                      <td className="px-2 text-right">{formatQty(u.reservedQty)}</td>
+                      <td data-label={t("Физический")} className="px-2 text-right">{formatQty(u.physicalQty)}</td>
+                      <td data-label={t("Резерв")} className="px-2 text-right">{formatQty(u.reservedQty)}</td>
                     </>
                   )}
-                  <td className="px-4 text-right font-medium">{formatQty(Number(u.physicalQty) - Number(u.reservedQty))}</td>
+                  <td data-label={t("Доступно")} className="px-4 text-right font-medium">{formatQty(Number(u.physicalQty) - Number(u.reservedQty))}</td>
                 </tr>
               ))}
             </tbody>

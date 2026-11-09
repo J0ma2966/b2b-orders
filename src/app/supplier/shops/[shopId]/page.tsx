@@ -172,7 +172,7 @@ const action = "flex w-full flex-col items-center gap-1.5 rounded-2xl bg-surface
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="rounded-2xl bg-surface px-3 py-2.5 ring-1 ring-gray-200/70">
-      <b className="block truncate text-sm tabular-nums">{value}</b>
+      <b className="block text-sm leading-tight tabular-nums [overflow-wrap:anywhere]">{value}</b>
       <span className="mt-0.5 block text-[11px] leading-tight text-gray-500">{label}</span>
     </div>
   );

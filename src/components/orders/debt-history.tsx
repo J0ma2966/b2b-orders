@@ -43,11 +43,11 @@ export async function DebtHistory({ entries, orderHref }: { entries: Entry[]; or
                 <Icon className="size-4" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
+                <span className="line-clamp-2 text-sm font-semibold leading-snug">
                   {t(DEBT_TYPE_LABEL[e.type])}
                   {e.order && <> · <Link className="text-brand-600" href={orderHref(e.order.id)}>№{e.order.number}</Link></>}
                 </span>
-                <span className="block truncate text-xs text-gray-500">
+                <span className="line-clamp-2 text-xs text-gray-500">
                   {t.dateTime(e.occurredAt)}{e.paymentMethod ? ` · ${t(PAYMENT_LABEL[e.paymentMethod])}` : ""}{e.comment ? ` · ${t(e.comment)}` : ""}
                 </span>
               </span>

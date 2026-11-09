@@ -24,7 +24,7 @@ export async function InvoiceList({ rows, action }: { rows: Row[]; action?: (row
   const today = new Date();
   return (
     <Card className="overflow-x-auto p-0 sm:p-0">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="stack-table w-full text-sm sm:min-w-[640px]">
         <thead className="bg-gray-50 text-xs text-gray-500">
           <tr>
             <th className="px-4 py-2 text-left">{t("Счёт")}</th>
@@ -40,15 +40,15 @@ export async function InvoiceList({ rows, action }: { rows: Row[]; action?: (row
             const overdue = r.status === "ISSUED" && r.dueDate < today;
             return (
               <tr key={r.id} className="align-top">
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 font-medium sm:font-normal">
                   №{r.number}
                   <span className="block text-xs text-gray-500">{t(MONTHS[r.period.getUTCMonth()])} {r.period.getUTCFullYear()} · {t("заказов: {n}", { n: r.orders })}</span>
                 </td>
-                {r.supplier && <td className="px-2 py-2">{r.supplier.displayName}</td>}
-                <td className="px-2 py-2 text-right">{t.money(r.turnover)}</td>
-                <td className="px-2 py-2 text-right font-medium">{t.money(r.amount)}</td>
-                <td className={overdue ? "px-2 py-2 font-medium text-red-600" : "px-2 py-2"}>{t.date(r.dueDate)}</td>
-                <td className="space-y-1 px-4 py-2 text-right">
+                {r.supplier && <td data-label={t("Поставщик")} className="px-2 py-2">{r.supplier.displayName}</td>}
+                <td data-label={t("Оборот")} className="px-2 py-2 text-right whitespace-nowrap">{t.money(r.turnover)}</td>
+                <td data-label={t("Сумма")} className="px-2 py-2 text-right font-medium whitespace-nowrap">{t.money(r.amount)}</td>
+                <td data-label={t("Оплатить до")} className={overdue ? "px-2 py-2 font-medium text-red-600" : "px-2 py-2"}>{t.date(r.dueDate)}</td>
+                <td data-label={t("Статус")} className="space-y-1 px-4 py-2 text-right">
                   <Badge color={overdue ? "red" : INVOICE_STATUS_COLOR[r.status]}>{overdue ? "Просрочен" : INVOICE_STATUS_LABEL[r.status]}</Badge>
                   {r.paidAt && <div className="text-xs text-gray-500">{t.date(r.paidAt)}</div>}
                   {r.status === "ISSUED" && action?.(r)}

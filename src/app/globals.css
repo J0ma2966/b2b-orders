@@ -417,3 +417,59 @@ main:has(> .nav-pending) > :not(.nav-pending) {
 @media (prefers-reduced-motion: reduce) {
   .spark-line { stroke-dashoffset: 0; }
 }
+
+/* ── Таблицы на телефоне ──────────────────────────────────────────────────
+   Широкая таблица с классом stack-table на узком экране превращается в стопку карточек:
+   строка — карточка, у каждой ячейки слева подпись столбца (data-label), справа значение.
+   Ячейка без data-label — заголовок карточки во всю ширину; stack-wide — подпись сверху, значение под ней. */
+@media (max-width: 639.98px) {
+  table.stack-table,
+  .stack-table > tbody,
+  .stack-table > tfoot,
+  .stack-table > tbody > tr,
+  .stack-table > tfoot > tr {
+    display: block;
+    width: 100%;
+  }
+  .stack-table > thead {
+    display: none;
+  }
+  .stack-table > tbody > tr,
+  .stack-table > tfoot > tr {
+    padding: 0.625rem 1rem;
+  }
+  .stack-table > tfoot > tr {
+    border-top: 1px solid var(--color-gray-200);
+  }
+  .stack-table td {
+    display: block;
+    padding: 0.125rem 0 !important;
+    text-align: right !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  .stack-table td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    max-width: 55%;
+    margin-right: 0.75rem;
+    text-align: left;
+    font-size: 0.75rem;
+    line-height: 1.5rem;
+    font-weight: 400;
+    color: var(--color-gray-500);
+  }
+  .stack-table td:not([data-label]),
+  .stack-table td.stack-wide {
+    text-align: left !important;
+  }
+  .stack-table td.stack-wide::before {
+    float: none;
+    display: block;
+    max-width: none;
+    line-height: 1.25rem;
+  }
+  .stack-table td:empty {
+    display: none;
+  }
+}

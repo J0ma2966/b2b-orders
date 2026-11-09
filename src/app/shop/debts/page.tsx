@@ -90,7 +90,7 @@ export default async function ShopDebtsPage() {
                   <Avatar name={a.supplier.displayName} src={fileUrl(a.supplier.logoPath)} className="size-14 text-base" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-2">
-                      <span className="truncate font-bold">{a.supplier.displayName}</span>
+                      <span className="line-clamp-2 min-w-0 font-bold leading-snug [overflow-wrap:anywhere]">{a.supplier.displayName}</span>
                       <span className="shrink-0 text-sm tabular-nums">
                         <b className={balance < 0 ? "text-brand-700" : undefined}>{balance < 0 ? balanceLabel(balance, t) : t.money(Math.max(0, balance)).replace(/\s\S+$/, "")}</b>
                         {limit && balance >= 0 && <span className="text-gray-500"> / {t.money(limit).replace(/\s\S+$/, "")}</span>}
@@ -125,12 +125,12 @@ export default async function ShopDebtsPage() {
                   const charge = amount > 0;
                   const Arrow = charge ? ArrowUpRight : ArrowDownLeft;
                   return (
-                    <li key={e.id} className="flex items-center gap-3.5 py-3.5">
-                      <span className={cn("grid size-12 shrink-0 place-items-center rounded-full", charge ? "bg-coral-soft text-red-800" : "bg-brand-50 text-brand-700")}>
+                    <li key={e.id} className="flex items-center gap-3 py-3.5 min-[390px]:gap-3.5">
+                      <span className={cn("grid size-10 shrink-0 place-items-center rounded-full min-[390px]:size-12", charge ? "bg-coral-soft text-red-800" : "bg-brand-50 text-brand-700")}>
                         <Arrow className="size-5" strokeWidth={2.4} aria-hidden />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold">
+                        <span className="block font-bold leading-snug">
                           {t(DEBT_TYPE_LABEL[e.type])}
                           {e.order && (
                             <>
@@ -140,7 +140,7 @@ export default async function ShopDebtsPage() {
                           )}
                           {e.paymentMethod && <span className="font-medium text-gray-500"> · {t(PAYMENT_LABEL[e.paymentMethod])}</span>}
                         </span>
-                        <span className="block truncate text-sm text-gray-500">
+                        <span className="line-clamp-2 text-sm text-gray-500">
                           {e.supplier} · {t.date(e.occurredAt)}
                           {e.comment && <> · {t(e.comment)}</>}
                         </span>

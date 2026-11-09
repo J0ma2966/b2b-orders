@@ -49,17 +49,17 @@ export default async function AdminFinancePage({ searchParams }: PageProps<"/adm
       <h2 className="mb-2 font-semibold">{t("Финансовые операции")}</h2>
       {entries.length === 0 ? <EmptyState>{t("Операций нет")}</EmptyState> : (
         <Card className="overflow-x-auto p-0 sm:p-0">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="stack-table w-full text-sm sm:min-w-[700px]">
             <thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="px-3 py-2 text-left">{t("Дата")}</th><th className="px-3 text-left">{t("Магазин → поставщик")}</th><th className="px-3 text-left">{t("Операция")}</th><th className="px-3 text-left">{t("Заказ")}</th><th className="px-3 text-right">{t("Сумма")}</th><th className="px-3 text-right">{t("Остаток")}</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {entries.map((e) => (
                 <tr key={e.id}>
-                  <td className="px-3 py-1.5 whitespace-nowrap">{t.dateTime(e.occurredAt)}</td>
-                  <td className="px-3">{e.account.shop.name} → {e.account.supplier.displayName}</td>
-                  <td className="px-3">{t(DEBT_TYPE_LABEL[e.type])}{e.paymentMethod && ` · ${t(PAYMENT_LABEL[e.paymentMethod])}`}{e.comment && <div className="text-xs text-gray-500">{t(e.comment)}</div>}</td>
-                  <td className="px-3">{e.order ? <Link className="text-brand-600" href={`/admin/orders/${e.order.id}`}>№{e.order.number}</Link> : "—"}</td>
-                  <td className="px-3 text-right">{Number(e.amount) > 0 ? "+" : ""}{t.money(e.amount)}</td>
-                  <td className="px-3 text-right whitespace-nowrap">{balanceLabel(Number(e.balanceAfter), t)}</td>
+                  <td className="px-3 py-1.5 whitespace-nowrap text-xs text-gray-500 sm:text-sm sm:text-ink">{t.dateTime(e.occurredAt)}</td>
+                  <td className="px-3 font-medium sm:font-normal">{e.account.shop.name} → {e.account.supplier.displayName}</td>
+                  <td data-label={t("Операция")} className="px-3">{t(DEBT_TYPE_LABEL[e.type])}{e.paymentMethod && ` · ${t(PAYMENT_LABEL[e.paymentMethod])}`}{e.comment && <div className="text-xs text-gray-500">{t(e.comment)}</div>}</td>
+                  <td data-label={t("Заказ")} className="px-3">{e.order ? <Link className="text-brand-600" href={`/admin/orders/${e.order.id}`}>№{e.order.number}</Link> : "—"}</td>
+                  <td data-label={t("Сумма")} className="px-3 text-right whitespace-nowrap">{Number(e.amount) > 0 ? "+" : ""}{t.money(e.amount)}</td>
+                  <td data-label={t("Остаток")} className="px-3 text-right whitespace-nowrap">{balanceLabel(Number(e.balanceAfter), t)}</td>
                 </tr>
               ))}
             </tbody>

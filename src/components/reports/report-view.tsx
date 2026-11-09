@@ -44,7 +44,7 @@ type Group = { key: string; amount: number; qty: number; count: number };
 function GroupTable({ t, title, rows, money = true, qty = true, count, keyLabel }: { t: T; title: string; rows: Group[]; money?: boolean; qty?: boolean; count?: string; keyLabel?: (k: string) => string }) {
   return (
     <Card className="p-0 sm:p-0">
-      <h3 className="px-4 pt-3 text-sm font-semibold">{t(title)}</h3>
+      <h3 className="px-4 pt-3 pb-1 text-sm font-semibold">{t(title)}</h3>
       {rows.length === 0 ? (
         <p className="px-4 py-3 text-sm text-gray-500">{t("Нет данных")}</p>
       ) : (
@@ -52,10 +52,10 @@ function GroupTable({ t, title, rows, money = true, qty = true, count, keyLabel 
           <tbody className="divide-y divide-gray-100">
             {rows.slice(0, 15).map((r) => (
               <tr key={r.key}>
-                <td className="px-4 py-1.5">{keyLabel ? keyLabel(r.key) : t(r.key)}</td>
-                {count && <td className="px-2 py-1.5 text-right text-gray-500">{r.count} {t(count)}</td>}
-                {qty && <td className="px-2 py-1.5 text-right text-gray-500">{formatQty(r.qty)}</td>}
-                {money && <td className="px-4 py-1.5 text-right font-medium">{t.money(r.amount)}</td>}
+                <td className="py-1.5 pr-2 pl-4 [overflow-wrap:anywhere]">{keyLabel ? keyLabel(r.key) : t(r.key)}</td>
+                {count && <td className="px-2 py-1.5 text-right whitespace-nowrap text-gray-500">{r.count} {t(count)}</td>}
+                {qty && <td className="px-2 py-1.5 text-right whitespace-nowrap text-gray-500">{formatQty(r.qty)}</td>}
+                {money && <td className="py-1.5 pr-4 pl-2 text-right font-medium whitespace-nowrap">{t.money(r.amount)}</td>}
               </tr>
             ))}
           </tbody>
@@ -119,13 +119,13 @@ export async function ReportView({ r, scope }: { r: Report; scope: "supplier" | 
           <Tile t={t} label="Отменены" value={r.logistics.cancelled} />
         </div>
         <Card className="overflow-x-auto p-0 sm:p-0">
-          <h3 className="px-4 pt-3 text-sm font-semibold">{t("Показатели доставщиков")}</h3>
+          <h3 className="px-4 pt-3 pb-1 text-sm font-semibold">{t("Показатели доставщиков")}</h3>
           {r.logistics.couriers.length === 0 ? <p className="px-4 py-3 text-sm text-gray-500">{t("Нет данных")}</p> : (
-            <table className="w-full min-w-[480px] text-sm">
+            <table className="stack-table w-full text-sm">
               <thead className="text-xs text-gray-500"><tr><th className="px-4 py-1 text-left">{t("Доставщик")}</th><th className="px-2 text-right">{t("Доставлено")}</th><th className="px-2 text-right">{t("Частично")}</th><th className="px-2 text-right">{t("Не доставлено")}</th><th className="px-4 text-right">{t("Собрано денег")}</th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {r.logistics.couriers.map((c) => (
-                  <tr key={c.name}><td className="px-4 py-1.5">{c.name}</td><td className="px-2 text-right">{c.delivered}</td><td className="px-2 text-right">{c.partial}</td><td className="px-2 text-right">{c.notDelivered}</td><td className="px-4 text-right">{t.money(c.collected)}</td></tr>
+                  <tr key={c.name}><td className="px-4 py-1.5 font-medium">{c.name}</td><td data-label={t("Доставлено")} className="px-2 text-right">{c.delivered}</td><td data-label={t("Частично")} className="px-2 text-right">{c.partial}</td><td data-label={t("Не доставлено")} className="px-2 text-right">{c.notDelivered}</td><td data-label={t("Собрано денег")} className="px-4 text-right whitespace-nowrap">{t.money(c.collected)}</td></tr>
                 ))}
               </tbody>
             </table>

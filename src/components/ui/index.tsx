@@ -37,8 +37,13 @@ export function ButtonLink({
   return <Link className={cn(buttonBase, buttonVariants[variant], className)} {...props}>{tr(children as ReactNode)}</Link>;
 }
 
+// Свои поля карточки (p-0, sm:p-2 …) заменяют стандартные, а не спорят с ними:
+// cn классы не сливает, и в CSS p-4 стоит после p-0, поэтому «p-0» иначе не срабатывал.
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-2xl bg-surface p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_14px_-4px_rgb(0_0_0/0.06)] ring-1 ring-gray-200/70 sm:p-6", className)} {...props} />;
+  const own = className ?? "";
+  const pad = /(^|\s)p-/.test(own) ? "" : "p-4";
+  const smPad = /(^|\s)sm:p-/.test(own) ? "" : "sm:p-6";
+  return <div className={cn("rounded-2xl bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.04),0_4px_14px_-4px_rgb(0_0_0/0.06)] ring-1 ring-gray-200/70", pad, smPad, className)} {...props} />;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {

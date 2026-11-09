@@ -47,7 +47,7 @@ export default async function SupplierAuditPage({ searchParams }: PageProps<"/su
         <EmptyState>{t("Записей нет")}</EmptyState>
       ) : (
         <Card className="overflow-x-auto p-0 sm:p-0">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="stack-table w-full text-left text-sm sm:min-w-[720px]">
             <thead className="border-b border-gray-200 text-xs text-gray-500">
               <tr>
                 <th className="px-4 py-2 font-medium">{t("Когда")}</th>
@@ -61,16 +61,16 @@ export default async function SupplierAuditPage({ searchParams }: PageProps<"/su
               {rows.map((r) => (
                 <tr key={r.id} className="align-top">
                   <td className="px-4 py-2 whitespace-nowrap text-gray-500">{t.dateTime(r.createdAt)}</td>
-                  <td className="px-4 py-2">
+                  <td data-label={t("Кто")} className="px-4 py-2">
                     {r.actorUserId ? users.get(r.actorUserId) ?? "—" : t("Система")}
                     {r.onBehalfOfUserId && <div className="text-xs text-yellow-700">{t("от имени {name}", { name: users.get(r.onBehalfOfUserId) })}</div>}
                   </td>
-                  <td className="px-4 py-2">{t(entityLabel.get(r.entity) ?? r.entity)}</td>
-                  <td className="px-4 py-2">
+                  <td data-label={t("Раздел")} className="px-4 py-2">{t(entityLabel.get(r.entity) ?? r.entity)}</td>
+                  <td data-label={t("Действие")} className="px-4 py-2">
                     {r.action}
                     {r.comment && <div className="text-xs text-gray-500">{t(r.comment)}</div>}
                   </td>
-                  <td className="px-4 py-2 text-xs">
+                  <td data-label={t("Изменения")} className="stack-wide px-4 py-2 text-xs">
                     {((r.changes as AuditChange[] | null) ?? []).map((c, i) => (
                       <div key={i}>
                         <span className="text-gray-500">{c.field}:</span> {JSON.stringify(c.old)} → {JSON.stringify(c.new)}
