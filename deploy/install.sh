@@ -211,7 +211,8 @@ say "Первая резервная копия"
 
 IP="$(public_ip)"
 say "Готово"
-echo "  Адрес:        ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
+if [ -n "$DOMAIN" ]; then SITE_URL="https://$DOMAIN"; else SITE_URL="http://$IP"; fi
+echo "  Адрес:        $SITE_URL"
 echo "  Супер-админ:  $(grep -oP '^SUPERADMIN_PHONE="?\K[^"]*' "$APP_DIR/.env")"
 if echo "$SEED_OUT" | grep -qi 'парол'; then
   echo "  Временный пароль супер-админа (показан один раз, при входе попросит сменить):"
