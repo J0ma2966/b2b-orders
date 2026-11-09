@@ -44,6 +44,7 @@ install -m 755 deploy/set-domain.sh /usr/local/sbin/b2b-set-domain
 install -m 755 deploy/notify.sh /usr/local/sbin/b2b-notify
 install -m 755 deploy/monitor.sh /usr/local/sbin/b2b-monitor
 install -m 755 deploy/telegram.sh /usr/local/sbin/b2b-telegram
+install -m 755 deploy/set-admin-phone.sh /usr/local/sbin/b2b-set-admin-phone
 command -v 7z >/dev/null || command -v 7zz >/dev/null || apt-get install -y -q 7zip >/dev/null 2>&1 || apt-get install -y -q p7zip-full >/dev/null 2>&1 || true
 for u in b2b-orders-backup b2b-orders-monitor b2b-orders-daily; do
   install -m 644 "deploy/$u.service" "/etc/systemd/system/$u.service"

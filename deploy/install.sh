@@ -172,6 +172,7 @@ install -m 755 "$APP_DIR/deploy/set-domain.sh" /usr/local/sbin/b2b-set-domain
 install -m 755 "$APP_DIR/deploy/notify.sh" /usr/local/sbin/b2b-notify
 install -m 755 "$APP_DIR/deploy/monitor.sh" /usr/local/sbin/b2b-monitor
 install -m 755 "$APP_DIR/deploy/telegram.sh" /usr/local/sbin/b2b-telegram
+install -m 755 "$APP_DIR/deploy/set-admin-phone.sh" /usr/local/sbin/b2b-set-admin-phone
 systemctl daemon-reload
 # Проверки и сводка работают и без Telegram (тогда просто молчат), а после sudo b2b-telegram setup пишут в канал
 systemctl enable --now b2b-orders.service b2b-orders-backup.timer b2b-orders-monitor.timer b2b-orders-daily.timer

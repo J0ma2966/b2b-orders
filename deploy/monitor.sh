@@ -16,6 +16,9 @@ LOGIN_FAIL_ONE="${LOGIN_FAIL_ONE:-15}"      # …или с одного адре
 DISK_ALERT_PCT="${DISK_ALERT_PCT:-90}"
 # Строки журнала, которые считаются ошибками приложения (стек «    at …» не считаем)
 ERR_RE='⨯|(^|[^A-Za-z])(Error|TypeError|RangeError|ReferenceError|SyntaxError|PrismaClient[A-Za-z]*Error)(:| \[)|Unhandled|uncaught|FATAL|heap out of memory|ECONNREFUSED|EADDRINUSE|\[error\]'
+# Шум от сканеров уязвимостей: боты шлют поддельный заголовок Next-Action: x (ищут React2Shell, CVE-2025-55182).
+# Next.js такие запросы отклоняет, платформа не задета: в тревоги не попадают, в сводке считаются отдельно
+NOISE_RE='Server Reference ID did not match the expected format'
 
 install -d -m 700 "$STATE_DIR"
 NOW="$(date +%s)"
@@ -89,7 +92,7 @@ $(log_tail 12)
   fi
   new="$(printf '%s\n' "$out" | sed -n 's/^-- cursor: //p' | tail -n1)"
   [ -z "$new" ] || put journal_cursor "$new"
-  printf '%s\n' "$out" | grep -v '^-- cursor: ' | grep -v '^    at ' | grep -E "$ERR_RE" | cut -c1-300 >> "$STATE_DIR/errors.pending"
+  printf '%s\n' "$out" | grep -v '^-- cursor: ' | grep -v '^    at ' | grep -E "$ERR_RE" | grep -vE "$NOISE_RE" | cut -c1-300 >> "$STATE_DIR/errors.pending"
   if [ -s "$STATE_DIR/errors.pending" ]; then
     local n; n="$(wc -l < "$STATE_DIR/errors.pending")"
     if "$NOTIFY" --key errors --every 900 "⚠️ Ошибки приложения: $n
@@ -133,13 +136,15 @@ $(sql "SELECT phone || ' — ' || count(*) FROM \"LoginAttempt\" WHERE NOT succe
 daily() {
   local since="now() - interval '24 hours'" o s l lines=()
   # Работа сайта
-  local restarts errs active
-  restarts="$(journalctl -u "$UNIT" --since -24h -o cat --no-pager 2>/dev/null | grep -c 'Scheduled restart job')"
-  errs="$(journalctl -u "$UNIT" --since -24h -o cat --no-pager 2>/dev/null | grep -v '^    at ' | grep -cE "$ERR_RE")"
+  local restarts errs noise active log24
+  log24="$(journalctl -u "$UNIT" --since -24h -o cat --no-pager 2>/dev/null | grep -v '^    at ')"
+  restarts="$(grep -c 'Scheduled restart job' <<<"$log24")"
+  errs="$(grep -E "$ERR_RE" <<<"$log24" | grep -cvE "$NOISE_RE")"
+  noise="$(grep -cE "$NOISE_RE" <<<"$log24")"
   active="$(systemctl show -p ActiveEnterTimestamp --value "$UNIT")"
   active="$(TZ=Asia/Tashkent date -d "$active" '+%d.%m %H:%M' 2>/dev/null || echo "$active")"
   if site_ok; then lines+=("🟢 Сайт работает (без перерыва с ${active:-?})"); else lines+=("🔴 Сайт сейчас не отвечает"); fi
-  lines+=("Падений приложения: $restarts, ошибок в журнале: $errs")
+  lines+=("Падений приложения: $restarts, ошибок в журнале: $errs$([ "$noise" -gt 0 ] && echo " · отклонено запросов от сканеров: $noise")")
 
   # Заказы и пользователи
   o="$(sql "SELECT count(*) FILTER (WHERE \"placedAt\" > $since), coalesce(sum(total) FILTER (WHERE \"placedAt\" > $since),0),
