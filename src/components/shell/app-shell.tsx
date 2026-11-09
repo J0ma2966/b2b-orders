@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui";
 import { Tr } from "@/components/ui/tr";
 import { BottomNav, BottomNavView, SideNav, SideNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner, UserMenu } from "./user-menu";
+import { NavPendingOverlay, NavProgressBar } from "./nav-progress";
 
 // Каркас кабинета. Статическая часть пререндерится, данные пользователя подгружаются потоком.
 export function AppShell({
@@ -30,6 +31,7 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <NavProgressBar />
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
@@ -63,8 +65,9 @@ export function AppShell({
             </Suspense>
           </div>
         </aside>
-        <main className={mobileNav ? "min-w-0 flex-1 pb-28 md:pb-0" : "min-w-0 flex-1"}>
+        <main className={mobileNav ? "relative min-w-0 flex-1 pb-28 md:pb-0" : "relative min-w-0 flex-1"}>
           <Suspense fallback={<Spinner />}>{children}</Suspense>
+          <NavPendingOverlay />
         </main>
       </div>
       {mobileNav && (

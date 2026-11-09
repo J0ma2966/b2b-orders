@@ -45,7 +45,10 @@ async function NativeSession() {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ru" className="h-full antialiased">
+    // suppressHydrationWarning: в приложении Android (Capacitor, SystemBars) до загрузки React
+    // на <html> ставятся переменные --safe-area-inset-*; это ожидаемо, не ошибка разметки.
+    // Действует только на атрибуты самого <html>, не на содержимое страницы.
+    <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans">
         <Suspense>
           <LocaleRoot>{children}</LocaleRoot>
