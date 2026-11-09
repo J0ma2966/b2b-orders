@@ -1,0 +1,9 @@
+[Unit]
+Description=B2B orders: сводка за сутки в 09:00 по Ташкенту
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Asia/Tashkent
+Persistent=true
+
+[Install]
+WantedBy=timers.target

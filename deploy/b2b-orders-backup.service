@@ -1,0 +1,6 @@
+[Unit]
+Description=B2B orders: резервная копия базы и загруженных файлов
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/b2b-backup
