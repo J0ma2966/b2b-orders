@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { db } from "@/lib/db";
 import { makeT, parseLocale } from "@/lib/i18n/core";
 import { nativePushConfigured, sendNativePush } from "@/lib/native-push";
+import { pushEndpointIsSafe } from "@/lib/ssrf-resolve";
 
 // Web Push (ТЗ п. 57). Без ключей VAPID push отключён, внутренние уведомления работают всегда.
 const pub = process.env.VAPID_PUBLIC_KEY;
@@ -32,6 +33,12 @@ async function sendPush(ids: string[]) {
     await sendNativePush(n.user.deviceTokens, { title: t(n.title), body: t(n.body), url: n.link ?? "/notifications" });
     if (!webPushConfigured) continue;
     for (const s of n.user.pushSubscriptions) {
+      // Перед обращением к адресу подписки убеждаемся, что он ведёт на публичный хост, а не
+      // во внутреннюю сеть (защита от SSRF, в т. ч. если имя хоста резолвится в приватный IP).
+      if (!(await pushEndpointIsSafe(s.endpoint))) {
+        await db.pushSubscription.delete({ where: { id: s.id } }).catch(() => null);
+        continue;
+      }
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
