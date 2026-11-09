@@ -9,6 +9,9 @@ import { PushSettings } from "./push-settings";
 import { db } from "@/lib/db";
 import { vapidPublicKey } from "@/lib/push";
 import { nativePushConfigured } from "@/lib/native-push";
+import { canResetWithoutCurrent } from "@/lib/auth/session";
+import { codeChannels } from "@/lib/login-code";
+import { TelegramLinkCard } from "./telegram-link";
 
 export default async function AccountPage() {
   const [auth, t] = await Promise.all([requireAuth(), getT()]);
@@ -40,7 +43,13 @@ export default async function AccountPage() {
           <Card>
             <h2 className="mb-3 font-semibold">{t("Сменить пароль")}</h2>
 
-            <PasswordForm />
+            <PasswordForm needCurrent={!canResetWithoutCurrent(auth.session)} />
+          </Card>
+        )}
+        {!auth.isImpersonating && codeChannels().telegram === "bot" && (
+          <Card>
+            <h2 className="mb-3 font-semibold">{t("Telegram для кодов входа")}</h2>
+            <TelegramLinkCard linked={!!auth.realUser.telegramChatId} />
           </Card>
         )}
         <Card>

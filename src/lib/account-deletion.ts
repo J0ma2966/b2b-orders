@@ -64,6 +64,7 @@ export async function deleteUserAccount(userId: string) {
     await tx.deviceToken.deleteMany({ where: { userId } });
     await tx.notification.deleteMany({ where: { userId } });
     await tx.loginAttempt.deleteMany({ where: { phone: user.phone } });
+    await tx.loginCode.deleteMany({ where: { OR: [{ phone: user.phone }, { userId }] } });
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -76,6 +77,7 @@ export async function deleteUserAccount(userId: string) {
         deletedAt: new Date(),
         pushEnabled: false,
         mustChangePassword: false,
+        telegramChatId: null,
       },
     });
     return { alreadyDeleted: false as const, ...impact };

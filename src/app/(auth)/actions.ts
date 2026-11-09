@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "@/lib/auth/password";
-import { createSession, destroySession, requestMeta } from "@/lib/auth/session";
+import { canResetWithoutCurrent, createSession, destroySession, requestMeta } from "@/lib/auth/session";
 import { homePathFor, requireAuth } from "@/lib/auth/current";
 import { syncLocaleOnLogin } from "@/lib/i18n/server";
 import { formValues, invalid, parseForm, type FormState } from "@/lib/forms";
@@ -55,7 +55,7 @@ export async function logoutAction() {
 
 const passwordSchema = z
   .object({
-    current: z.string().min(1, "Введите текущий пароль"),
+    current: z.string().optional(),
     password: z.string().min(MIN_PASSWORD_LENGTH, `Минимум ${MIN_PASSWORD_LENGTH} символов`),
     password2: z.string(),
   })
@@ -66,14 +66,19 @@ export async function changePasswordAction(_prev: FormState, formData: FormData)
   if (auth.isImpersonating) return { error: "Нельзя менять пароль в режиме «от имени»" };
   const parsed = parseForm(passwordSchema, formData);
   if (!parsed.success) return invalid(parsed.error, formData);
-  if (!(await verifyPassword(parsed.data.current, auth.realUser.passwordHash))) {
-    return { fieldErrors: { current: ["Неверный текущий пароль"] } };
+  // После входа по коду («Забыли пароль?») старый пароль не спрашиваем — 15 минут
+  if (!canResetWithoutCurrent(auth.session)) {
+    if (!parsed.data.current) return { fieldErrors: { current: ["Введите текущий пароль"] } };
+    if (!(await verifyPassword(parsed.data.current, auth.realUser.passwordHash))) {
+      return { fieldErrors: { current: ["Неверный текущий пароль"] } };
+    }
   }
   await db.$transaction([
     db.user.update({
       where: { id: auth.realUser.id },
       data: { passwordHash: await hashPassword(parsed.data.password), mustChangePassword: false },
     }),
+    db.session.update({ where: { id: auth.session.id }, data: { passwordResetUntil: null } }),
     // Выходим на остальных устройствах
     db.session.deleteMany({ where: { userId: auth.realUser.id, NOT: { id: auth.session.id } } }),
   ]);

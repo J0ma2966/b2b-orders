@@ -33,6 +33,9 @@ model User {
   pushEnabled  Boolean    @default(true)
   // Язык интерфейса (ru, uz): для push и уведомлений, когда пользователь не в приложении
   locale       String     @default("ru")
+  // Чат с ботом входа в Telegram (ID чата), куда приходят коды; привязывается, когда человек
+  // делится в боте своим номером — Telegram присылает номер владельца аккаунта
+  telegramChatId String?  @unique
   deletedAt    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -66,9 +69,40 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   lastSeenAt DateTime @default(now())
+  // Вход по одноразовому коду: до этого времени можно задать новый пароль без старого
+  passwordResetUntil DateTime?
   deviceTokens DeviceToken[]
 
   @@index([userId])
+}
+
+enum CodeChannel {
+  TELEGRAM
+  SMS
+}
+
+// Одноразовый код входа (Telegram или SMS) и привязка Telegram из профиля (purpose = LINK).
+// Сам код хранится только хешем. Для бота код создаётся в момент отправки: если чат ещё не
+// привязан, человек открывает бота по ссылке с linkToken и делится номером — тогда код и приходит.
+model LoginCode {
+  id         String      @id @default(cuid())
+  phone      String
+  userId     String?
+  purpose    String      @default("LOGIN") // LOGIN | LINK
+  channel    CodeChannel
+  codeHash   String?
+  linkToken  String?     @unique
+  chatId     String?
+  attempts   Int         @default(0)
+  ip         String?
+  sentAt     DateTime?
+  usedAt     DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime    @default(now())
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@index([chatId, createdAt])
 }
 
 model LoginAttempt {
