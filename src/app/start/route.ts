@@ -6,7 +6,7 @@ function go(path: string) {
   return new Response(null, { status: 307, headers: { Location: path, "Cache-Control": "no-store" } });
 }
 
-// Куда вести вошедшего пользователя с главной (см. src/proxy.ts)
+// Куда вести вошедшего пользователя с главной (правило rewrites в next.config.ts)
 export async function GET() {
   const auth = await getAuth();
   if (!auth) {
