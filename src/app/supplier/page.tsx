@@ -189,9 +189,9 @@ export default async function SupplierHome() {
       )}
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Link href="/supplier/team"><Card className="p-3 sm:p-4"><div className="text-lg font-semibold">{count.ADMIN ?? 0}</div><div className="text-xs text-gray-500">{t("Администраторы")}</div></Card></Link>
-        <Link href="/supplier/delivery"><Card className="p-3 sm:p-4"><div className="text-lg font-semibold">{count.COURIER ?? 0}</div><div className="text-xs text-gray-500">{t("Доставщики")}</div></Card></Link>
-        <Link href="/supplier/territory"><Card className="p-3 sm:p-4"><div className="text-lg font-semibold">{territories}</div><div className="text-xs text-gray-500">{t("Территорий доставки")}</div></Card></Link>
+        <Link href="/supplier/team"><Card className="h-full p-3 sm:p-4"><div className="text-lg font-semibold">{count.ADMIN ?? 0}</div><div className="text-xs leading-tight text-gray-500 hyphens-auto [overflow-wrap:anywhere]">{t("Администраторы")}</div></Card></Link>
+        <Link href="/supplier/delivery"><Card className="h-full p-3 sm:p-4"><div className="text-lg font-semibold">{count.COURIER ?? 0}</div><div className="text-xs leading-tight text-gray-500 hyphens-auto [overflow-wrap:anywhere]">{t("Доставщики")}</div></Card></Link>
+        <Link href="/supplier/territory"><Card className="h-full p-3 sm:p-4"><div className="text-lg font-semibold">{territories}</div><div className="text-xs leading-tight text-gray-500 hyphens-auto [overflow-wrap:anywhere]">{t("Территорий доставки")}</div></Card></Link>
       </div>
     </div>
   );

@@ -32,13 +32,13 @@ export function CourierShell({ children }: { children: ReactNode }) {
         <ImpersonationBanner />
       </Suspense>
       <header className="sticky top-0 z-[1001] border-b border-gray-200/60 bg-page/80 backdrop-blur-xl backdrop-saturate-150" style={{ viewTransitionName: "app-header" }}>
-        <div className="mx-auto flex h-14 max-w-xl items-center justify-between gap-3 px-4">
+        <div className="mx-auto flex h-14 max-w-xl items-center justify-between gap-2 px-4 min-[390px]:gap-3">
           <Link href="/courier" className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-brand-600 text-on-brand" aria-hidden>
+            <span className="hidden size-10 shrink-0 place-items-center rounded-2xl bg-brand-600 text-on-brand min-[390px]:grid" aria-hidden>
               <Truck className="size-5" strokeWidth={2.2} />
             </span>
             <span className="min-w-0 leading-tight">
-              <span className="block text-[15px] font-bold"><Tr>Доставщик</Tr></span>
+              <span className="block truncate text-[15px] font-bold"><Tr>Доставщик</Tr></span>
               <Suspense fallback={<span className="block h-4" />}>
                 <SupplierName />
               </Suspense>
@@ -75,7 +75,7 @@ async function CourierActions() {
   // Поставщик, который развозит сам, возвращается отсюда в свой кабинет
   const staff = ctx && ctx.membership.role !== "COURIER";
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex shrink-0 items-center gap-0.5 min-[390px]:gap-1.5">
       {staff && (
         <Link href="/supplier/delivery" className="grid size-10 place-items-center rounded-full hover:bg-gray-100" aria-label={t("Кабинет поставщика")} title={t("Кабинет поставщика")}>
           <Building className="size-5" aria-hidden />

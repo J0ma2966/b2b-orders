@@ -191,7 +191,7 @@ export function BottomNavView({
               onClick={() => !on && tapHaptic()}
               aria-current={on ? "page" : undefined}
               className={cn(
-                "tab-item relative z-10 flex min-w-0 flex-col items-center gap-1 rounded-2xl pt-2 pb-1.5 text-[11px] leading-none",
+                "tab-item relative z-10 flex min-w-0 flex-col items-center gap-1 rounded-2xl pt-2 pb-1.5 text-[10px] leading-none min-[390px]:text-[11px]",
                 on ? (app ? "font-semibold text-on-brand" : "font-semibold text-brand-700") : "text-gray-500",
               )}
             >
@@ -203,7 +203,7 @@ export function BottomNavView({
                   </span>
                 )}
               </span>
-              <span className="max-w-full truncate px-0.5">{t(item.label)}</span>
+              <span className="max-w-full truncate px-0.5 tracking-[-0.01em]">{t(item.label)}</span>
             </Link>
           );
         })}

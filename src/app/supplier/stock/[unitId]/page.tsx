@@ -49,7 +49,7 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
         <ThresholdForm unitId={unit.id} current={unit.lowStockThreshold?.toString() ?? ""} />
       </Card>
       <Card className="overflow-x-auto p-0 sm:p-0">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="stack-table w-full text-sm sm:min-w-[720px]">
           <thead className="border-b border-gray-200 text-left text-xs text-gray-500">
             <tr>
               <th className="px-4 py-2 font-medium">{t("Когда")}</th>
@@ -64,13 +64,13 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
             {moves.map((m) => (
               <tr key={m.id} className="align-top">
                 <td className="px-4 py-2 whitespace-nowrap text-gray-500">{t.dateTime(m.createdAt)}</td>
-                <td className="px-4 py-2">{t(MOVEMENT_LABEL[m.type])}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{signed(m.physicalDelta)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{signed(m.reservedDelta)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">
+                <td data-label={t("Операция")} className="px-4 py-2">{t(MOVEMENT_LABEL[m.type])}</td>
+                <td data-label={t("Физ.")} className="px-4 py-2 text-right tabular-nums">{signed(m.physicalDelta)}</td>
+                <td data-label={t("Резерв")} className="px-4 py-2 text-right tabular-nums">{signed(m.reservedDelta)}</td>
+                <td data-label={t("Остаток после")} className="px-4 py-2 text-right tabular-nums">
                   {formatQty(m.physicalAfter)} / {formatQty(m.reservedAfter)}
                 </td>
-                <td className="px-4 py-2 text-xs">
+                <td data-label={t("Кто · основание")} className="px-4 py-2 text-xs">
                   {m.userId ? users.get(m.userId) : t("Система")}
                   {m.onBehalfOfUserId && <span className="text-yellow-700"> {t("(от имени {name})", { name: users.get(m.onBehalfOfUserId) })}</span>}
                   {m.reason && <div className="text-gray-500">{t(m.reason)}</div>}

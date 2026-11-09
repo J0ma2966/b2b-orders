@@ -1049,6 +1049,7 @@ const uz: Record<string, string> = {
   "Ферганская область": "Fargʻona viloyati",
   "Физ.": "Fiz.",
   "Физический": "Jismoniy",
+  "Фасовка": "Qadoqlash",
   "Физический {p} · резерв {r}": "Jismoniy {p} · band qilingan {r}",
   "Физический {p}, в резерве {r}": "Jismoniy {p}, band qilingan {r}",
   "Финансовые операции": "Moliyaviy operatsiyalar",
