@@ -48,3 +48,7 @@ next-env.d.ts
 
 # ключи push (npm run push:setup)
 /secrets/
+
+# Ключ подписи Android
+*.jks
+*.keystore

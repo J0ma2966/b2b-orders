@@ -48,17 +48,9 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 ### Android: подписанная сборка для Google Play
 
-1. Один раз создать ключ загрузки (хранить вне репозитория, потеря ключа = нельзя обновлять приложение без обращения в Google):
-   `keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000`
-2. `mobile/android/keystore.properties` (в .gitignore):
-   ```
-   storeFile=../upload.jks
-   storePassword=…
-   keyAlias=upload
-   keyPassword=…
-   ```
-3. `cd mobile/android && ./gradlew bundleRelease -PversionCode=2 -PversionName=1.0.1` → `app/build/outputs/bundle/release/app-release.aab`. `versionCode` увеличивать при каждой загрузке.
-4. В Play Console включить Play App Signing.
+В GitHub Actions: **Actions → Android release → Run workflow** — подписанный AAB для Play и APK того же выпуска. Ключ загрузки — в секретах репозитория. Ключ, секреты и всё, что заполнить в Play Console: [docs/google-play.md](google-play.md).
+
+На своём компьютере (нужен Android SDK): ключ из `scripts/android-upload-key.ps1`, файл `mobile/android/keystore.properties` (в .gitignore) со строками `storeFile`, `storePassword`, `keyAlias=upload`, `keyPassword`, затем `cd mobile/android && ./gradlew bundleRelease -PversionCode=2 -PversionName=1.0.1` → `app/build/outputs/bundle/release/app-release.aab`. `versionCode` увеличивать при каждой загрузке.
 
 ### iOS: сборка для App Store
 
@@ -132,12 +124,12 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 | Пункт | Статус |
 |---|---|
-| Target API | `targetSdkVersion 36` (Android 16), `minSdk 26` (Android 8.0, нужен сканеру QR) — выше требования Play (35 для новых приложений) |
+| Target API | `targetSdkVersion 36` (Android 16), `minSdk 26` (Android 8.0, нужен сканеру QR) — соответствует требованию Play на 2026 г. (36 с 31.08.2026) |
 | Формат | Android App Bundle (`bundleRelease`), Play App Signing |
 | Data safety | Те же типы данных, что в App Privacy: Personal info (Name, Phone, Address), Location (Approximate, Precise), Photos and videos, Financial info (Purchase history, Other), Device IDs. Данные шифруются при передаче — да; пользователь может запросить удаление — да, ссылка `https://<домен>/account-deletion` |
 | Разрешения | INTERNET, CAMERA, ACCESS_COARSE/FINE_LOCATION (только при использовании), POST_NOTIFICATIONS (Android 13+), VIBRATE (вибрация при считывании QR). Фоновой геолокации нет |
 | 16 КБ страницы памяти (обязательно для Android 15+) | В приложении нет собственных нативных .so-библиотек — требование выполняется |
-| Тестирование для новых личных аккаунтов разработчика | Для личного (не организации) аккаунта Play Console требует закрытое тестирование с 12+ тестировщиками 14 дней до публикации. Аккаунт организации (нужен D-U-N-S) этого не требует |
+| Тестирование для новых личных аккаунтов разработчика | Для личного (не организации) аккаунта Play Console требует закрытое тестирование с 12+ тестировщиками 14 дней до публикации. Аккаунт организации (нужен D-U-N-S) этого не требует. Порядок публикации — [docs/google-play.md](google-play.md) |
 
 ## Безопасность (OWASP MASVS 2, уровень L1)
 

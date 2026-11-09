@@ -1,0 +1,156 @@
+# Сборка Android для публикации в Google Play: подписанный AAB (его загружают в Play Console)
+# и подписанный APK того же выпуска (поставить на телефон и проверить перед загрузкой).
+# Запуск вручную: Actions → Android release → Run workflow. Пошагово: docs/google-play.md.
+#
+# Ключ загрузки (upload key) хранится только в секретах репозитория:
+#   ANDROID_UPLOAD_KEYSTORE           — файл upload.jks в base64 (scripts/android-upload-key.ps1 делает его и копирует)
+#   ANDROID_UPLOAD_KEYSTORE_PASSWORD  — пароль ключа
+#   ANDROID_UPLOAD_KEY_ALIAS          — необязательно, по умолчанию upload
+# Секреты берутся только при ручном запуске. На PR сборка проверяется с временным одноразовым ключом
+# (такой файл в Play не загрузить, артефакт не выкладывается).
+name: Android release
+
+on:
+  pull_request:
+    paths: ["mobile/android/**", "capacitor.config.ts", "package.json", "package-lock.json", "scripts/mobile-*", ".github/workflows/android-release.yml"]
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: "Версия, которую видят пользователи (например 1.0.0)"
+        required: true
+        default: "1.0.0"
+      versionCode:
+        description: "Номер сборки для Play (пусто — номер запуска этой сборки + 100). Каждая загрузка в Play должна быть больше прошлой"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PUBLISH: ${{ github.event_name == 'workflow_dispatch' }}
+      MOBILE_SERVER_URL: ${{ github.event_name == 'workflow_dispatch' && vars.MOBILE_SERVER_URL || 'https://app.example.uz' }}
+      VERSION_NAME: ${{ inputs.versionName || '1.0.0' }}
+      VERSION_CODE_INPUT: ${{ inputs.versionCode }}
+    steps:
+      - name: Проверка настроек
+        env:
+          KEYSTORE: ${{ github.event_name == 'workflow_dispatch' && secrets.ANDROID_UPLOAD_KEYSTORE || '' }}
+          KEYSTORE_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD || '' }}
+        run: |
+          fail=0
+          if [ "$PUBLISH" = true ] && { [ -z "$KEYSTORE" ] || [ -z "$KEYSTORE_PASSWORD" ]; }; then
+            echo "::error::Нет секретов ANDROID_UPLOAD_KEYSTORE и ANDROID_UPLOAD_KEYSTORE_PASSWORD (docs/google-play.md, шаг 2)"; fail=1
+          fi
+          case "$MOBILE_SERVER_URL" in
+            https://*) echo "Сервер приложения: $MOBILE_SERVER_URL" ;;
+            *) echo "::error::Переменная репозитория MOBILE_SERVER_URL должна быть адресом https:// боевого сервера"; fail=1 ;;
+          esac
+          if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::versionName должен быть вида 1.0.0"; fail=1
+          fi
+          if [ -n "$VERSION_CODE_INPUT" ] && ! printf '%s' "$VERSION_CODE_INPUT" | grep -Eq '^[1-9][0-9]{0,8}$'; then
+            echo "::error::versionCode — целое число от 1"; fail=1
+          fi
+          exit $fail
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Firebase для push
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+            node -e "const j=require('./mobile/android/app/google-services.json'); if(!j.client?.some(c=>c.client_info?.android_client_info?.package_name==='uz.b2borders.app')){console.error('В google-services.json нет приложения uz.b2borders.app');process.exit(1)}"
+            echo "Push через Firebase: включён"
+          else
+            echo "::warning::Секрет GOOGLE_SERVICES_JSON не задан — в этой сборке нет системных push (приложение работает)"
+          fi
+      - run: npm run mobile:sync -- android
+      - name: Ключ подписи
+        env:
+          KEYSTORE: ${{ github.event_name == 'workflow_dispatch' && secrets.ANDROID_UPLOAD_KEYSTORE || '' }}
+          KEYSTORE_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD || '' }}
+          KEY_ALIAS: ${{ github.event_name == 'workflow_dispatch' && secrets.ANDROID_UPLOAD_KEY_ALIAS || '' }}
+        run: |
+          alias="${KEY_ALIAS:-upload}"
+          if [ "$PUBLISH" = true ]; then
+            printf '%s' "$KEYSTORE" | tr -d '\r\n ' | base64 -d > "$RUNNER_TEMP/upload.jks"
+          else
+            # Проверка на PR: одноразовый ключ, только чтобы собрать и проверить подписанную сборку
+            export KEYSTORE_PASSWORD="pr-check-$RANDOM$RANDOM"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/upload.jks" -storetype PKCS12 -alias "$alias" -keyalg RSA -keysize 2048 \
+              -validity 30 -dname "CN=PR check" -storepass:env KEYSTORE_PASSWORD -keypass:env KEYSTORE_PASSWORD > /dev/null
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/upload.jks" -storepass:env KEYSTORE_PASSWORD -alias "$alias" > /dev/null; then
+            echo "::error::Ключ не открылся: проверьте ANDROID_UPLOAD_KEYSTORE (base64 файла целиком), пароль и псевдоним «$alias»"; exit 1
+          fi
+          {
+            echo "storeFile=$RUNNER_TEMP/upload.jks"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$alias"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+          } > mobile/android/keystore.properties
+          echo "Отпечаток ключа загрузки (SHA-256) — сверить в Play Console → Целостность приложения:"
+          keytool -list -v -keystore "$RUNNER_TEMP/upload.jks" -storepass:env KEYSTORE_PASSWORD -alias "$alias" | grep -E 'SHA256:'
+      - name: Сборка AAB и APK
+        working-directory: mobile/android
+        run: |
+          code="${VERSION_CODE_INPUT:-$(( ${{ github.run_number }} + 100 ))}"
+          echo "versionName=$VERSION_NAME versionCode=$code"
+          echo "VERSION_CODE=$code" >> "$GITHUB_ENV"
+          ./gradlew --no-daemon bundleRelease assembleRelease lintRelease -PversionCode="$code" -PversionName="$VERSION_NAME"
+      - name: Проверка сборки
+        run: |
+          set -e
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n1)"
+          AAB=mobile/android/app/build/outputs/bundle/release/app-release.aab
+          APK=mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -f "$AAB" && test -f "$APK"
+          # Подпись: AAB — ключом загрузки, APK — тем же ключом (v2+)
+          jarsigner -verify "$AAB" | grep -q "jar verified"
+          "$BT/apksigner" verify --min-sdk-version 26 "$APK"
+          # Что увидит Play: пакет, версия, target SDK, не отладочная сборка, адрес сервера
+          badging=$("$BT/aapt2" dump badging "$APK")
+          echo "$badging" | grep -E "^(package|targetSdkVersion|sdkVersion|application-label):"
+          echo "$badging" | grep -q "package: name='uz.b2borders.app' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'"
+          echo "$badging" | grep -q "targetSdkVersion:'36'"
+          if echo "$badging" | grep -q "application-debuggable"; then echo "::error::Сборка отладочная"; exit 1; fi
+          echo "Разрешения в приложении (для анкеты Data safety):"
+          "$BT/aapt2" dump permissions "$APK" | grep -E "uses-permission" || true
+          unzip -p "$APK" assets/capacitor.config.json | grep -q "\"url\": *\"$MOBILE_SERVER_URL" || { echo "::error::В приложении не тот адрес сервера"; exit 1; }
+          mkdir -p release
+          cp "$AAB" "release/b2b-orders-$VERSION_NAME-$VERSION_CODE.aab"
+          cp "$APK" "release/b2b-orders-$VERSION_NAME-$VERSION_CODE.apk"
+          ls -l release
+      - name: Удалить ключ с машины сборки
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks" mobile/android/keystore.properties
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: android-release-${{ inputs.versionName }}-${{ env.VERSION_CODE }}
+          path: release/*
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-release-lint
+          path: mobile/android/app/build/reports/lint-results-release.html
+          retention-days: 14
