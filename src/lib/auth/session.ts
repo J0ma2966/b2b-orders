@@ -29,7 +29,7 @@ export async function requestMeta() {
 
 export async function createSession(
   userId: string,
-  context: { activeSupplierId?: string; activeShopId?: string } = {},
+  context: { activeSupplierId?: string; activeShopId?: string; passwordResetUntil?: Date } = {},
 ) {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
@@ -81,4 +81,9 @@ export async function destroySession() {
 
 export async function destroyAllUserSessions(userId: string) {
   await db.session.deleteMany({ where: { userId } });
+}
+
+// После входа по одноразовому коду («Забыли пароль?») новый пароль задают без старого — недолго
+export function canResetWithoutCurrent(session: { passwordResetUntil: Date | null }) {
+  return !!session.passwordResetUntil && session.passwordResetUntil > new Date();
 }

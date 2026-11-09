@@ -14,6 +14,7 @@
     "db:seed": "prisma db seed",
     "postinstall": "prisma generate",
     "push:setup": "node scripts/push-setup.mjs",
+    "telegram:login": "node scripts/telegram-login.mjs",
     "mobile:sync": "node scripts/mobile-prepare.mjs && cap sync",
     "mobile:android": "npm run mobile:sync -- android && cap open android",
     "mobile:ios": "npm run mobile:sync -- ios && cap open ios"
