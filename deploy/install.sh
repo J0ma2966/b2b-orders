@@ -161,21 +161,10 @@ ok "сборка готова"
 
 say "Служба systemd"
 install -m 644 "$APP_DIR/deploy/b2b-orders.service" /etc/systemd/system/b2b-orders.service
-install -m 644 "$APP_DIR/deploy/b2b-orders-backup.service" /etc/systemd/system/b2b-orders-backup.service
-for u in b2b-orders-backup b2b-orders-monitor b2b-orders-daily; do
-  install -m 644 "$APP_DIR/deploy/$u.service" "/etc/systemd/system/$u.service"
-  install -m 644 "$APP_DIR/deploy/$u.timer" "/etc/systemd/system/$u.timer"
-done
-install -m 755 "$APP_DIR/deploy/backup.sh" /usr/local/sbin/b2b-backup
-install -m 755 "$APP_DIR/deploy/update.sh" /usr/local/sbin/b2b-update
-install -m 755 "$APP_DIR/deploy/set-domain.sh" /usr/local/sbin/b2b-set-domain
-install -m 755 "$APP_DIR/deploy/notify.sh" /usr/local/sbin/b2b-notify
-install -m 755 "$APP_DIR/deploy/monitor.sh" /usr/local/sbin/b2b-monitor
-install -m 755 "$APP_DIR/deploy/telegram.sh" /usr/local/sbin/b2b-telegram
-install -m 755 "$APP_DIR/deploy/set-admin-phone.sh" /usr/local/sbin/b2b-set-admin-phone
-systemctl daemon-reload
-# Проверки и сводка работают и без Telegram (тогда просто молчат), а после sudo b2b-telegram setup пишут в канал
-systemctl enable --now b2b-orders.service b2b-orders-backup.timer b2b-orders-monitor.timer b2b-orders-daily.timer
+# Команды b2b-* и таймеры (копии, проверки, сводка). Проверки и сводка работают и без Telegram
+# (тогда просто молчат), а после sudo b2b-telegram setup пишут в канал
+bash "$APP_DIR/deploy/install-commands.sh"
+systemctl enable --now b2b-orders.service
 systemctl restart b2b-orders.service
 for _ in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null "http://127.0.0.1:$PORT/login" || die "приложение не отвечает: journalctl -u b2b-orders -n 50"
