@@ -12,6 +12,7 @@ import { getT } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "./language-switcher";
 import { BottomNav, BottomNavView, TabNav, TabNavView, type NavItem } from "./nav-links";
 import { ImpersonationBanner } from "./user-menu";
+import { NavPendingOverlay, NavProgressBar } from "./nav-progress";
 import { navForRole, SHOP_NAV_HIDE_ON } from "./shop-nav";
 import { shopBadges } from "@/lib/nav-badges";
 
@@ -20,6 +21,7 @@ import { shopBadges } from "@/lib/nav-badges";
 export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobileNav: NavItem[]; children: ReactNode }) {
   return (
     <div data-theme="shop" className="flex min-h-full flex-1 flex-col bg-page font-sans text-ink">
+      <NavProgressBar />
       <Suspense>
         <ImpersonationBanner />
       </Suspense>
@@ -52,8 +54,9 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-32 md:pt-5 md:pb-10">
+      <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-32 md:pt-5 md:pb-10">
         <Suspense fallback={<Spinner />}>{children}</Suspense>
+        <NavPendingOverlay />
       </main>
       <Suspense fallback={<BottomNavView items={mobileNav} root="/shop" tone="dark" hideOn={SHOP_NAV_HIDE_ON} />}>
         <ShopBottomNav items={mobileNav} nav={nav} />
