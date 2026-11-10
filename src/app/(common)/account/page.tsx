@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Button, Card, DefinitionList, PageHeader } from "@/components/ui";
+import { Button, ButtonLink, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { logoutAction } from "@/app/(auth)/actions";
-import { requireAuth } from "@/lib/auth/current";
+import { getShopContext, homePathFor, requireAuth } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { formatPhone } from "@/lib/phone";
 import { PasswordForm } from "./password-form";
@@ -20,6 +20,9 @@ export default async function AccountPage() {
     db.deviceToken.count({ where: { userId: auth.realUser.id } }),
   ]);
   const devices = web + apps;
+  // У магазина данные точки правятся здесь, в «Настройках», а не на странице профиля (защита от случайных правок)
+  const shopCtx = (await homePathFor(auth)) === "/shop" ? await getShopContext() : null;
+  const shop = shopCtx?.shop;
   return (
     <>
       <PageHeader title="Мой профиль" />
@@ -33,6 +36,26 @@ export default async function AccountPage() {
             ]}
           />
         </Card>
+        {shop && (
+          <Card>
+            <h2 className="mb-3 font-semibold">{t("Данные магазина")}</h2>
+            <DefinitionList
+              items={[
+                ["Название", shop.name],
+                ["ИНН", shop.inn || "—"],
+                ["Контактное лицо", shop.contactName],
+                ["Основной телефон", formatPhone(shop.phone)],
+                ["Запасной телефон", shop.phone2 ? formatPhone(shop.phone2) : "—"],
+                ["Адрес", shop.address],
+              ]}
+            />
+            {shopCtx.membership.role === "OWNER" ? (
+              <ButtonLink href="/shop/profile/edit" variant="secondary" className="mt-4">Изменить данные магазина</ButtonLink>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">{t("Изменить профиль может только владелец магазина")}</p>
+            )}
+          </Card>
+        )}
         {!auth.isImpersonating && (
           <Card>
             <h2 className="mb-3 font-semibold">{t("Уведомления")}</h2>

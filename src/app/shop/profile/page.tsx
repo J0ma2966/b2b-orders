@@ -6,15 +6,13 @@ import { initials } from "@/components/shop/ui";
 import { logoutAction } from "@/app/(auth)/actions";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
-import { getTerritoryOptions } from "@/lib/territory";
-import { fileUrl } from "@/lib/storage-url";
 import { formatPhone } from "@/lib/phone";
-import { ShopProfileForm } from "./form";
 import { getT } from "@/lib/i18n/server";
 import { unreadBySection } from "@/lib/nav-badges";
 import { SHOP_NAV } from "@/components/shell/shop-nav";
 
-// Профиль магазина в стиле макета: лаймовая шапка, язык, меню разделов, выход, ниже — данные магазина.
+// Профиль магазина в стиле макета: лаймовая шапка, язык, меню разделов, выход. Данные магазина
+// редактируются только в «Настройках» (/shop/profile/edit), чтобы не изменить их случайно.
 // Кружок у пункта — непрочитанные уведомления раздела (их сумма — на «Профиле» в нижней панели).
 export default async function ShopProfilePage() {
   const t = await getT();
@@ -22,8 +20,7 @@ export default async function ShopProfilePage() {
   const s = ctx.shop;
   const owner = ctx.membership.role === "OWNER";
   const points = ctx.memberships.length;
-  const [territories, territory, suppliers, unreadTotal, unread] = await Promise.all([
-    getTerritoryOptions(),
+  const [territory, suppliers, unreadTotal, unread] = await Promise.all([
     db.territory.findUnique({ where: { id: s.territoryId }, select: { name: true } }),
     db.shopAccount.count({ where: { shopId: s.id } }),
     db.notification.count({ where: { userId: ctx.auth.user.id, readAt: null } }),
@@ -43,7 +40,7 @@ export default async function ShopProfilePage() {
     { href: "/shop/replacements", icon: Repeat2, tile: "bg-tile-mint", title: t("Замены"), badge: unread["/shop/replacements"] },
     { href: "/shop/team", icon: Users, tile: "bg-tile-violet", title: t("Сотрудники"), show: owner, badge: unread["/shop/team"] },
     { href: "/shop/documents", icon: FileText, tile: "bg-tile-peach", title: t("Документы"), badge: unread["/shop/documents"] },
-    { href: "/account", icon: Settings, tile: "bg-page", title: t("Настройки"), sub: t("Пароль, push-уведомления") },
+    { href: "/account", icon: Settings, tile: "bg-page", title: t("Настройки"), sub: t(owner ? "Данные магазина, пароль, push" : "Пароль, push-уведомления") },
   ];
 
   return (
@@ -62,9 +59,9 @@ export default async function ShopProfilePage() {
             </span>
           </span>
           {owner && (
-            <a href="#shop-form" aria-label={t("Изменить профиль")} className="grid size-14 shrink-0 place-items-center rounded-full bg-night text-lime">
+            <Link href="/shop/profile/edit" aria-label={t("Изменить профиль")} className="grid size-14 shrink-0 place-items-center rounded-full bg-night text-lime">
               <Pencil className="size-5" strokeWidth={2.2} aria-hidden />
-            </a>
+            </Link>
           )}
         </div>
       </section>
@@ -99,38 +96,6 @@ export default async function ShopProfilePage() {
         <button className="w-full rounded-[1.5rem] bg-coral-soft py-4 font-bold text-red-900">{t("Выйти")}</button>
       </form>
 
-      <section id="shop-form" className="scroll-mt-6 rounded-[1.75rem] bg-surface p-4 sm:p-6">
-        <h2 className="mb-4 font-display text-xl font-bold">{t("Данные магазина")}</h2>
-        {s.photoPaths.length > 0 && (
-          <div className="mb-4 flex gap-2 overflow-x-auto">
-            {s.photoPaths.map((p) => (
-              <img key={p} src={fileUrl(p)!} alt="" className="h-24 rounded-2xl object-cover" />
-            ))}
-          </div>
-        )}
-        {!owner ? (
-          <div className="space-y-1 text-sm">
-            <p className="font-medium">{s.name}</p>
-            <p className="text-gray-600">{s.address}</p>
-            <p className="pt-2 text-gray-500">{t("Изменить профиль может только владелец магазина")}</p>
-          </div>
-        ) : (
-          <ShopProfileForm
-            territories={territories}
-            defaults={{
-              name: s.name,
-              inn: s.inn ?? "",
-              shopPhone: s.phone,
-              phone2: s.phone2 ?? "",
-              contactName: s.contactName,
-              address: s.address,
-              territoryId: s.territoryId,
-              lat: String(s.lat),
-              lng: String(s.lng),
-            }}
-          />
-        )}
-      </section>
     </div>
   );
 }
