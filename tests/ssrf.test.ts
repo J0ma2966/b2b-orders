@@ -38,3 +38,25 @@ describe("SSRF: адрес push-подписки", () => {
     expect(parsePushEndpoint("not-a-url").ok).toBe(false);
   });
 });
+
+// Повторный аудит 2026-11-10: URL приводит «[::ffff:127.0.0.1]» к «[::ffff:7f00:1]», и прежняя
+// проверка по тексту такой адрес пропускала — запрос уходил на 127.0.0.1.
+describe("SSRF: IPv4 внутри IPv6", () => {
+  it("закрывает IPv4-mapped в шестнадцатеричной записи и другие обёртки", () => {
+    for (const ip of ["::ffff:7f00:1", "::ffff:a9fe:a9fe", "0:0:0:0:0:ffff:c0a8:1", "::7f00:1", "64:ff9b::7f00:1", "2002:7f00:1::1", "fec0::1", "ff02::1", "febf::1", "::ffff:0:7f00:1", "1:2:3"]) {
+      expect(isBlockedIp(ip), ip).toBe(true);
+    }
+  });
+  it("публичные IPv6 по-прежнему проходят", () => {
+    for (const ip of ["2a00:1450:4001:81b::200e", "2606:4700:4700::1111", "::ffff:808:808", "64:ff9b::808:808"]) {
+      expect(isBlockedIp(ip), ip).toBe(false);
+    }
+  });
+  it("адрес подписки с такими хостами отклоняется", () => {
+    for (const u of ["https://[::ffff:127.0.0.1]:5432/x", "https://[::ffff:169.254.169.254]/", "https://[::127.0.0.1]/", "https://[64:ff9b::7f00:1]/", "https://[fec0::1]/", "https://localhost./x"]) {
+      expect(parsePushEndpoint(u).ok, u).toBe(false);
+    }
+    expect(parsePushEndpoint("https://[2a00:1450:4001:81b::200e]/x").ok).toBe(true);
+  });
+});
+

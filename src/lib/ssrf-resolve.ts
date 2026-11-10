@@ -1,5 +1,8 @@
 import "server-only";
+import { lookup as dnsLookup, type LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
+import { Agent } from "node:https";
+import type { LookupFunction } from "node:net";
 import { isBlockedIp, parsePushEndpoint } from "./ssrf";
 
 // Полная проверка адреса push-подписки перед тем, как сервер сам к нему обратится:
@@ -20,3 +23,21 @@ export async function pushEndpointIsSafe(endpoint: string): Promise<boolean> {
     return false;
   }
 }
+
+// Проверка выше и само соединение резолвят имя по отдельности: между ними DNS может ответить
+// по-другому (сначала публичный адрес, затем 127.0.0.1 — «DNS rebinding»). Поэтому соединение
+// push идёт через агент, который проверяет именно тот адрес, к которому подключается.
+// IP-литералы сюда не попадают (резолвить нечего) — они проверены в parsePushEndpoint.
+export const guardedLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, options, (err, address, family) => {
+    if (err) return callback(err, address, family);
+    const list: LookupAddress[] = Array.isArray(address) ? address : [{ address, family: family ?? 4 }];
+    if (list.length === 0 || list.some((a) => isBlockedIp(a.address))) {
+      const blocked = Object.assign(new Error(`push endpoint ${hostname} resolves to a non-public address`), { code: "ESSRFBLOCKED" });
+      return callback(blocked, address, family);
+    }
+    callback(null, address, family);
+  });
+};
+
+export const pushAgent = new Agent({ lookup: guardedLookup });

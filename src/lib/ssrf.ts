@@ -34,23 +34,50 @@ export function isBlockedIpv4(host: string): boolean {
   );
 }
 
-// Нормализуем IPv6: убираем зону («%eth0»), приводим к нижнему регистру
-function normalizeIpv6(host: string): string {
-  return host.replace(/%.*$/, "").toLowerCase();
+// IPv6 в любой записи («::1», «::ffff:127.0.0.1», «::ffff:7f00:1», «fe80::1%eth0») → 8 групп по 16 бит.
+// null — это не IPv6-адрес.
+export function ipv6Groups(host: string): number[] | null {
+  let h = host.replace(/^\[|\]$/g, "").replace(/%.*$/, "").toLowerCase();
+  if (!h.includes(":")) return null;
+  // Хвост в виде IPv4 («::ffff:1.2.3.4») — это последние две группы
+  const tail = /^(.*:)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(h);
+  if (tail) {
+    const o = ipv4Octets(tail[2]);
+    if (!o) return null;
+    h = `${tail[1]}${((o[0] << 8) | o[1]).toString(16)}:${((o[2] << 8) | o[3]).toString(16)}`;
+  }
+  const halves = h.split("::");
+  if (halves.length > 2) return null;
+  const part = (p: string) => (p === "" ? [] : p.split(":"));
+  const head = part(halves[0]);
+  const rest = halves.length === 2 ? part(halves[1]) : [];
+  if ([...head, ...rest].some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return null;
+  return [...head, ...Array(halves.length === 2 ? missing : 0).fill("0"), ...rest].map((g) => parseInt(g, 16));
 }
 
-// Закрытый IPv6: ::1 loopback, ::, fe80::/10 link-local, fc00::/7 unique-local,
-// а также IPv4-mapped (::ffff:a.b.c.d) с закрытым IPv4 внутри
+// Закрытый IPv6: ::1 loopback, ::, fe80::/10 link-local, fec0::/10 site-local, fc00::/7 unique-local,
+// ff00::/8 multicast, а также адреса, внутри которых лежит IPv4: ::ffff:a.b.c.d (IPv4-mapped),
+// ::a.b.c.d, 64:ff9b::/96 (NAT64), 2002::/16 (6to4) — у них проверяется вложенный IPv4.
+// URL приводит «[::ffff:127.0.0.1]» к виду «[::ffff:7f00:1]», поэтому сравнивать текст нельзя —
+// только разобранные группы: иначе такой адрес проходил проверку и вёл на 127.0.0.1.
+// Строка с двоеточием, которую не удалось разобрать как IPv6, считается закрытой.
 export function isBlockedIpv6(host: string): boolean {
-  const h = normalizeIpv6(host);
-  if (!h.includes(":")) return false;
-  if (h === "::1" || h === "::") return true;
-  // ::ffff:a.b.c.d и ::a.b.c.d — туннель к IPv4, проверяем вложенный IPv4
-  const mapped = /(?:^|:)((?:\d{1,3}\.){3}\d{1,3})$/.exec(h);
-  if (mapped) return isBlockedIpv4(mapped[1]);
-  const first = h.split(":")[0];
-  if (first.startsWith("fe8") || first.startsWith("fe9") || first.startsWith("fea") || first.startsWith("feb")) return true; // fe80::/10
-  if (first.startsWith("fc") || first.startsWith("fd")) return true; // fc00::/7
+  if (!host.includes(":")) return false;
+  const g = ipv6Groups(host);
+  if (!g) return true;
+  const v4 = (hi: number, lo: number) => isBlockedIpv4(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  const zero = (from: number, to: number) => g.slice(from, to).every((x) => x === 0);
+  if (zero(0, 7) && (g[7] === 0 || g[7] === 1)) return true; // :: и ::1
+  if (zero(0, 5) && g[5] === 0xffff) return v4(g[6], g[7]); // ::ffff:a.b.c.d
+  if (zero(0, 4) && g[4] === 0xffff && g[5] === 0) return v4(g[6], g[7]); // ::ffff:0:a.b.c.d
+  if (zero(0, 6)) return true; // ::a.b.c.d — устаревшая запись IPv4, наружу не ведёт
+  if (g[0] === 0x64 && g[1] === 0xff9b && zero(2, 6)) return v4(g[6], g[7]); // NAT64
+  if (g[0] === 0x2002) return v4(g[1], g[2]); // 6to4
+  if ((g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0) return true; // link-local, site-local
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // unique-local
+  if ((g[0] & 0xff00) === 0xff00) return true; // multicast
   return false;
 }
 
@@ -62,7 +89,8 @@ export function isBlockedIp(host: string): boolean {
 // Явно опасное имя хоста без резолвинга DNS: localhost, IP-литерал из закрытого диапазона.
 // Публичное доменное имя тут проходит — его адрес проверяется уже после резолвинга (ssrf-resolve.ts).
 export function isBlockedHostname(hostname: string): boolean {
-  const name = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  // Точка в конце («localhost.») — то же имя
+  const name = hostname.replace(/^\[|\]$/g, "").toLowerCase().replace(/\.$/, "");
   if (!name) return true;
   if (name === "localhost" || name.endsWith(".localhost") || name.endsWith(".local")) return true;
   return isBlockedIp(name);

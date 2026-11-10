@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
-import type { CodeChannel } from "@/generated/prisma/client";
+import { Prisma, type CodeChannel } from "@/generated/prisma/client";
+import { isTxTimeout } from "@/lib/auth/login-attempts";
 import { formatPhone } from "@/lib/phone";
 import { parseLocale, translate, type Locale } from "@/lib/i18n/core";
 import {
@@ -39,32 +40,46 @@ export async function requestLoginCode(phone: string, channel: CodeChannel, ip: 
 
   const now = Date.now();
   const since = new Date(now - LIMIT_WINDOW_MS);
-  const [last, perPhone, perIp] = await Promise.all([
-    db.loginCode.findFirst({ where: { phone, purpose: "LOGIN" }, orderBy: { createdAt: "desc" } }),
-    db.loginCode.count({ where: { phone, purpose: "LOGIN", createdAt: { gte: since } } }),
-    ip ? db.loginCode.count({ where: { ip, createdAt: { gte: since } } }) : 0,
-  ]);
-  if (last && now - last.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-    const retryInSec = Math.ceil((RESEND_COOLDOWN_MS - (now - last.createdAt.getTime())) / 1000);
-    return { ok: false, error: "Новый код можно запросить через {n} сек.", retryInSec };
-  }
-  if (perPhone >= MAX_CODES_PER_PHONE || perIp >= MAX_CODES_PER_IP) {
-    return { ok: false, error: "Слишком много запросов кода. Попробуйте через час." };
-  }
-
   const found = await db.user.findUnique({ where: { phone } });
   const user = found?.status === "ACTIVE" ? found : null;
   const viaBot = channel === "TELEGRAM" && channels.telegram === "bot";
-  const record = await db.loginCode.create({
-    data: {
-      phone,
-      userId: user?.id,
-      channel,
-      ip,
-      linkToken: viaBot ? generateLinkToken() : null,
-      expiresAt: new Date(now + (viaBot ? LINK_TTL_MS : CODE_TTL_MS)),
-    },
-  });
+
+  // Подсчёт лимитов и создание записи — под блокировкой на адрес и на номер. Без неё залп
+  // одновременных запросов проходил проверку «не чаще раза в минуту, не больше 5 в час»
+  // раньше, чем появлялась первая запись, и на номер уходили десятки SMS сразу.
+  const reserved = await db
+    .$transaction(async (tx): Promise<RequestResult | { record: { id: string; linkToken: string | null } }> => {
+      if (ip) await tx.$executeRaw`SELECT pg_advisory_xact_lock(1, hashtext(${ip}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(2, hashtext(${phone}))`;
+      const last = await tx.loginCode.findFirst({ where: { phone, purpose: "LOGIN" }, orderBy: { createdAt: "desc" } });
+      const perPhone = await tx.loginCode.count({ where: { phone, purpose: "LOGIN", createdAt: { gte: since } } });
+      const perIp = ip ? await tx.loginCode.count({ where: { ip, createdAt: { gte: since } } }) : 0;
+      if (last && now - last.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+        const retryInSec = Math.ceil((RESEND_COOLDOWN_MS - (now - last.createdAt.getTime())) / 1000);
+        return { ok: false, error: "Новый код можно запросить через {n} сек.", retryInSec };
+      }
+      if (perPhone >= MAX_CODES_PER_PHONE || perIp >= MAX_CODES_PER_IP) {
+        return { ok: false, error: "Слишком много запросов кода. Попробуйте через час." };
+      }
+      const record = await tx.loginCode.create({
+        data: {
+          phone,
+          userId: user?.id,
+          channel,
+          ip,
+          linkToken: viaBot ? generateLinkToken() : null,
+          expiresAt: new Date(now + (viaBot ? LINK_TTL_MS : CODE_TTL_MS)),
+        },
+      });
+      return { record };
+    })
+    .catch((e): RequestResult => {
+      // Поток запросов на один номер: очередь на блокировку не дождалась — это тоже отказ
+      if (isTxTimeout(e)) return { ok: false, error: "Слишком много запросов кода. Попробуйте через час." };
+      throw e;
+    });
+  if (!("record" in reserved)) return reserved;
+  const { record } = reserved;
 
   try {
     if (viaBot) {
@@ -104,11 +119,17 @@ export async function verifyLoginCode(phone: string, code: string) {
     orderBy: { createdAt: "desc" },
     take: 5,
   });
-  const hit = candidates.find((c) => codeMatches(c.id, code, c.codeHash!));
-  if (!hit) {
-    if (candidates.length) await db.loginCode.updateMany({ where: { id: { in: candidates.map((c) => c.id) } }, data: { attempts: { increment: 1 } } });
-    return null;
-  }
+  if (candidates.length === 0) return null;
+  // Сначала списываем попытку, потом сравниваем — и только с теми кодами, у которых попытка
+  // ещё оставалась. Иначе залп одновременных запросов успевал прочитать «попыток меньше пяти»
+  // раньше, чем счётчик вырастет, и перебирал сотни вариантов одного кода.
+  const live = await db.$queryRaw<{ id: string }[]>`
+    UPDATE "LoginCode" SET attempts = attempts + 1
+    WHERE id IN (${Prisma.join(candidates.map((c) => c.id))}) AND attempts < ${MAX_ATTEMPTS_PER_CODE} AND "usedAt" IS NULL
+    RETURNING id`;
+  const allowed = new Set(live.map((r) => r.id));
+  const hit = candidates.find((c) => allowed.has(c.id) && codeMatches(c.id, code, c.codeHash!));
+  if (!hit) return null;
   // Условное обновление: один код — один вход, даже при двух одновременных отправках формы
   const used = await db.loginCode.updateMany({ where: { id: hit.id, usedAt: null }, data: { usedAt: new Date() } });
   if (used.count !== 1) return null;

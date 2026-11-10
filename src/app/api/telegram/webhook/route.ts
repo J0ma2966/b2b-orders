@@ -1,13 +1,13 @@
-import { timingSafeEqual } from "node:crypto";
 import { handleTelegramUpdate } from "@/lib/login-code";
 import type { TgUpdate } from "@/lib/login-code-core";
+import { secretMatches } from "@/lib/secret-compare";
 
 // Вебхук бота входа. Telegram присылает секрет, заданный при setWebhook (npm run telegram:login),
 // в заголовке X-Telegram-Bot-Api-Secret-Token — без него запрос отклоняется.
 export async function POST(req: Request) {
   const secret = process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET ?? "";
   const got = req.headers.get("x-telegram-bot-api-secret-token") ?? "";
-  if (!secret || !process.env.TELEGRAM_LOGIN_BOT_TOKEN || got.length !== secret.length || !timingSafeEqual(Buffer.from(got), Buffer.from(secret))) {
+  if (!process.env.TELEGRAM_LOGIN_BOT_TOKEN || !secretMatches(got, secret)) {
     return new Response("Forbidden", { status: 403 });
   }
   let update: TgUpdate;

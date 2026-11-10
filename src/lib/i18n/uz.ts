@@ -1525,6 +1525,7 @@ const uz: Record<string, string> = {
   "Замена №{0} зачтена в баланс: {1} — {2} {3}": "№{0} almashtirish balansga hisoblandi: {1} — {2} {3}",
   "Замена №{0} зачтена в баланс на {1}": "№{0} almashtirish balansga {1} ga hisoblandi",
   "Этот телефон уже работает у поставщика": "Bu telefon allaqachon yetkazib beruvchida ishlaydi",
+  "Этот телефон уже зарегистрирован как магазин": "Bu telefon allaqachon doʻkon sifatida roʻyxatdan oʻtgan",
   "Вас добавили сотрудником магазина «{0}»": "Sizni «{0}» doʻkoniga xodim sifatida qoʻshishdi",
   "Сотрудник не найден": "Xodim topilmadi",
   "{0} просит оформить заказ {1}": "{0} {1} buyurtmasini rasmiylashtirishni soʻrayapti",

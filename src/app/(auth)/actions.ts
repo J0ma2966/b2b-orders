@@ -9,10 +9,7 @@ import { canResetWithoutCurrent, createSession, destroySession, requestMeta } fr
 import { homePathFor, requireAuth } from "@/lib/auth/current";
 import { syncLocaleOnLogin } from "@/lib/i18n/server";
 import { formValues, invalid, parseForm, type FormState } from "@/lib/forms";
-
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILS_PER_PHONE = 5;
-const MAX_FAILS_PER_IP = 30;
+import { finishLoginAttempt, reserveLoginAttempt } from "@/lib/auth/login-attempts";
 
 const loginSchema = z.object({
   phone: z.string().trim().min(1, "Введите телефон"),
@@ -27,18 +24,13 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   if (!phone) return { fieldErrors: { phone: ["Телефон в формате +998 90 123-45-67"] }, values };
 
   const { ip } = await requestMeta();
-  const since = new Date(Date.now() - WINDOW_MS);
-  const [phoneFails, ipFails] = await Promise.all([
-    db.loginAttempt.count({ where: { phone, success: false, createdAt: { gte: since } } }),
-    ip ? db.loginAttempt.count({ where: { ip, success: false, createdAt: { gte: since } } }) : 0,
-  ]);
-  if (phoneFails >= MAX_FAILS_PER_PHONE || ipFails >= MAX_FAILS_PER_IP) {
-    return { error: "Слишком много неудачных попыток. Попробуйте через 15 минут.", values };
-  }
+  // Попытка записывается до проверки пароля: одновременные запросы лимит не обходят
+  const attemptId = await reserveLoginAttempt(phone, ip);
+  if (!attemptId) return { error: "Слишком много неудачных попыток. Попробуйте через 15 минут.", values };
 
   const user = await db.user.findUnique({ where: { phone } });
   const ok = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
-  await db.loginAttempt.create({ data: { phone, ip, success: ok && user?.status === "ACTIVE" } });
+  await finishLoginAttempt(attemptId, ok && user?.status === "ACTIVE");
   if (!user || !ok) return { error: "Неверный телефон или пароль", values };
   if (user.status !== "ACTIVE") return { error: "Учётная запись заблокирована. Обратитесь к администратору.", values };
 

@@ -222,6 +222,11 @@ export async function addMemberAction(_prev: FormState, formData: FormData): Pro
   if (user) {
     const existing = await db.supplierMember.findUnique({ where: { supplierId_userId: { supplierId: ctx.supplier.id, userId: user.id } } });
     if (existing) return { fieldErrors: { phone: ["Этот пользователь уже в команде"] }, values: formValues(formData) };
+    // Чужого владельца или сотрудника магазина в команду не добавить: согласия он не давал, а после
+    // входа попадал бы в кабинет этого поставщика вместо своего магазина (то же правило, что в shop-team.ts)
+    if (await db.shopMember.count({ where: { userId: user.id, isActive: true } })) {
+      return { fieldErrors: { phone: ["Этот телефон уже зарегистрирован как магазин"] }, values: formValues(formData) };
+    }
   } else {
     tempPassword = generateTempPassword();
     user = await db.user.create({ data: { phone, fullName, passwordHash: await hashPassword(tempPassword), mustChangePassword: true } });
