@@ -49,7 +49,7 @@ const config: CapacitorConfig = {
     // Android 15+ рисует приложение от края до края; Capacitor сам отодвигает WebView от системных панелей,
     // пока на странице нет viewport-fit=cover
     SystemBars: { insetsHandling: "css" },
-    SplashScreen: { launchShowDuration: 1500, launchAutoHide: true, backgroundColor: "#1f5ad6", showSpinner: false },
+    SplashScreen: { launchShowDuration: 1500, launchAutoHide: true, backgroundColor: "#5B3FD6", showSpinner: false },
     PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
   },
 };
