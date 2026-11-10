@@ -49,8 +49,18 @@ OLD="$(grep -oP '^APP_DOMAIN="?\K[^"]*' "$APP_DIR/.env" || true)"
 
 command -v certbot >/dev/null || apt-get install -y -q certbot python3-certbot-nginx
 
-# Основной сайт: шаблон deploy/nginx.conf, имена домена (и www). Прежний файл — в запас:
-# если сертификат не выдадут, вернём всё как было и сайт продолжит работать по старому адресу.
+# 1. Сертификат. Настройки сайта пока не трогаем: на время проверки Let's Encrypt certbot сам добавляет
+#    в nginx ответ на неё и убирает его. Если сертификат уже есть (повторный запуск), certbot его оставит.
+#    Свою переадресацию certbot не ставит: её и HTTPS пишем ниже сами (certbot --redirect спотыкается о www).
+if [ -n "$EMAIL" ]; then CERT_MAIL=(-m "$EMAIL"); else CERT_MAIL=(--register-unsafely-without-email); fi
+certbot certonly --nginx --cert-name "$DOMAIN" -d "$DOMAIN" ${WWW:+-d "$WWW"} --non-interactive --agree-tos "${CERT_MAIL[@]}" \
+  --deploy-hook "systemctl reload nginx" \
+  || { echo "! Сертификат для $DOMAIN не выдан (выше причина от Let's Encrypt). Ничего не менял, сайт работает по старому адресу." >&2; exit 1; }
+LIVE="$LE_DIR/live/$DOMAIN"
+[ -s "$LIVE/fullchain.pem" ] || { echo "! Не нашёл сертификат в $LIVE. Ничего не менял, сайт работает по старому адресу." >&2; exit 1; }
+
+# 2. Настройки сайта: http → https://домен; https://домен — приложение (шаблон deploy/nginx.conf);
+#    https://www → https://домен. Прежний файл — в запас: если nginx не примет новый, вернём старый.
 CONF="$NGINX_DIR/sites-available/b2b-orders"
 cp -a "$CONF" "$CONF.bak" 2>/dev/null || true
 restore() {
@@ -59,26 +69,45 @@ restore() {
   nginx -t >/dev/null 2>&1 && systemctl reload nginx
   exit 1
 }
-sed "s/__SERVER_NAME__/$DOMAIN${WWW:+ $WWW}/g; s/__PORT__/3000/g" "$APP_DIR/deploy/nginx.conf" > "$CONF.new"
-[ -e /proc/net/if_inet6 ] || sed -i '/listen \[::\]:80;/d' "$CONF.new"
-if [ -n "$WWW" ]; then
-  # www → основной адрес; проверки Let's Encrypt не трогаем, иначе сертификат для www не выдадут
-  S="    # $WWW → $DOMAIN
-    set \$to_main 0;
-    if (\$host = $WWW) { set \$to_main 1; }
-    if (\$request_uri ~ \"^/.well-known/acme-challenge/\") { set \$to_main 0; }
-    if (\$to_main) { return 301 https://$DOMAIN\$request_uri; }" \
-    awk '{ print } /server_name / && !done { print ENVIRON["S"]; done = 1 }' "$CONF.new" > "$CONF.tmp"
-  mv "$CONF.tmp" "$CONF.new"
-fi
+SSL="    ssl_certificate $LIVE/fullchain.pem;
+    ssl_certificate_key $LIVE/privkey.pem;"
+[ -s "$LE_DIR/options-ssl-nginx.conf" ] && SSL="$SSL
+    include $LE_DIR/options-ssl-nginx.conf;"
+[ -s "$LE_DIR/ssl-dhparams.pem" ] && SSL="$SSL
+    ssl_dhparam $LE_DIR/ssl-dhparams.pem;"
+{
+  echo "# Создано командой b2b-set-domain: https://$DOMAIN${WWW:+ (и $WWW → $DOMAIN)}."
+  echo "# Сертификат Let's Encrypt продлевается сам (certbot.timer), после продления nginx перечитывает настройки."
+  echo "server {"
+  echo "    listen 80;"
+  echo "    listen [::]:80;"
+  echo "    server_name $DOMAIN${WWW:+ $WWW};"
+  echo "    # Всё по http — на https. Проверку Let's Encrypt при продлении certbot добавляет сюда сам."
+  echo "    location / { return 301 https://$DOMAIN\$request_uri; }"
+  echo "}"
+  echo
+  # Приложение: блок из шаблона, только на 443 с сертификатом и HSTS
+  sed '/^server {/,$!d' "$APP_DIR/deploy/nginx.conf" \
+    | sed "s/__SERVER_NAME__/$DOMAIN/g; s/__PORT__/3000/g; s/^\( *\)listen 80;/\1listen 443 ssl;/; s/^\( *\)listen \[::\]:80;/\1listen [::]:443 ssl;/" \
+    | S="$SSL
+    add_header Strict-Transport-Security \"max-age=31536000\" always;" \
+      awk '{ print } /server_name / && !done { print ENVIRON["S"]; done = 1 }'
+  if [ -n "$WWW" ]; then
+    echo
+    echo "server {"
+    echo "    listen 443 ssl;"
+    echo "    listen [::]:443 ssl;"
+    echo "    server_name $WWW;"
+    echo "$SSL"
+    echo "    location / { return 301 https://$DOMAIN\$request_uri; }"
+    echo "}"
+  fi
+} > "$CONF.new"
+[ -e /proc/net/if_inet6 ] || sed -i '/listen \[::\]:/d' "$CONF.new"
 mv "$CONF.new" "$CONF"
 ln -sf "$CONF" "$NGINX_DIR/sites-enabled/b2b-orders"
-nginx -t || restore "nginx не принял настройки."
+nginx -t || restore "nginx не принял новые настройки."
 systemctl reload nginx
-
-if [ -n "$EMAIL" ]; then CERT_MAIL=(-m "$EMAIL"); else CERT_MAIL=(--register-unsafely-without-email); fi
-certbot --nginx --cert-name "$DOMAIN" -d "$DOMAIN" ${WWW:+-d "$WWW"} --non-interactive --agree-tos "${CERT_MAIL[@]}" --redirect --hsts \
-  || restore "Сертификат для $DOMAIN не выдан (выше причина от Let's Encrypt)."
 rm -f "$CONF.bak"
 
 # Прежние адреса переадресуем на новый (по файлу на адрес, цель — всегда текущий домен)
