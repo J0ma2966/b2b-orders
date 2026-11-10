@@ -13,7 +13,7 @@ const dev = devSetup || serverUrl.startsWith("http://");
 
 const config: CapacitorConfig = {
   appId: process.env.MOBILE_APP_ID ?? "uz.b2borders.app",
-  appName: "Оптовые заказы",
+  appName: "OptoLink",
   webDir: "mobile/www",
   // По этой метке сервер понимает, что страница открыта в приложении
   appendUserAgent: "B2BOrdersApp/1",

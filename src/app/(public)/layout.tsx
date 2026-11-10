@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { LanguageSwitcher } from "@/components/shell/language-switcher";
-import { Tr } from "@/components/ui/tr";
 
 // Открытые страницы без входа: политика конфиденциальности, удаление аккаунта (ссылки для App Store и Google Play)
 export default function PublicLayout({ children }: LayoutProps<"/">) {
@@ -8,7 +7,7 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-full flex-1 flex-col items-center px-4 py-8 sm:py-12">
       <div className="mb-6 flex w-full max-w-3xl items-center justify-between gap-3">
         <Link href="/" className="text-lg font-semibold text-brand-700">
-          <Tr>Оптовые заказы</Tr>
+          OptoLink
         </Link>
         <LanguageSwitcher />
       </div>

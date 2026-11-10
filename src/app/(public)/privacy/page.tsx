@@ -22,7 +22,7 @@ export default async function PrivacyPage() {
     return (
       <>
         <h1>Maxfiylik siyosati</h1>
-        <p>Yangilangan: {L.updated}. Ushbu siyosat «Ulgurji buyurtmalar» platformasi — sayt hamda Android va iOS ilovalariga taalluqli. Shaxsiy ma’lumotlar operatori: {L.operator}. Aloqa: {contact}.</p>
+        <p>Yangilangan: {L.updated}. Ushbu siyosat «OptoLink» platformasi — sayt hamda Android va iOS ilovalariga taalluqli. Shaxsiy ma’lumotlar operatori: {L.operator}. Aloqa: {contact}.</p>
         <h2>Qanday ma’lumotlar yigʻiladi</h2>
         <ul>
           <li>Hisob: ism, telefon raqami, e-mail (ixtiyoriy), parol (faqat xesh koʻrinishida saqlanadi), interfeys tili.</li>
@@ -53,7 +53,7 @@ export default async function PrivacyPage() {
   return (
     <>
       <h1>Политика конфиденциальности</h1>
-      <p>Обновлено: {L.updated}. Политика действует для платформы «Оптовые заказы» — сайта и приложений для Android и iOS. Оператор персональных данных: {L.operator}. Связь: {contact}.</p>
+      <p>Обновлено: {L.updated}. Политика действует для платформы «OptoLink» — сайта и приложений для Android и iOS. Оператор персональных данных: {L.operator}. Связь: {contact}.</p>
       <h2>Какие данные мы собираем</h2>
       <ul>
         <li>Аккаунт: имя, телефон, e-mail (по желанию), пароль (хранится только в виде хеша), язык интерфейса.</li>

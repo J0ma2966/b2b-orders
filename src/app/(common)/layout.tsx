@@ -30,7 +30,7 @@ async function RoleShell({ children }: { children: ReactNode }) {
   if (home === "/courier") return <CourierShell>{children}</CourierShell>;
   if (home === "/supplier") return <SupplierShell>{children}</SupplierShell>;
   return (
-    <AppShell title="Оптовые заказы" root="/account" nav={NAV} context={<HomeLink />}>
+    <AppShell title="OptoLink" root="/account" nav={NAV} context={<HomeLink />}>
       {children}
     </AppShell>
   );

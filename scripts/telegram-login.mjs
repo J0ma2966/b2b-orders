@@ -65,8 +65,8 @@ await call("setWebhook", { url: `${base}/api/telegram/webhook`, secret_token: se
 ok(`вебхук ${base}/api/telegram/webhook`);
 
 const texts = {
-  ru: { cmd: "Подключить номер для кодов входа", short: "Коды для входа на платформу оптовых заказов", about: "Здесь приходят коды для входа на платформу оптовых заказов. Нажмите «Старт», затем «Поделиться номером»." },
-  uz: { cmd: "Kirish kodlari uchun raqamni ulash", short: "Ulgurji buyurtmalar platformasiga kirish kodlari", about: "Bu yerga ulgurji buyurtmalar platformasiga kirish kodlari keladi. «Start», soʻng «Raqamni ulashish» tugmasini bosing." },
+  ru: { cmd: "Подключить номер для кодов входа", short: "Коды для входа в OptoLink", about: "Здесь приходят коды для входа в OptoLink. Нажмите «Старт», затем «Поделиться номером»." },
+  uz: { cmd: "Kirish kodlari uchun raqamni ulash", short: "OptoLink platformasiga kirish kodlari", about: "Bu yerga OptoLink platformasiga kirish kodlari keladi. «Start», soʻng «Raqamni ulashish» tugmasini bosing." },
 };
 for (const [lang, t] of Object.entries(texts)) {
   const language_code = lang === "ru" ? undefined : lang;
