@@ -16,7 +16,7 @@ import { getLocale, getT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
-  const name = t("Оптовые заказы");
+  const name = "OptoLink";
   return {
     title: { default: name, template: `%s · ${name}` },
     description: t("B2B-платформа заказов между поставщиками и магазинами"),

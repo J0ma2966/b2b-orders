@@ -9,7 +9,8 @@ export default async function Home() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-12">
       <LanguageSwitcher className="mb-6 self-start" />
-      <h1 className="text-3xl font-semibold sm:text-4xl">{t("Оптовые заказы у поставщиков")}</h1>
+      <p className="text-lg font-semibold text-brand-700">OptoLink</p>
+      <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">{t("Оптовые заказы у поставщиков")}</h1>
       <p className="mt-3 text-gray-600">
         {t("Магазины заказывают товар у поставщиков своего региона, поставщики ведут каталог, остатки и доставку, а платформа учитывает приёмку, оплаты и долги.")}
       </p>

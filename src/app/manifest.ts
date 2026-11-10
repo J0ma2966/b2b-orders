@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 // PWA: магазин и доставщик ставят приложение на главный экран телефона.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Оптовые заказы",
-    short_name: "Заказы",
+    name: "OptoLink",
+    short_name: "OptoLink",
     description: "Заказы у поставщиков, доставка и учёт оплат",
     start_url: "/",
     display: "standalone",

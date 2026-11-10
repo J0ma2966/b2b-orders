@@ -12,7 +12,7 @@
 		<string>uz</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>Оптовые заказы</string>
+	<string>OptoLink</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

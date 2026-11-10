@@ -132,7 +132,7 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Оптовые заказы", body: "", url: "/notifications" };
+  let data = { title: "OptoLink", body: "", url: "/notifications" };
   try {
     data = { ...data, ...event.data.json() };
   } catch {}

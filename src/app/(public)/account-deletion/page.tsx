@@ -18,7 +18,7 @@ export default async function AccountDeletionInfoPage({ searchParams }: PageProp
     return (
       <>
         {done && <p className="mb-4 rounded-lg bg-green-50 p-3 text-green-900 ring-1 ring-green-200">Hisobingiz oʻchirildi.</p>}
-        <h1>«Ulgurji buyurtmalar» hisobini oʻchirish</h1>
+        <h1>«OptoLink» hisobini oʻchirish</h1>
         <h2>Qanday oʻchirish mumkin</h2>
         <ul>
           <li>Ilovada yoki saytda: kiring → Profil → «Hisobni oʻchirish» → parolni kiriting va tasdiqlang.</li>
@@ -39,7 +39,7 @@ export default async function AccountDeletionInfoPage({ searchParams }: PageProp
   return (
     <>
       {done && <p className="mb-4 rounded-lg bg-green-50 p-3 text-green-900 ring-1 ring-green-200">Ваш аккаунт удалён.</p>}
-      <h1>Удаление аккаунта «Оптовые заказы»</h1>
+      <h1>Удаление аккаунта «OptoLink»</h1>
       <h2>Как удалить</h2>
       <ul>
         <li>В приложении или на сайте: войдите → Профиль → «Удалить аккаунт» → введите пароль и подтвердите.</li>
