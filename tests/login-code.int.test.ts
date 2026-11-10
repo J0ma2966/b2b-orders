@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 vi.mock("@/lib/auth/current", () => ({ getAuth: async () => null }));
 
 import { db } from "@/lib/db";
-import { handleTelegramUpdate, requestLoginCode, verifyLoginCode } from "@/lib/login-code";
+import { handleTelegramUpdate, requestLoginCode, verifyLoginCode, verifyRegisterCode } from "@/lib/login-code";
 import { cleanCode, codeMatches, generateCode, hashCode, parseTgUpdate, type TgUpdate } from "@/lib/login-code-core";
 
 // Вход по одноразовому коду: бот Telegram (привязка номера кнопкой «Поделиться номером»),
@@ -132,6 +132,48 @@ describe.skipIf(!enabled)("вход по коду", () => {
     expect(texts.some((t) => /\d{6}/.test(t))).toBe(false);
     expect(texts.at(-1)).toContain("не совпадает");
     expect((await db.user.findUniqueOrThrow({ where: { id: victim.id } })).telegramChatId).toBeNull();
+  });
+
+  it("регистрация: код приходит на незарегистрированный номер только владельцу этого номера", async () => {
+    process.env.TELEGRAM_LOGIN_BOT_TOKEN = "1:test";
+    process.env.TELEGRAM_LOGIN_BOT_USERNAME = "b2b_login_bot";
+    const phone = newPhone();
+    const other = newPhone();
+    const [chat, stranger] = [`7${tag}5`, `7${tag}6`];
+
+    const r = await requestLoginCode(phone, "TELEGRAM", null, "REGISTER");
+    expect(r.ok).toBe(true);
+    const token = r.ok ? r.botUrl!.split("start=")[1] : "";
+
+    // Чужой человек открыл ссылку и делится своим номером — кода нет
+    await handleTelegramUpdate(start(stranger, token));
+    await handleTelegramUpdate(contact(stranger, other));
+    expect(botMessages(stranger).some((t) => /\d{6}/.test(t))).toBe(false);
+    expect(botMessages(stranger).at(-1)).toContain("не совпадает");
+
+    // Владелец номера: «Старт», «Поделиться номером» — код в чате
+    await handleTelegramUpdate(start(chat, token));
+    expect(botMessages(chat).at(-1)).toContain("Поделиться номером");
+    await handleTelegramUpdate(contact(chat, phone));
+    const text = botMessages(chat).at(-1)!;
+    expect(text).toContain("Код для регистрации");
+    const code = codeFrom(text);
+
+    // Код регистрации не годится для входа, и наоборот — неверный код не подтверждает номер
+    expect(await verifyLoginCode(phone, code)).toBeNull();
+    expect(await verifyRegisterCode(phone, code === "000000" ? "111111" : "000000")).toBeNull();
+    expect(await verifyRegisterCode(phone, code)).toEqual({ chatId: chat });
+    expect(await verifyRegisterCode(phone, code)).toBeNull(); // один код — одна регистрация
+  });
+
+  it("регистрация: на уже зарегистрированный номер код не выдаётся; без ссылки бот отвечает «не зарегистрирован»", async () => {
+    process.env.TELEGRAM_LOGIN_BOT_TOKEN = "1:test";
+    process.env.TELEGRAM_LOGIN_BOT_USERNAME = "b2b_login_bot";
+    const u = await user();
+    expect(await requestLoginCode(u.phone, "TELEGRAM", null, "REGISTER")).toMatchObject({ ok: false });
+    const chat = `7${tag}7`;
+    await handleTelegramUpdate(contact(chat, newPhone()));
+    expect(botMessages(chat).at(-1)).toContain("не зарегистрирован");
   });
 
   it("незарегистрированный номер: тот же ответ, код не отправляется", async () => {

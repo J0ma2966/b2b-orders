@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { Alert, Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { PrivacyNote } from "@/components/forms/privacy-note";
-import { AccountFields } from "@/components/forms/account-fields";
+import { AccountFields, type PhoneConfirmChannels } from "@/components/forms/account-fields";
 import { MapPicker } from "@/components/map/map-picker";
 import { TerritorySelect } from "@/components/territory/territory-select";
 import type { TerritoryOption } from "@/components/territory/types";
@@ -14,7 +14,7 @@ import { useT } from "@/lib/i18n/client";
 import { registerShopAction } from "../actions";
 import { PhotoInput } from "@/components/ui/photo-input";
 
-export function ShopRegisterForm({ territories, loggedIn }: { territories: TerritoryOption[]; loggedIn: boolean }) {
+export function ShopRegisterForm({ territories, loggedIn, confirm }: { territories: TerritoryOption[]; loggedIn: boolean; confirm: PhoneConfirmChannels }) {
   const t = useT();
   const [state, action, pending] = useActionState(registerShopAction, initialFormState);
   const e = state.fieldErrors ?? {};
@@ -23,7 +23,7 @@ export function ShopRegisterForm({ territories, loggedIn }: { territories: Terri
   return (
     <ActionForm action={action} pending={pending} className="space-y-6">
       {state.error && <Alert tone="error">{state.error}</Alert>}
-      {!loggedIn && <AccountFields state={state} />}
+      {!loggedIn && <AccountFields state={state} confirm={confirm} />}
       <fieldset className="space-y-4">
         <legend className="mb-2 text-base font-semibold">{t("Магазин")}</legend>
         <Field label="Название магазина" name="name" error={e.name}>

@@ -14,6 +14,9 @@ import { notifySuperAdmins } from "@/lib/notify";
 import { isRealFile, saveImage, UploadError } from "@/lib/storage";
 import { getLocale } from "@/lib/i18n/server";
 import { coord, formValues, invalid, opt, parseForm, req, type FormState } from "@/lib/forms";
+import { finishLoginAttempt, reserveLoginAttempt } from "@/lib/auth/login-attempts";
+import { codeChannels, phoneConfirmChannels, requestLoginCode, verifyRegisterCode } from "@/lib/login-code";
+import { cleanCode } from "@/lib/login-code-core";
 
 const phoneField = (msg = "Телефон в формате +998 90 123-45-67") =>
   req().transform((v, ctx) => {
@@ -67,7 +70,16 @@ async function resolveAccount(formData: FormData) {
       } as FormState,
     };
   }
+  // Номер подтверждается кодом, когда на сервере настроен бот Telegram или SMS. Сам код проверяется
+  // последним шагом (confirmPhone), после всех остальных полей: иначе ошибка в адресе или на карте
+  // сжигала бы код, и его пришлось бы получать заново.
+  const phoneCode = phoneConfirmationRequired() ? cleanCode(String(formData.get("phoneCode") ?? "")) : undefined;
+  if (phoneCode === null) {
+    return { error: { fieldErrors: { phoneCode: ["Подтвердите номер: получите код и введите 6 цифр"] }, values: formValues(formData) } as FormState };
+  }
   return {
+    phoneCode,
+    ip,
     account: {
       fullName: parsed.data.fullName,
       phone: parsed.data.loginPhone,
@@ -75,6 +87,46 @@ async function resolveAccount(formData: FormData) {
       locale: await getLocale(),
     },
   };
+}
+
+function phoneConfirmationRequired() {
+  return phoneConfirmChannels() !== null;
+}
+
+type NewAccount = { phone: string; fullName: string; passwordHash: string; locale: string; telegramChatId?: string };
+
+// Проверка кода подтверждения номера. Вызывается перед самым созданием учётной записи.
+// Возвращает ошибку формы или ничего; чат Telegram, из которого поделились номером, привязывается к аккаунту.
+async function confirmPhone(acc: { phoneCode?: string; ip?: string | null; account?: NewAccount }, formData: FormData): Promise<FormState | null> {
+  if (!acc.account || acc.phoneCode === undefined) return null;
+  const values = formValues(formData);
+  // Общий с входом лимит неудач: код нельзя перебирать
+  const attemptId = await reserveLoginAttempt(acc.account.phone, acc.ip ?? null);
+  if (!attemptId) return { fieldErrors: { phoneCode: ["Слишком много неудачных попыток. Попробуйте через 15 минут."] }, values };
+  const ok = await verifyRegisterCode(acc.account.phone, acc.phoneCode);
+  await finishLoginAttempt(attemptId, !!ok);
+  if (!ok) return { fieldErrors: { phoneCode: ["Неверный или устаревший код"] }, values };
+  if (ok.chatId) {
+    // Один чат — один пользователь (как при подключении бота из профиля)
+    await db.user.updateMany({ where: { telegramChatId: ok.chatId }, data: { telegramChatId: null } });
+    acc.account.telegramChatId = ok.chatId;
+  }
+  return null;
+}
+
+export type RegisterCodeState = { ok?: boolean; botUrl?: string | null; channel?: "TELEGRAM" | "SMS"; error?: string; errorParams?: Record<string, string | number>; sentAt?: number };
+
+// Кнопка «Получить код» в форме регистрации
+export async function requestRegisterCodeAction(rawPhone: string, wanted?: "TELEGRAM" | "SMS"): Promise<RegisterCodeState> {
+  if (await getAuth()) return { error: "Вы уже вошли" };
+  const phone = normalizePhone(String(rawPhone ?? ""));
+  if (!phone) return { error: "Телефон в формате +998 90 123-45-67" };
+  const channels = codeChannels();
+  const channel = wanted === "SMS" && channels.sms ? "SMS" : channels.telegram ? "TELEGRAM" : "SMS";
+  const { ip } = await requestMeta();
+  const r = await requestLoginCode(phone, channel, ip, "REGISTER");
+  if (!r.ok) return { error: r.error, errorParams: r.retryInSec ? { n: r.retryInSec } : undefined };
+  return { ok: true, botUrl: r.botUrl, channel, sentAt: Date.now() };
 }
 
 // ───────────── Магазин (ТЗ п. 11–13) ─────────────
@@ -115,6 +167,9 @@ export async function registerShopAction(_prev: FormState, formData: FormData): 
     if (e instanceof UploadError) return { fieldErrors: { photo: [e.message] }, values };
     throw e;
   }
+
+  const phoneError = await confirmPhone(acc, formData);
+  if (phoneError) return phoneError;
 
   const shop = await db.$transaction(async (tx) => {
     const userId = acc.userId ?? (await tx.user.create({ data: acc.account! })).id;
@@ -197,6 +252,9 @@ export async function registerSupplierAction(_prev: FormState, formData: FormDat
     if (e instanceof UploadError) return { fieldErrors: { logo: [e.message] }, values };
     throw e;
   }
+
+  const phoneError = await confirmPhone(acc, formData);
+  if (phoneError) return phoneError;
 
   const supplier = await db.$transaction(async (tx) => {
     const userId = acc.userId ?? (await tx.user.create({ data: acc.account! })).id;

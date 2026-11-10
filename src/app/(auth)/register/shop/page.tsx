@@ -4,6 +4,7 @@ import { Card, Spinner } from "@/components/ui";
 import { getAuth } from "@/lib/auth/current";
 import { getTerritoryOptions } from "@/lib/territory";
 import { getT } from "@/lib/i18n/server";
+import { phoneConfirmChannels } from "@/lib/login-code";
 import { ShopRegisterForm } from "./shop-form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,5 +29,5 @@ export default async function RegisterShopPage() {
 
 async function FormLoader() {
   const [auth, territories] = await Promise.all([getAuth(), getTerritoryOptions()]);
-  return <ShopRegisterForm territories={territories} loggedIn={!!auth} />;
+  return <ShopRegisterForm territories={territories} loggedIn={!!auth} confirm={phoneConfirmChannels()} />;
 }
