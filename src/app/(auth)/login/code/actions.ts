@@ -1,17 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { createSession, requestMeta } from "@/lib/auth/session";
 import { homePathFor } from "@/lib/auth/current";
 import { syncLocaleOnLogin } from "@/lib/i18n/server";
 import { requestLoginCode, verifyLoginCode } from "@/lib/login-code";
 import { cleanCode, PASSWORD_RESET_WINDOW_MS } from "@/lib/login-code-core";
-
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILS_PER_PHONE = 5;
-const MAX_FAILS_PER_IP = 30;
+import { finishLoginAttempt, reserveLoginAttempt } from "@/lib/auth/login-attempts";
 
 export type CodeFormState = {
   step: "phone" | "code";
@@ -43,19 +39,14 @@ export async function verifyCodeAction(prev: CodeFormState, formData: FormData):
   const code = cleanCode(String(formData.get("code") ?? ""));
   if (!code) return { ...prev, error: "Введите 6 цифр кода" };
 
-  // Общий с входом по паролю счётчик неудач: код нельзя подбирать, чередуя с паролем
+  // Общий с входом по паролю счётчик неудач: код нельзя подбирать, чередуя с паролем.
+  // Попытка записывается до проверки кода: одновременные запросы лимит не обходят.
   const { ip } = await requestMeta();
-  const since = new Date(Date.now() - WINDOW_MS);
-  const [phoneFails, ipFails] = await Promise.all([
-    db.loginAttempt.count({ where: { phone, success: false, createdAt: { gte: since } } }),
-    ip ? db.loginAttempt.count({ where: { ip, success: false, createdAt: { gte: since } } }) : 0,
-  ]);
-  if (phoneFails >= MAX_FAILS_PER_PHONE || ipFails >= MAX_FAILS_PER_IP) {
-    return { ...prev, error: "Слишком много неудачных попыток. Попробуйте через 15 минут." };
-  }
+  const attemptId = await reserveLoginAttempt(phone, ip);
+  if (!attemptId) return { ...prev, error: "Слишком много неудачных попыток. Попробуйте через 15 минут." };
 
   const user = await verifyLoginCode(phone, code);
-  await db.loginAttempt.create({ data: { phone, ip, success: !!user } });
+  await finishLoginAttempt(attemptId, !!user);
   if (!user) return { ...prev, error: "Неверный или устаревший код" };
 
   await createSession(user.id, { passwordResetUntil: new Date(Date.now() + PASSWORD_RESET_WINDOW_MS) });

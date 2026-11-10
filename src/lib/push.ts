@@ -3,7 +3,7 @@ import webpush from "web-push";
 import { db } from "@/lib/db";
 import { makeT, parseLocale } from "@/lib/i18n/core";
 import { nativePushConfigured, sendNativePush } from "@/lib/native-push";
-import { pushEndpointIsSafe } from "@/lib/ssrf-resolve";
+import { pushAgent, pushEndpointIsSafe } from "@/lib/ssrf-resolve";
 
 // Web Push (ТЗ п. 57). Без ключей VAPID push отключён, внутренние уведомления работают всегда.
 const pub = process.env.VAPID_PUBLIC_KEY;
@@ -43,7 +43,8 @@ async function sendPush(ids: string[]) {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify({ title: t(n.title), body: t(n.body), url: n.link ?? "/notifications" }),
-          { TTL: 3600 },
+          // Агент проверяет адрес, к которому реально идёт соединение (см. ssrf-resolve.ts)
+          { TTL: 3600, agent: pushAgent },
         );
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;

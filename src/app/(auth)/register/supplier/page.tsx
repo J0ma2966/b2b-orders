@@ -4,6 +4,7 @@ import { Card, Spinner } from "@/components/ui";
 import { getAuth } from "@/lib/auth/current";
 import { getTerritoryOptions } from "@/lib/territory";
 import { getT } from "@/lib/i18n/server";
+import { phoneConfirmChannels } from "@/lib/login-code";
 import { SupplierRegisterForm } from "./supplier-form";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,5 +29,5 @@ export default async function RegisterSupplierPage() {
 
 async function FormLoader() {
   const [auth, territories] = await Promise.all([getAuth(), getTerritoryOptions()]);
-  return <SupplierRegisterForm territories={territories} loggedIn={!!auth} />;
+  return <SupplierRegisterForm territories={territories} loggedIn={!!auth} confirm={phoneConfirmChannels()} />;
 }

@@ -6,6 +6,8 @@ import { normalizePhone } from "./phone";
 
 export const CODE_LENGTH = 6;
 export const CODE_TTL_MS = 5 * 60 * 1000;
+// Код подтверждения номера при регистрации живёт дольше: форму с адресом и картой заполняют не одну минуту
+export const REGISTER_CODE_TTL_MS = 30 * 60 * 1000;
 // Ссылка на бота (человек ещё не подключил Telegram) живёт дольше кода: нужно открыть бота и поделиться номером
 export const LINK_TTL_MS = 15 * 60 * 1000;
 export const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -91,9 +93,12 @@ export const BOT_TEXT = {
   notRegistered: "Номер {phone} не зарегистрирован на платформе.",
   linked: "Готово: Telegram подключён к номеру {phone}. Коды для входа будут приходить сюда.",
   mismatch: "Номер в Telegram ({phone}) не совпадает с номером, который вы ввели при входе. Войдите с этим номером или получите код по SMS.",
+  registerMismatch: "Номер в Telegram ({phone}) не совпадает с номером, который вы указали при регистрации. Укажите этот номер в форме и получите код ещё раз.",
   expired: "Ссылка устарела. Запросите код на странице входа ещё раз.",
   code: "Код для входа: {code}",
+  registerCode: "Код для регистрации в OptoLink: {code}",
   codeHint: "Никому его не сообщайте. Код действует 5 минут.",
+  registerCodeHint: "Введите его в форме регистрации и никому не сообщайте. Код действует 30 минут.",
 } as const;
 
 export function smsText(code: string, template = process.env.SMS_TEMPLATE) {

@@ -187,7 +187,10 @@ export function readXlsx(buf: Buffer): (string | number | null)[][] {
   const files = unzip(buf);
   const wb = files.get("xl/workbook.xml")?.toString("utf8");
   if (!wb) throw new XlsxError("Файл не похож на Excel (.xlsx)");
-  const rid = /<sheet\b[^>]*\br:id="([^"]+)"/.exec(wb)?.[1];
+  // Идентификатор из файла подставляется в регулярное выражение ниже — только буквы, цифры, «_» и «-»,
+  // иначе присланный файл мог бы подсунуть своё выражение и надолго занять сервер
+  const rawRid = /<sheet\b[^>]*\br:id="([^"]+)"/.exec(wb)?.[1];
+  const rid = rawRid && /^[\w-]{1,64}$/.test(rawRid) ? rawRid : undefined;
   const rels = files.get("xl/_rels/workbook.xml.rels")?.toString("utf8") ?? "";
   let target = rid ? new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`).exec(rels)?.[1] ?? new RegExp(`<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="${rid}"`).exec(rels)?.[1] : undefined;
   target = target ? target.replace(/^\/?xl\//, "").replace(/^\//, "") : "worksheets/sheet1.xml";
