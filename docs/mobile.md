@@ -62,7 +62,7 @@ npm run mobile:ios       # открывает Xcode (только на Mac)
 
 ### Иконка и заставка
 
-`python3 scripts/mobile-icons.py` — из `mobile/resources/icon.png` (1024×1024, без прозрачности) делает иконки Android/iOS/PWA и заставки. Сейчас стоит временная иконка «коробка»; замените файл своим логотипом и запустите скрипт.
+`python3 scripts/mobile-icons.py` — из файлов `mobile/resources` (`icon.png`, `foreground.png`, `monochrome.png`, `splash-mark.png`, все 1024×1024) делает иконки Android (обычные, круглые, адаптивные и тематические Android 13+), iOS, PWA и заставки. Сейчас там логотип OptoLink; исходники в SVG и правила использования — `public/brand/README.md`.
 
 ### Push-уведомления: настройка сервера
 
