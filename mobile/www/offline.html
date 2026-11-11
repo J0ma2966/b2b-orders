@@ -49,10 +49,29 @@
   document.getElementById("change").addEventListener("click", function () {
     window.location.replace("index.html?setup=1");
   });
-  document.getElementById("retry").addEventListener("click", function () {
-    var url = devUrl || (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || "index.html";
-    window.location.replace(url);
-  });
+  // «Повторить» — снова открыть страницу, которая не загрузилась, внутри приложения.
+  // На Android эта страница открыта с https://localhost, где app-config.js не отдаётся, поэтому адрес
+  // спрашиваем у приложения (OfflineRetry). Переход на «index.html» здесь увёл бы в системный браузер.
+  var offlineRetry = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.OfflineRetry;
+  var retrying = false;
+  function isHttp(u) { return typeof u === "string" && /^https?:\/\//i.test(u); }
+  function go(url) {
+    if (isHttp(url)) window.location.replace(url);
+    else if (!offlineRetry) window.location.replace("index.html"); // сборка без адреса сервера: выбор адреса
+    else retrying = false;
+  }
+  function retry() {
+    if (retrying) return;
+    retrying = true;
+    var fallback = devUrl || (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || null;
+    if (!offlineRetry) return go(fallback);
+    offlineRetry.target().then(function (r) {
+      go((r && r.url) || fallback);
+    }).catch(function () { go(fallback); });
+  }
+  document.getElementById("retry").addEventListener("click", retry);
+  // Связь вернулась — пробуем сами, не дожидаясь нажатия
+  window.addEventListener("online", retry);
 </script>
 </body>
 </html>
