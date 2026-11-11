@@ -17,6 +17,7 @@ notify.sh           b2b-notify
 monitor.sh          b2b-monitor
 telegram.sh         b2b-telegram
 set-admin-phone.sh  b2b-set-admin-phone
+support-mail.sh     b2b-support-mail
 LIST
 
 # Резервные копии (03:30), проверки (раз в 2 минуты), утренняя сводка (09:00)

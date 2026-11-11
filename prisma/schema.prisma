@@ -1001,3 +1001,26 @@ model CommissionInvoice {
   @@unique([supplierId, period])
   @@index([status, dueDate])
 }
+
+// ───────────── Почта техподдержки ─────────────
+// Письма из ящика поддержки (IMAP), см. src/lib/support-mail.ts. В ящике письма не меняются.
+
+model SupportEmail {
+  id          String    @id @default(cuid())
+  // Message-ID письма, а без него — «uidvalidity:uid»: повторная проверка не создаёт дубль
+  messageKey  String    @unique
+  uid         Int
+  fromAddress String?
+  fromName    String?
+  replyTo     String?
+  subject     String
+  text        String
+  attachments Json?
+  receivedAt  DateTime
+  handledAt   DateTime?
+  handledById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([handledAt, receivedAt])
+  @@index([receivedAt])
+}
