@@ -4,6 +4,7 @@ import { SideNav } from "@/components/shell/nav-links";
 import { getAuth } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { unreadBySection } from "@/lib/nav-badges";
+import { mergeMax } from "@/lib/nav-badges-core";
 
 export const ADMIN_NAV = [
   { href: "/admin", label: "Обзор", icon: "📊" },
@@ -21,6 +22,7 @@ export const ADMIN_NAV = [
   { href: "/admin/reports", label: "Отчёты", icon: "📈" },
   { href: "/admin/map", label: "Карта", icon: "🗺️" },
   { href: "/admin/territories", label: "Территории", icon: "📍" },
+  { href: "/admin/support", label: "Поддержка", icon: "✉️" },
   { href: "/notifications", label: "Уведомления", icon: "🔔" },
   { href: "/admin/audit", label: "Аудит", icon: "📜" },
   { href: "/admin/settings", label: "Настройки", icon: "⚙️" },
@@ -30,11 +32,13 @@ export const ADMIN_NAV = [
 async function AdminSideNav() {
   const auth = await getAuth();
   if (!auth) return <SideNav items={ADMIN_NAV} root="/admin" />;
-  const [badges, unread] = await Promise.all([
+  const [badges, unread, support] = await Promise.all([
     unreadBySection(auth.user.id, ADMIN_NAV.map((i) => i.href)),
     db.notification.count({ where: { userId: auth.user.id, readAt: null } }),
+    db.supportEmail.count({ where: { handledAt: null } }),
   ]);
-  return <SideNav items={ADMIN_NAV} root="/admin" badges={{ ...badges, "/notifications": unread }} />;
+  // «Поддержка» — как почтовый ящик: число необработанных писем
+  return <SideNav items={ADMIN_NAV} root="/admin" badges={mergeMax(badges, { "/notifications": unread, "/admin/support": support })} />;
 }
 
 // Кабинет суперадмина. Используется и в /admin, и на общих страницах (уведомления, профиль),
