@@ -1700,8 +1700,7 @@ const uz: Record<string, string> = {
   "📷 Снять фото": "📷 Suratga olish",
   "🖼 Из галереи": "🖼 Galereyadan",
   "Убрать фото": "Fotoni olib tashlash",
-  "⏻ Выйти": "⏻ Chiqish",
-  "⏻ Выйти из аккаунта": "⏻ Akkauntdan chiqish",
+  "Выйти из аккаунта": "Akkauntdan chiqish",
   // Индикаторы разделов, тост оформления, принудительная продажа, артикул, push
   "Заказ №{n} оформлен": "Buyurtma №{n} rasmiylashtirildi",
   "Товар зарезервирован, поставщик получил уведомление": "Mahsulot band qilindi, yetkazib beruvchiga xabar yuborildi",

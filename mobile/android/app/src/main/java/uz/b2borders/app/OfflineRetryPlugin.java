@@ -12,11 +12,14 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 // Кнопка «Повторить» на странице «Нет связи» (mobile/www/offline.html).
-// Capacitor показывает эту страницу с адреса https://localhost/offline.html, где app-config.js
-// не отдаётся, поэтому адрес для повтора берётся отсюда: страница, которая не открылась,
-// а если её нет — сервер из сборки. Переход на localhost увёл бы в системный браузер.
+// Capacitor показывает эту страницу с адреса https://localhost/offline.html. При зашитом адресе сервера
+// localhost для него чужой сайт: любой переход туда (в том числе возврат на саму страницу «Нет связи»
+// после неудачного повтора) уходил в системный браузер. Поэтому повтор делает само приложение:
+// проверяет связь и открывает страницу, которая не загрузилась (если её нет — сервер из сборки).
 @CapacitorPlugin(name = "OfflineRetry")
 public class OfflineRetryPlugin extends Plugin {
 
@@ -42,6 +45,16 @@ public class OfflineRetryPlugin extends Plugin {
             lastFailedUrl = url.toString();
         }
 
+        // Адреса самого приложения (https://localhost/…, в том числе страница «Нет связи») всегда остаются
+        // в WebView. Иначе при зашитом адресе сервера Capacitor считает localhost чужим сайтом
+        // и открывает его в системном браузере.
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            Uri url = request == null ? null : request.getUrl();
+            if (url != null && url.getHost() != null && url.getHost().equalsIgnoreCase(bridge.getHost())) return false;
+            return super.shouldOverrideUrlLoading(view, request);
+        }
+
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             remember(request);
@@ -65,13 +78,55 @@ public class OfflineRetryPlugin extends Plugin {
         return same ? candidate : null;
     }
 
-    @PluginMethod
-    public void target(PluginCall call) {
+    private String targetUrl() {
         String server = getBridge().getServerUrl();
         String url = sameServer(lastFailedUrl, server);
-        if (url == null) url = server;
+        return url != null ? url : server;
+    }
+
+    @PluginMethod
+    public void target(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("url", url);
+        result.put("url", targetUrl());
         call.resolve(result);
+    }
+
+    // Отвечает ли сервер: любой ответ HTTP значит, что связь есть
+    private static boolean reachable(String url) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("HEAD");
+            connection.setConnectTimeout(6000);
+            connection.setReadTimeout(6000);
+            connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
+            connection.getResponseCode();
+            return true;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    // «Повторить»: сначала проверяем связь, и только если сервер отвечает, открываем страницу — из
+    // самого приложения (WebView.loadUrl), а не переходом со страницы. Пока связи нет, страница
+    // «Нет связи» остаётся на месте и ничего никуда не уходит.
+    @PluginMethod
+    public void open(PluginCall call) {
+        final String url = targetUrl();
+        if (url == null) {
+            call.reject("Адрес сервера не задан");
+            return;
+        }
+        new Thread(() -> {
+            boolean ok = reachable(url);
+            JSObject result = new JSObject();
+            result.put("ok", ok);
+            result.put("url", url);
+            if (ok) getBridge().getWebView().post(() -> getBridge().getWebView().loadUrl(url));
+            call.resolve(result);
+        }).start();
     }
 }
