@@ -16,6 +16,7 @@
   .secondary { background: #fff; color: #1f5ad6; border: 1px solid #c9cfda !important; margin-top: 10px !important; }
   .hint { margin-top: 10px; font-size: 13px; word-break: break-all; }
   [hidden] { display: none !important; }
+  button:disabled { opacity: .7; }
   button { margin-top: 22px; width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: #1f5ad6; color: #fff; font-size: 16px; font-weight: 600; }
 </style>
 </head>
@@ -26,6 +27,7 @@
   <p>Проверьте интернет и попробуйте ещё раз. Доставщик может открыть сохранённые доставки, когда связь появится хотя бы на минуту.</p>
   <p class="uz"><b>Server bilan aloqa yo‘q.</b> Internetni tekshirib, qayta urinib ko‘ring.</p>
   <button type="button" id="retry">Повторить · Qayta urinish</button>
+  <p class="hint" id="status" role="status" hidden></p>
   <button type="button" id="change" class="secondary" hidden>Сменить адрес сервера · Manzilni o‘zgartirish</button>
   <p class="hint" id="current" hidden></p>
 </main>
@@ -49,10 +51,41 @@
   document.getElementById("change").addEventListener("click", function () {
     window.location.replace("index.html?setup=1");
   });
-  document.getElementById("retry").addEventListener("click", function () {
+  // «Повторить» — снова открыть страницу, которая не загрузилась, внутри приложения.
+  // На Android проверку связи и сам переход делает приложение (OfflineRetry.open): эта страница открыта
+  // с https://localhost, и любой переход с неё, который не удался, Capacitor уводит в системный браузер.
+  // Пока связи нет, остаёмся здесь и говорим об этом.
+  var offlineRetry = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.OfflineRetry;
+  var button = document.getElementById("retry");
+  var statusLine = document.getElementById("status");
+  var buttonText = button.textContent;
+  var retrying = false;
+  function busy(on) {
+    retrying = on;
+    button.disabled = on;
+    button.textContent = on ? "Подключение… · Ulanmoqda…" : buttonText;
+  }
+  function stillOffline() {
+    busy(false);
+    statusLine.textContent = "Связи пока нет · Aloqa hali yo‘q";
+    statusLine.hidden = false;
+  }
+  function retry() {
+    if (retrying) return;
+    busy(true);
+    statusLine.hidden = true;
+    if (offlineRetry && offlineRetry.open) {
+      // Удачно — приложение само откроет страницу; busy не снимаем
+      offlineRetry.open().then(function (r) { if (!r || !r.ok) stillOffline(); }).catch(stillOffline);
+      return;
+    }
+    // iOS и сборка с выбором адреса: страница лежит в приложении вместе с app-config.js
     var url = devUrl || (window.APP_CONFIG && window.APP_CONFIG.serverUrl) || "index.html";
     window.location.replace(url);
-  });
+  }
+  button.addEventListener("click", retry);
+  // Связь вернулась — пробуем сами, не дожидаясь нажатия
+  window.addEventListener("online", retry);
 </script>
 </body>
 </html>

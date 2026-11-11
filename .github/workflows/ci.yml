@@ -64,9 +64,8 @@ jobs:
       - run: npm run build
       - name: Сквозной сценарий в браузере
         run: |
-          # Системные пакеты для Chromium ставит apt; если зеркала Ubuntu недоступны (сбой DNS на раннере),
-          # браузер ставится без них: нужные библиотеки в образе раннера уже есть, не хватает только шрифтов
-          npx playwright install --with-deps chromium || npx playwright install chromium
+          # Системные шрифты ставятся через apt; если зеркала Ubuntu недоступны, хватает того, что уже есть на машине сборки
+          timeout 240 npx playwright install --with-deps chromium || npx playwright install chromium
           npx prisma db seed
           npm run start > /tmp/server.log 2>&1 &
           npx --yes wait-on@8.0.3 -t 60000 http-get://localhost:3000/login

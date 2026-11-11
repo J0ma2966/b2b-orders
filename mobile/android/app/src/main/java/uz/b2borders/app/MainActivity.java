@@ -12,10 +12,13 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PrintPlugin.class);
         registerPlugin(DevServerPlugin.class);
         registerPlugin(PushStatusPlugin.class);
+        registerPlugin(OfflineRetryPlugin.class);
         // Отладочная сборка: адрес сервера, выбранный на телефоне (локальная сеть)
         CapConfig devConfig = DevServerPlugin.savedConfig(this);
         if (devConfig != null) config = devConfig;
         super.onCreate(savedInstanceState);
+        // «Нет связи» → «Повторить» открывает ту же страницу, а не начало (OfflineRetryPlugin)
+        bridge.setWebViewClient(new OfflineRetryPlugin.Client(bridge));
     }
 
     @Override

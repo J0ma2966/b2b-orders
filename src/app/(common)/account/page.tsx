@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button, ButtonLink, Card, DefinitionList, PageHeader } from "@/components/ui";
+import { Icon } from "@/components/ui/icon";
 import { logoutAction } from "@/app/(auth)/actions";
 import { getShopContext, homePathFor, requireAuth } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
@@ -87,7 +88,7 @@ export default async function AccountPage() {
       </div>
       {/* В мобильном приложении шапка узкая — выход всегда есть здесь, в профиле любой роли */}
       <form action={logoutAction} className="mt-4">
-        <Button variant="secondary" className="w-full text-red-600 sm:w-auto">⏻ Выйти из аккаунта</Button>
+        <Button variant="secondary" className="w-full text-red-600 sm:w-auto"><Icon emoji="⏻" className="mr-2 inline-block size-4 align-[-2px]" />{t("Выйти из аккаунта")}</Button>
       </form>
     </>
   );
