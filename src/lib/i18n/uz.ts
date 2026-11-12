@@ -1,6 +1,16 @@
 // Узбекский словарь (латиница). Ключ — русская строка интерфейса, см. core.ts.
 // Проверка полноты: node scripts/i18n-check.mjs --missing
 const uz: Record<string, string> = {
+  "Тема обращения": "Murojaat mavzusi",
+  "Все темы": "Barcha mavzular",
+  "Без темы": "Mavzusiz",
+  "Отметить все новые письма в этом списке обработанными?": "Ushbu roʻyxatdagi barcha yangi xatlar koʻrib chiqilgan deb belgilansinmi?",
+  "Отметить все обработанными ({n})": "Barchasini koʻrib chiqilgan deb belgilash ({n})",
+  "Только письма, которые подходят под поиск и тему": "Faqat qidiruv va mavzuga mos xatlar",
+  "Написать в поддержку": "Qoʻllab-quvvatlashga yozish",
+  "Персональные данные": "Shaxsiy ma’lumotlar",
+  "Блокировка": "Bloklash",
+  "Проверка заявки": "Arizani tekshirish",
   "Сумма {0}, получено {1}, долг по заказу {2}": "Summa {0}, olingan {1}, buyurtma boʻyicha qarz {2}",
   "Сумма {0}, получено {1}": "Summa {0}, olingan {1}",
   "{0} — {1} {2}. Причина: {3}": "{0} — {1} {2}. Sabab: {3}",

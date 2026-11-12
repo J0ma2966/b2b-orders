@@ -3,12 +3,19 @@ import { SupplierCard } from "@/components/supplier-card";
 import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop } from "@/lib/territory";
 import { getT } from "@/lib/i18n/server";
+import { SupportLink } from "@/components/support-link";
 
 
 export default async function ShopSuppliersPage() {
   const t = await getT();
   const ctx = await requireShop();
-  if (ctx.shop.isBlocked) return <Alert tone="error">{t("Магазин заблокирован администратором платформы.")}</Alert>;
+  if (ctx.shop.isBlocked)
+    return (
+      <Alert tone="error">
+        {t("Магазин заблокирован администратором платформы.")}{" "}
+        <SupportLink topic="blocked" className="underline">{t("Написать в поддержку")}</SupportLink>
+      </Alert>
+    );
   const suppliers = await availableSuppliersForShop(ctx.shop.territoryId);
   return (
     <>

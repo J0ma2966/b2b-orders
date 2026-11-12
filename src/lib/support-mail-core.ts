@@ -1,5 +1,6 @@
 // Почта техподдержки: чистые функции без сети и базы (разбор настроек, письма, текста уведомления)
 import { readFileSync } from "node:fs";
+import { topicFromSubject } from "@/lib/support-topics";
 
 export type SupportMailConfig = {
   host: string;
@@ -107,6 +108,7 @@ export type SupportEmailRecord = {
   fromName: string | null;
   replyTo: string | null;
   subject: string;
+  topic: string | null;
   text: string;
   attachments: { name: string; size: number; type: string }[] | undefined;
   receivedAt: Date;
@@ -152,13 +154,15 @@ export function toRecord(m: IncomingMail, now = new Date()): SupportEmailRecord 
     type: clean(a.contentType, 100),
   }));
   const date = m.date && !Number.isNaN(m.date.getTime()) && m.date.getTime() <= now.getTime() + 86_400_000 ? m.date : now;
+  const subject = clean(m.subject, 500) || "(без темы)";
   return {
     messageKey: messageId || `${m.uidValidity}:${m.uid}`,
     uid: m.uid,
     fromAddress: addr(m.from),
     fromName: clean(m.from?.name, 200) || null,
     replyTo: addr(m.replyTo),
-    subject: clean(m.subject, 500) || "(без темы)",
+    subject,
+    topic: topicFromSubject(subject),
     text: text || "(пустое письмо)",
     attachments: attachments.length ? attachments : undefined,
     receivedAt: date,

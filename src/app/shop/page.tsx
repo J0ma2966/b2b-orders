@@ -8,6 +8,7 @@ import { availableSuppliersForShop } from "@/lib/territory";
 import { db } from "@/lib/db";
 import { orderStatusFilter } from "@/lib/order-core";
 import { getT } from "@/lib/i18n/server";
+import { SupportLink } from "@/components/support-link";
 import { activePromotions, cartQtyByUnit, favoriteIds, shopFeed, type CatalogFilter, type FeedSort } from "@/lib/shop-catalog";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim().slice(0, 100) : "");
@@ -16,7 +17,13 @@ const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.tri
 export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
   const [ctx, t, sp] = await Promise.all([requireShop(), getT(), searchParams]);
   const shop = ctx.shop;
-  if (shop.isBlocked) return <Alert tone="error">{t("Магазин заблокирован администратором платформы. Заказы недоступны.")}</Alert>;
+  if (shop.isBlocked)
+    return (
+      <Alert tone="error">
+        {t("Магазин заблокирован администратором платформы. Заказы недоступны.")}{" "}
+        <SupportLink topic="blocked" className="underline">{t("Написать в поддержку")}</SupportLink>
+      </Alert>
+    );
 
   const q = str(sp.q);
   const category = str(sp.c);

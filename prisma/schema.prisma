@@ -1014,6 +1014,8 @@ model SupportEmail {
   fromName    String?
   replyTo     String?
   subject     String
+  // Тема обращения из метки «[OptoLink: …]» в теме письма (src/lib/support-topics.ts)
+  topic       String?
   text        String
   attachments Json?
   receivedAt  DateTime
@@ -1023,4 +1025,5 @@ model SupportEmail {
 
   @@index([handledAt, receivedAt])
   @@index([receivedAt])
+  @@index([topic, receivedAt])
 }

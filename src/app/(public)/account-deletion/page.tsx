@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocale, getT } from "@/lib/i18n/server";
-import { legalInfo } from "@/lib/legal";
+import { SupportLink } from "@/components/support-link";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT())("Удаление аккаунта") };
@@ -11,9 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
 // Сюда же попадает пользователь после удаления (?done=1).
 export default async function AccountDeletionInfoPage({ searchParams }: PageProps<"/account-deletion">) {
   const [locale, params] = await Promise.all([getLocale(), searchParams]);
-  const L = legalInfo();
   const done = params.done === "1";
-  const mail = <a href={`mailto:${L.email}`} className="text-brand-600">{L.email}</a>;
+  const mail = <SupportLink topic="deletion" body={locale === "uz" ? "Hisob telefon raqami: " : "Телефон аккаунта: "} />;
   if (locale === "uz") {
     return (
       <>
