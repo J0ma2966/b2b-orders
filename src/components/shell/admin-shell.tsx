@@ -35,7 +35,7 @@ async function AdminSideNav() {
   const [badges, unread, support] = await Promise.all([
     unreadBySection(auth.user.id, ADMIN_NAV.map((i) => i.href)),
     db.notification.count({ where: { userId: auth.user.id, readAt: null } }),
-    db.supportEmail.count({ where: { handledAt: null } }),
+    db.supportEmail.count({ where: { handledAt: null, spam: false } }),
   ]);
   // «Поддержка» — как почтовый ящик: число необработанных писем
   return <SideNav items={ADMIN_NAV} root="/admin" badges={mergeMax(badges, { "/notifications": unread, "/admin/support": support })} />;

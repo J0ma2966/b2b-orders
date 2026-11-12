@@ -5,7 +5,7 @@
 //  1. На сервере: sudo b2b-support-mail gmail-script — команда выведет этот файл с уже вписанными URL и SECRET.
 //  2. Войдите в Gmail поддержки, откройте script.google.com → «Новый проект», вставьте текст целиком, сохраните.
 //  3. Вверху выберите функцию setup и нажмите «Выполнить», разрешите доступ к Gmail и внешним запросам.
-// Дальше скрипт сам раз в минуту отправляет новые письма. Письма в Gmail не меняются.
+// Дальше скрипт сам раз в минуту отправляет новые письма из «Входящих» и «Спама». Письма в Gmail не меняются.
 
 var URL = '__URL__';
 var SECRET = '__SECRET__';
@@ -35,32 +35,41 @@ function forwardSupportMail() {
     sent.forEach(function (id) { seen[id] = true; });
     var me = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
 
-    var query = 'in:inbox newer_than:' + (initial ? FIRST_RUN_DAYS : 2) + 'd';
-    var threads = GmailApp.search(query, 0, 50);
+    // «Входящие» и «Спам»: письма клиентов, которые Gmail счёл спамом, тоже уходят на сайт с пометкой
+    var days = initial ? FIRST_RUN_DAYS : 2;
     var batch = [];
-    for (var i = 0; i < threads.length && batch.length < PER_RUN; i++) {
-      var msgs = threads[i].getMessages();
-      for (var j = 0; j < msgs.length && batch.length < PER_RUN; j++) {
-        var m = msgs[j];
-        var id = m.getId();
-        if (seen[id]) continue;
-        // Свои ответы из этого ящика не пересылаем
-        if (me && m.getFrom().toLowerCase().indexOf(me) !== -1) { seen[id] = true; sent.push(id); continue; }
-        var atts = m.getAttachments({ includeInlineImages: false }).map(function (a) {
-          return { name: a.getName(), size: a.getSize(), type: a.getContentType() };
-        });
-        batch.push({
-          id: id,
-          messageId: m.getHeader('Message-ID') || null,
-          from: m.getFrom(),
-          replyTo: m.getReplyTo() || null,
-          subject: m.getSubject(),
-          text: (m.getPlainBody() || '').slice(0, MAX_TEXT),
-          date: m.getDate().toISOString(),
-          attachments: atts,
-        });
+    var found = 0;
+    [['in:inbox', false], ['in:spam', true]].forEach(function (box) {
+      var threads = GmailApp.search(box[0] + ' newer_than:' + days + 'd', 0, 50);
+      found += threads.length;
+      for (var i = 0; i < threads.length && batch.length < PER_RUN; i++) {
+        var msgs = threads[i].getMessages();
+        for (var j = 0; j < msgs.length && batch.length < PER_RUN; j++) {
+          var m = msgs[j];
+          var id = m.getId();
+          if (seen[id]) continue;
+          // Свои ответы из этого ящика не пересылаем
+          if (me && m.getFrom().toLowerCase().indexOf(me) !== -1) { seen[id] = true; sent.push(id); continue; }
+          // Удалённые письма из цепочки не пересылаем
+          if (m.isInTrash()) continue;
+          var atts = m.getAttachments({ includeInlineImages: false }).map(function (a) {
+            return { name: a.getName(), size: a.getSize(), type: a.getContentType() };
+          });
+          seen[id] = true;
+          batch.push({
+            id: id,
+            messageId: m.getHeader('Message-ID') || null,
+            from: m.getFrom(),
+            replyTo: m.getReplyTo() || null,
+            subject: m.getSubject(),
+            text: (m.getPlainBody() || '').slice(0, MAX_TEXT),
+            date: m.getDate().toISOString(),
+            attachments: atts,
+            spam: box[1],
+          });
+        }
       }
-    }
+    });
 
     if (batch.length > 0) {
       var res = UrlFetchApp.fetch(URL, {
@@ -75,9 +84,9 @@ function forwardSupportMail() {
         return; // письма уйдут при следующем запуске
       }
       batch.forEach(function (b) { sent.push(b.id); });
-      console.log('Отправлено на сайт писем: ' + batch.length + ', новых на сайте: ' + (JSON.parse(res.getContentText()).created || 0));
+      console.log('Отправлено на сайт писем: ' + batch.length + ' (из спама: ' + batch.filter(function (b) { return b.spam; }).length + ')');
     } else {
-      console.log('Новых писем нет (во «Входящих» за ' + (initial ? FIRST_RUN_DAYS : 2) + ' дн.: цепочек ' + threads.length + ')');
+      console.log('Новых писем нет (во «Входящих» и «Спаме» за ' + days + ' дн.: цепочек ' + found + ')');
     }
     props.setProperty('sentIds', JSON.stringify(sent.slice(-KEEP_IDS)));
   } finally {

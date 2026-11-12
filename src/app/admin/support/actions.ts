@@ -19,6 +19,15 @@ export async function setSupportEmailHandledAction(formData: FormData) {
   revalidatePath(`/admin/support/${id}`);
 }
 
+// «Не спам» / «В спам»: только на платформе, письмо в Gmail не меняется
+export async function setSupportEmailSpamAction(formData: FormData) {
+  await requireSuperAdmin();
+  const id = String(formData.get("id") ?? "");
+  await db.supportEmail.updateMany({ where: { id }, data: { spam: formData.get("spam") === "1" } });
+  revalidatePath("/admin/support");
+  revalidatePath(`/admin/support/${id}`);
+}
+
 // «Проверить почту сейчас», не дожидаясь очередной минуты
 export async function checkSupportMailAction() {
   await requireSuperAdmin();

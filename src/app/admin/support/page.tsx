@@ -15,6 +15,7 @@ import { supportFilter, supportWhere } from "./filter";
 const FILTERS: [string, string][] = [
   ["new", "Новые"],
   ["handled", "Обработанные"],
+  ["spam", "Спам Gmail"],
 ];
 
 // Письма из ящика техподдержки (src/lib/support-mail.ts)
@@ -28,13 +29,14 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
   const where = supportWhere(filter);
   const cfg = supportMailConfig();
   const mode = supportMailMode();
-  const [total, rows, fresh, state, freshHere, byTopic] = await Promise.all([
+  const [total, rows, fresh, state, freshHere, byTopic, spamFresh] = await Promise.all([
     db.supportEmail.count({ where }),
     db.supportEmail.findMany({ where, orderBy: { receivedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
-    db.supportEmail.count({ where: { handledAt: null } }),
+    db.supportEmail.count({ where: { handledAt: null, spam: false } }),
     supportMailState(),
     db.supportEmail.count({ where: { AND: [where, { handledAt: null }] } }),
-    db.supportEmail.groupBy({ by: ["topic"], where: { handledAt: null }, _count: true }),
+    db.supportEmail.groupBy({ by: ["topic"], where: { handledAt: null, spam: false }, _count: true }),
+    db.supportEmail.count({ where: { handledAt: null, spam: true } }),
   ]);
   const freshByTopic = new Map(byTopic.map((x) => [x.topic ?? "none", x._count]));
   // Ссылка на тему с сохранением поиска и статуса
@@ -84,6 +86,12 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
             {state.lastOkAt ? t("Почта проверена {date}", { date: t.dateTime(state.lastOkAt) }) : t("Почта ещё не проверялась. Первая проверка — через минуту после запуска сервера.")}
           </p>
         )}
+        {spamFresh > 0 && status !== "spam" && (
+          <Alert tone="warning">
+            {t("В спаме Gmail необработанных писем: {n}.", { n: spamFresh })}{" "}
+            <Link href="/admin/support?status=spam" className="underline">{t("Проверить")}</Link>
+          </Alert>
+        )}
         {mode === "webhook" && (
           <p className="text-xs text-gray-500">
             {state.lastOkAt ? t("Письма пересылает скрипт Gmail, последний раз {date}", { date: t.dateTime(state.lastOkAt) }) : t("Ждём первую пересылку от скрипта Gmail (раз в минуту).")}
@@ -118,7 +126,8 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
                 <span className="text-xs whitespace-nowrap text-gray-500">{t.dateTime(r.receivedAt)}</span>
               </div>
               <div className="mt-0.5 flex items-center gap-2">
-                {!r.handledAt && <Badge color="blue">{t("Новое")}</Badge>}
+                {r.spam && <Badge color="yellow">{t("Спам Gmail")}</Badge>}
+                {!r.handledAt && !r.spam && <Badge color="blue">{t("Новое")}</Badge>}
                 {isSupportTopic(r.topic) && <Badge color="gray">{t(supportTopicLabel(r.topic))}</Badge>}
                 <span className={r.handledAt ? "text-sm" : "text-sm font-medium"}>{r.subject}</span>
               </div>

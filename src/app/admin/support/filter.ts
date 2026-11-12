@@ -11,13 +11,15 @@ export function supportFilter(get: (k: string) => unknown): SupportFilter {
   const topic = str(get("topic"));
   return {
     q: str(get("q")),
-    status: status === "new" || status === "handled" ? status : undefined,
+    status: status === "new" || status === "handled" || status === "spam" ? status : undefined,
     topic: topic === "none" || isSupportTopic(topic) ? topic : undefined,
   };
 }
 
 export function supportWhere({ q, status, topic }: SupportFilter): Prisma.SupportEmailWhereInput {
   return {
+    // Спам Gmail виден только в своём фильтре
+    spam: status === "spam",
     ...(status === "new" && { handledAt: null }),
     ...(status === "handled" && { handledAt: { not: null } }),
     ...(topic && { topic: topic === "none" ? null : topic }),

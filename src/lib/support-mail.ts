@@ -55,7 +55,7 @@ const firstAddress = (a: AddressObject | AddressObject[] | undefined): ParsedAdd
 
 // Сохраняет письма и уведомляет суперадминов. silent — первое подключение: одно общее уведомление.
 export async function ingestSupportMails(mails: IncomingMail[], { silent = false, now = new Date() } = {}) {
-  const created: { id: string; subject: string; fromName: string | null; fromAddress: string | null; text: string }[] = [];
+  const created: { id: string; subject: string; fromName: string | null; fromAddress: string | null; text: string; spam: boolean }[] = [];
   for (const m of mails) {
     const r = toRecord(m, now);
     const exists = await db.supportEmail.findUnique({ where: { messageKey: r.messageKey }, select: { id: true } });
@@ -78,7 +78,18 @@ export async function ingestSupportMails(mails: IncomingMail[], { silent = false
     });
     return created.length;
   }
-  for (const r of created.slice(0, NOTIFY_EACH)) {
+  // Письма из «Спама» Gmail: одно общее уведомление, чтобы настоящий спам не засыпал колокольчик
+  const spam = created.filter((r) => r.spam);
+  if (spam.length > 0) {
+    await notifySuperAdmins({
+      type: "support.spam",
+      title: `В спаме Gmail писем: ${spam.length}`,
+      body: spam.length === 1 ? `${senderLabel(spam[0])}: ${snippet(spam[0].subject, 120)}` : "Проверьте, нет ли среди них обращений клиентов",
+      link: "/admin/support?status=spam",
+    });
+  }
+  const normal = created.filter((r) => !r.spam);
+  for (const r of normal.slice(0, NOTIFY_EACH)) {
     await notifySuperAdmins({
       type: "support.email",
       title: `Письмо в поддержку: ${snippet(r.subject, 120)}`,
@@ -88,7 +99,7 @@ export async function ingestSupportMails(mails: IncomingMail[], { silent = false
       entityId: r.id,
     });
   }
-  const rest = created.length - NOTIFY_EACH;
+  const rest = normal.length - NOTIFY_EACH;
   if (rest > 0) {
     await notifySuperAdmins({ type: "support.email", title: `Ещё писем в поддержку: ${rest}`, link: "/admin/support" });
   }

@@ -66,6 +66,8 @@ export type WebhookMail = {
   html?: string | null;
   date?: string | null;
   attachments?: { name?: string | null; size?: number | null; type?: string | null }[];
+  // Письмо лежит в «Спаме» Gmail
+  spam?: boolean | null;
 };
 
 export function webhookToIncoming(m: WebhookMail): IncomingMail {
@@ -82,6 +84,7 @@ export function webhookToIncoming(m: WebhookMail): IncomingMail {
     html: m.html,
     date: date && !Number.isNaN(date.getTime()) ? date : null,
     attachments: (m.attachments ?? []).map((a) => ({ filename: a.name, size: a.size, contentType: a.type })),
+    spam: !!m.spam,
   };
 }
 
@@ -99,6 +102,7 @@ export type IncomingMail = {
   date?: Date | null;
   attachments?: { filename?: string | null; size?: number | null; contentType?: string | null }[];
   tooLarge?: boolean;
+  spam?: boolean;
 };
 
 export type SupportEmailRecord = {
@@ -109,6 +113,7 @@ export type SupportEmailRecord = {
   replyTo: string | null;
   subject: string;
   topic: string | null;
+  spam: boolean;
   text: string;
   attachments: { name: string; size: number; type: string }[] | undefined;
   receivedAt: Date;
@@ -163,6 +168,7 @@ export function toRecord(m: IncomingMail, now = new Date()): SupportEmailRecord 
     replyTo: addr(m.replyTo),
     subject,
     topic: topicFromSubject(subject),
+    spam: !!m.spam,
     text: text || "(пустое письмо)",
     attachments: attachments.length ? attachments : undefined,
     receivedAt: date,

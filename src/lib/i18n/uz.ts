@@ -1,6 +1,13 @@
 // Узбекский словарь (латиница). Ключ — русская строка интерфейса, см. core.ts.
 // Проверка полноты: node scripts/i18n-check.mjs --missing
 const uz: Record<string, string> = {
+  "Спам Gmail": "Gmail spami",
+  "Не спам": "Spam emas",
+  "В спам": "Spamga",
+  "В спаме Gmail необработанных писем: {n}.": "Gmail spamida koʻrib chiqilmagan xatlar: {n}.",
+  "Проверить": "Tekshirish",
+  "В спаме Gmail писем: {0}": "Gmail spamida xatlar: {0}",
+  "Проверьте, нет ли среди них обращений клиентов": "Ular orasida mijozlar murojaatlari yoʻqligini tekshiring",
   "Тема обращения": "Murojaat mavzusi",
   "Все темы": "Barcha mavzular",
   "Без темы": "Mavzusiz",

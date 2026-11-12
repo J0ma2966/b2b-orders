@@ -35,12 +35,22 @@ describe.skipIf(!enabled)("почта поддержки: темы и «отме
     expect(rows.map((r) => r.topic)).toEqual(["deletion", "deletion", null]);
   });
 
+  it("спам Gmail виден только в своём фильтре", async () => {
+    await ingestSupportMails([{ ...mail("9", "Выигрыш"), spam: true }]);
+    const { supportWhere } = await import("@/app/admin/support/filter");
+    const keys = async (status?: string) => (await db.supportEmail.findMany({ where: { AND: [supportWhere({ q: tag, status }), { messageKey: { contains: tag } }] } })).map((r) => r.messageKey.slice(tag.length + 2, -3)).sort();
+    expect(await keys()).toEqual(["1", "2", "3"]);
+    expect(await keys("new")).toEqual(["1", "2", "3"]);
+    expect(await keys("spam")).toEqual(["9"]);
+  });
+
   it("«отметить все» трогает только письма по фильтру, потом — все остальные", async () => {
     await markAllSupportEmailsHandledAction(form({ q: tag, topic: "deletion" }));
-    expect(await handled()).toEqual({ "1": true, "2": true, "3": false });
+    expect(await handled()).toEqual({ "1": true, "2": true, "3": false, "9": false });
     await markAllSupportEmailsHandledAction(form({ q: tag }));
-    expect(await handled()).toEqual({ "1": true, "2": true, "3": true });
-    const row = await db.supportEmail.findFirstOrThrow({ where: { messageKey: { contains: tag } } });
+    // Спам не трогается, пока не выбран фильтр «Спам Gmail»
+    expect(await handled()).toEqual({ "1": true, "2": true, "3": true, "9": false });
+    const row = await db.supportEmail.findFirstOrThrow({ where: { messageKey: { contains: tag }, spam: false } });
     expect(row.handledById).toBe(adminId);
   });
 });
