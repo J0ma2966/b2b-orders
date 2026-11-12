@@ -13,7 +13,9 @@ import {
   supportMailConfig,
   toRecord,
   uidsToFetch,
+  webhookToIncoming,
   type IncomingMail,
+  type WebhookMail,
   type ParsedAddress,
   type SupportMailConfig,
 } from "@/lib/support-mail-core";
@@ -196,4 +198,20 @@ export async function pollSupportMail(now = new Date()): Promise<{ created: numb
   } finally {
     running = null;
   }
+}
+
+// Приём писем от скрипта Google (POST /api/support-mail/inbound). initial — первая отправка скрипта:
+// одно общее уведомление вместо уведомления на каждое письмо.
+export async function ingestWebhookMails(mails: WebhookMail[], initial: boolean, now = new Date()) {
+  const created = await ingestSupportMails(mails.map(webhookToIncoming), { silent: initial, now });
+  const state = await supportMailState();
+  await saveState({ ...state, lastCheckAt: now.toISOString(), lastOkAt: now.toISOString(), lastError: null });
+  return created;
+}
+
+// Как подключена почта: IMAP (сервер сам читает ящик), скрипт Google (письма приходят на сайт) или никак
+export function supportMailMode(): "imap" | "webhook" | null {
+  if (supportMailConfig()) return "imap";
+  if (process.env.SUPPORT_MAIL_WEBHOOK_SECRET) return "webhook";
+  return null;
 }

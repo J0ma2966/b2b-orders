@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { senderLabel, snippet, supportMailConfig } from "@/lib/support-mail-core";
-import { supportMailState } from "@/lib/support-mail";
+import { supportMailMode, supportMailState } from "@/lib/support-mail";
 import type { Prisma } from "@/generated/prisma/client";
 import { checkSupportMailAction } from "./actions";
 
@@ -37,6 +37,7 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
     }),
   };
   const cfg = supportMailConfig();
+  const mode = supportMailMode();
   const [total, rows, fresh, state] = await Promise.all([
     db.supportEmail.count({ where }),
     db.supportEmail.findMany({ where, orderBy: { receivedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
@@ -47,7 +48,7 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
     <>
       <PageHeader
         title="Поддержка"
-        subtitle={cfg ? t("Письма из ящика {box} · новых: {n}", { box: cfg.user, n: fresh }) : "Письма из ящика техподдержки"}
+        subtitle={cfg ? t("Письма из ящика {box} · новых: {n}", { box: cfg.user, n: fresh }) : t("Письма из ящика техподдержки · новых: {n}", { n: fresh })}
         actions={
           cfg && (
             <form action={checkSupportMailAction}>
@@ -57,15 +58,20 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
         }
       />
       <div className="mb-4 space-y-2">
-        {!cfg && (
+        {!mode && (
           <Alert tone="warning">
-            {t("Почта поддержки не подключена. На сервере выполните sudo b2b-support-mail setup и введите адрес ящика и пароль приложения.")}
+            {t("Почта поддержки не подключена. На сервере выполните sudo b2b-support-mail setup (IMAP) или sudo b2b-support-mail gmail-script (скрипт Gmail).")}
           </Alert>
         )}
         {cfg && state.lastError && <Alert tone="error">{t(state.lastError)}</Alert>}
         {cfg && (
           <p className="text-xs text-gray-500">
             {state.lastOkAt ? t("Почта проверена {date}", { date: t.dateTime(state.lastOkAt) }) : t("Почта ещё не проверялась. Первая проверка — через минуту после запуска сервера.")}
+          </p>
+        )}
+        {mode === "webhook" && (
+          <p className="text-xs text-gray-500">
+            {state.lastOkAt ? t("Письма пересылает скрипт Gmail, последний раз {date}", { date: t.dateTime(state.lastOkAt) }) : t("Ждём первую пересылку от скрипта Gmail (раз в минуту).")}
           </p>
         )}
       </div>

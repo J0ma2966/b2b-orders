@@ -44,6 +44,46 @@ export const FIRST_RUN_LIMIT = 20;
 // Сколько отдельных уведомлений за одну проверку; остальные письма — одним общим
 export const NOTIFY_EACH = 5;
 
+// «Имя <адрес>», «"Имя" <адрес>» или просто адрес — как отдаёт GmailApp.getFrom()
+export function parseAddressString(s: string | null | undefined): { name: string | null; address: string | null } | null {
+  const v = (s ?? "").trim();
+  if (!v) return null;
+  const m = /^\s*"?([^"<]*?)"?\s*<([^<>\s]+@[^<>\s]+)>\s*$/.exec(v);
+  if (m) return { name: m[1].trim() || null, address: m[2] };
+  return /^[^\s@<>]+@[^\s@<>]+$/.test(v) ? { name: null, address: v } : { name: v, address: null };
+}
+
+// Письма от скрипта Google в Gmail (deploy/gmail-apps-script.gs): сервер сам в почту не ходит.
+// Нужен, когда хостинг закрывает исходящий порт 993.
+export type WebhookMail = {
+  id: string;
+  messageId?: string | null;
+  from?: string | null;
+  replyTo?: string | null;
+  subject?: string | null;
+  text?: string | null;
+  html?: string | null;
+  date?: string | null;
+  attachments?: { name?: string | null; size?: number | null; type?: string | null }[];
+};
+
+export function webhookToIncoming(m: WebhookMail): IncomingMail {
+  const date = m.date ? new Date(m.date) : null;
+  return {
+    uid: 0,
+    uidValidity: "gmail-script",
+    // Без Message-ID ключом служит id письма в Gmail
+    messageId: m.messageId?.trim() || `gmail:${m.id}`,
+    from: parseAddressString(m.from),
+    replyTo: parseAddressString(m.replyTo),
+    subject: m.subject,
+    text: m.text,
+    html: m.html,
+    date: date && !Number.isNaN(date.getTime()) ? date : null,
+    attachments: (m.attachments ?? []).map((a) => ({ filename: a.name, size: a.size, contentType: a.type })),
+  };
+}
+
 export type ParsedAddress = { address?: string | null; name?: string | null };
 
 export type IncomingMail = {

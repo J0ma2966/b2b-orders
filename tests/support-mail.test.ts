@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeImapError, htmlToText, replyMailto, senderLabel, supportMailConfig, toRecord, uidsToFetch } from "@/lib/support-mail-core";
+import { describeImapError, htmlToText, parseAddressString, webhookToIncoming, replyMailto, senderLabel, supportMailConfig, toRecord, uidsToFetch } from "@/lib/support-mail-core";
 
 describe("почта техподдержки: чистые функции", () => {
   it("настройки: без хоста, логина или пароля — выключено; 993 — TLS", () => {
@@ -56,5 +56,18 @@ describe("почта техподдержки: чистые функции", () 
     expect(describeImapError({ authenticationFailed: true })).toMatch(/пароль приложения/);
     expect(describeImapError({ code: "ENOTFOUND" })).toMatch(/Не найден/);
     expect(htmlToText("a<br>b")).toBe("a\nb");
+  });
+
+  it("письма от скрипта Gmail: адреса из строки, ключ по Message-ID или id Gmail", () => {
+    expect(parseAddressString('"Алмаз, магазин" <a@b.uz>')).toEqual({ name: "Алмаз, магазин", address: "a@b.uz" });
+    expect(parseAddressString("Али <ali@mail.ru>")).toEqual({ name: "Али", address: "ali@mail.ru" });
+    expect(parseAddressString("x@y.uz")).toEqual({ name: null, address: "x@y.uz" });
+    expect(parseAddressString("")).toBeNull();
+    const m = webhookToIncoming({ id: "18f", from: "Али <ali@mail.ru>", subject: "Тест", text: "Привет", date: "2026-11-12T00:00:00Z", attachments: [{ name: "a.pdf", size: 10, type: "application/pdf" }] });
+    const r = toRecord(m, new Date("2026-11-12T01:00:00Z"));
+    expect(r.messageKey).toBe("gmail:18f");
+    expect(r.fromName).toBe("Али");
+    expect(r.attachments).toEqual([{ name: "a.pdf", size: 10, type: "application/pdf" }]);
+    expect(webhookToIncoming({ id: "1", messageId: "<z@q>", date: "мусор" }).date).toBeNull();
   });
 });
