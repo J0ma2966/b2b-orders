@@ -66,12 +66,19 @@ export function fcmTransient(status: number) {
   return status === 429 || status >= 500;
 }
 
-// Ответ FCM одной строкой: «FCM 403 SENDER_ID_MISMATCH: текст» — чтобы в журнале и алерте была причина
+// Ответ FCM одной строкой: «FCM 403 IAM_PERMISSION_DENIED: текст» — чтобы в журнале и алерте была причина
 export function fcmErrorSummary(status: number, body: string) {
   try {
-    const e = (JSON.parse(body) as { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } }).error;
-    const code = e?.details?.find((d) => d.errorCode)?.errorCode ?? e?.status ?? "";
-    return `FCM ${status} ${code}: ${e?.message ?? ""}`.replace(/\s+/g, " ").trim();
+    type Detail = { errorCode?: string; reason?: string };
+    const e = (JSON.parse(body) as { error?: { status?: string; message?: string; details?: Detail[] } }).error;
+    const code = e?.details?.map((d) => d.errorCode ?? d.reason).find(Boolean) ?? e?.status ?? "";
+    // Ссылку на Troubleshooter Google обрезаем — она длинная и одноразовая
+    const message = (e?.message ?? "").replace(/\s*Remediate access.*$/s, "");
+    const hint =
+      code === "IAM_PERMISSION_DENIED"
+        ? " → у сервисного аккаунта из FCM_SERVICE_ACCOUNT_FILE нет права отправлять push: ключ надо создать в Firebase (Настройки проекта → Сервисные аккаунты) или выдать роль Firebase Cloud Messaging API Admin, см. docs/mobile.md"
+        : "";
+    return `FCM ${status} ${code}: ${message}${hint}`.replace(/\s+/g, " ").trim();
   } catch {
     return `FCM ${status}: ${body.replace(/\s+/g, " ").slice(0, 300)}`;
   }

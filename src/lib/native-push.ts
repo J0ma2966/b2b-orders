@@ -132,7 +132,7 @@ export async function sendNativePush(tokens: { id: string; platform: "ANDROID" |
     } catch (e) {
       // Одной строкой, с кодом и причиной («native push ANDROID Error: FCM 403 PERMISSION_DENIED: …»),
       // чтобы в алерте Telegram (deploy/monitor.sh) была видна причина. Временные сбои — без слова Error, без алерта.
-      const msg = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, " ").slice(0, 300);
+      const msg = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, " ").slice(0, 600);
       if (e instanceof PushError && e.transient) console.warn(`native push ${t.platform} delayed: ${msg}`);
       else console.error(`native push ${t.platform} Error: ${msg}`);
     }
