@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateKeyPairSync, verify } from "node:crypto";
-import { apnsBody, apnsJwt, apnsTokenGone, fcmBody, fcmTokenGone, googleAssertion, validDeviceToken } from "@/lib/native-push-core";
+import { apnsBody, apnsJwt, apnsTokenGone, fcmBody, fcmErrorSummary, fcmTokenGone, fcmTransient, googleAssertion, validDeviceToken } from "@/lib/native-push-core";
 import { safePath } from "@/lib/push-path";
 import { fileNameFrom } from "@/lib/native";
 
@@ -46,6 +46,22 @@ describe("push в мобильном приложении", () => {
     expect(fcmTokenGone(400, '{"error":{"details":[{"errorCode":"UNREGISTERED"}]}}')).toBe(true);
     expect(fcmTokenGone(500, "UNREGISTERED")).toBe(false);
     expect(fcmTokenGone(401, "")).toBe(false);
+    expect(fcmTokenGone(403, '{"error":{"status":"PERMISSION_DENIED","details":[{"errorCode":"SENDER_ID_MISMATCH"}]}}')).toBe(true);
+    expect(fcmTokenGone(403, '{"error":{"status":"PERMISSION_DENIED","message":"Permission denied"}}')).toBe(false);
+    expect(fcmTokenGone(400, '{"error":{"message":"The registration token is not a valid FCM registration token"}}')).toBe(true);
+    expect(fcmTransient(503)).toBe(true);
+    expect(fcmTransient(429)).toBe(true);
+    expect(fcmTransient(403)).toBe(false);
+    expect(fcmErrorSummary(403, '{\n "error": {\n  "code": 403,\n  "message": "Permission denied",\n  "status": "PERMISSION_DENIED"\n }\n}')).toBe(
+      "FCM 403 PERMISSION_DENIED: Permission denied",
+    );
+    const iam = fcmErrorSummary(
+      403,
+      JSON.stringify({ error: { code: 403, message: "Permission 'cloudmessaging.messages.create' denied on resource 'projects/x'. Remediate access with this Troubleshooter URL - https://console.cloud.google.com/x .", status: "PERMISSION_DENIED", details: [{ reason: "IAM_PERMISSION_DENIED" }] } }),
+    );
+    expect(iam).toMatch(/^FCM 403 IAM_PERMISSION_DENIED: Permission 'cloudmessaging.messages.create' denied on resource 'projects\/x'\. → /);
+    expect(iam).not.toContain("Troubleshooter");
+    expect(fcmErrorSummary(502, "<html>\nBad gateway</html>")).toBe("FCM 502: <html> Bad gateway</html>");
     expect(apnsTokenGone(410, "")).toBe(true);
     expect(apnsTokenGone(400, '{"reason":"BadDeviceToken"}')).toBe(true);
     expect(apnsTokenGone(403, '{"reason":"InvalidProviderToken"}')).toBe(false);

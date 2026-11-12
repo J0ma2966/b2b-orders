@@ -51,10 +51,37 @@ export function apnsBody(m: PushMessage) {
   return { aps: { alert: { title: m.title, body: m.body }, sound: "default" }, url: safePath(m.url) };
 }
 
-// Токен больше не действует (приложение удалено, токен обновился) — его надо удалить из базы
+// Токен больше не действует — его надо удалить из базы:
+// 404 / UNREGISTERED — приложение удалено или токен обновился;
+// SENDER_ID_MISMATCH — токен выдан другим проектом Firebase (например, старой сборкой приложения);
+// INVALID_ARGUMENT про сам токен — токен испорчен.
 export function fcmTokenGone(status: number, body: string) {
   if (status === 404) return true;
-  return status === 400 && /UNREGISTERED|registration token is not a valid/i.test(body);
+  if (/UNREGISTERED|SENDER_ID_MISMATCH/.test(body)) return status === 400 || status === 403;
+  return status === 400 && /registration token is not a valid/i.test(body);
+}
+
+// Временные сбои Google (перегрузка, лимиты) — не повод для алерта, уведомление и так есть на сайте
+export function fcmTransient(status: number) {
+  return status === 429 || status >= 500;
+}
+
+// Ответ FCM одной строкой: «FCM 403 IAM_PERMISSION_DENIED: текст» — чтобы в журнале и алерте была причина
+export function fcmErrorSummary(status: number, body: string) {
+  try {
+    type Detail = { errorCode?: string; reason?: string };
+    const e = (JSON.parse(body) as { error?: { status?: string; message?: string; details?: Detail[] } }).error;
+    const code = e?.details?.map((d) => d.errorCode ?? d.reason).find(Boolean) ?? e?.status ?? "";
+    // Ссылку на Troubleshooter Google обрезаем — она длинная и одноразовая
+    const message = (e?.message ?? "").replace(/\s*Remediate access[\s\S]*$/, "");
+    const hint =
+      code === "IAM_PERMISSION_DENIED"
+        ? " → у сервисного аккаунта из FCM_SERVICE_ACCOUNT_FILE нет права отправлять push: выдайте ему роль Firebase Cloud Messaging API Admin в Google Cloud → IAM (новый ключ того же аккаунта не поможет), см. docs/mobile.md"
+        : "";
+    return `FCM ${status} ${code}: ${message}${hint}`.replace(/\s+/g, " ").trim();
+  } catch {
+    return `FCM ${status}: ${body.replace(/\s+/g, " ").slice(0, 300)}`;
+  }
 }
 
 export function apnsTokenGone(status: number, body: string) {
