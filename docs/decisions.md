@@ -274,3 +274,6 @@
 - Ответ — из своей почты (mailto с «Re: тема»), отправка писем с платформы (SMTP) пока не нужна.
 - Пароль приложения кладёт команда `b2b-support-mail setup` в secrets/support-mail.pass (SUPPORT_IMAP_PASSWORD_FILE):
   в .env не нужно экранировать спецсимволы, и пароля нет в файле, который чаще открывают.
+- 2026-11-12: хостинг (AdminVPS) закрывает исходящий порт 993. Запасной путь без IMAP: скрипт Google Apps Script
+  в самом Gmail (deploy/gmail-apps-script.gs) раз в минуту шлёт новые письма POST-ом на /api/support-mail/inbound
+  с секретом SUPPORT_MAIL_WEBHOOK_SECRET. Дальше тот же путь: SupportEmail, уведомления, раздел «Поддержка».

@@ -3,6 +3,8 @@
 #   sudo b2b-support-mail setup   — подключить ящик (адрес, пароль приложения), проверить вход, перезапустить сайт
 #   sudo b2b-support-mail test    — проверить вход в ящик с текущими настройками
 #   sudo b2b-support-mail status  — что подключено и последние записи журнала
+#   sudo b2b-support-mail gmail-script — без IMAP: выдать скрипт Google для Gmail, который сам пересылает
+#                                  письма на сайт (если хостинг закрывает исходящий порт 993)
 #   sudo b2b-support-mail off     — отключить (письма, уже сохранённые на платформе, остаются)
 # Ящик открывается только для чтения: письма не удаляются и не помечаются прочитанными.
 set -euo pipefail
@@ -113,11 +115,35 @@ cmd_status() {
   echo "(пусто — значит ошибок не было; статус проверки виден и в кабинете: /admin/support)"
 }
 
+# Скрипт Google в Gmail шлёт письма на https://ДОМЕН/api/support-mail/inbound с секретом из .env
+cmd_gmail_script() {
+  local domain secret script="$APP_DIR/deploy/gmail-apps-script.gs"
+  domain="$(get_env APP_DOMAIN)"
+  [ -n "$domain" ] || { echo "В $ENV_FILE не задан APP_DOMAIN (sudo b2b-set-domain ДОМЕН)" >&2; exit 1; }
+  [ -f "$script" ] || { echo "Не найден $script — сначала sudo b2b-update" >&2; exit 1; }
+  secret="$(get_env SUPPORT_MAIL_WEBHOOK_SECRET)"
+  if [ -z "$secret" ]; then
+    secret="$(openssl rand -hex 32)"
+    set_env SUPPORT_MAIL_WEBHOOK_SECRET "$secret"
+    restart_app
+  fi
+  echo
+  echo "1. Войдите в Gmail поддержки и откройте https://script.google.com → «Новый проект»."
+  echo "2. Удалите всё в редакторе и вставьте текст между линиями ниже. Сохраните (Ctrl+S)."
+  echo "3. Вверху выберите функцию setup → «Выполнить» → разрешите доступ (Дополнительно → Перейти в проект)."
+  echo "Дальше скрипт раз в минуту пересылает новые письма в раздел «Поддержка»."
+  echo "Секрет в тексте — как пароль: не публикуйте его. Новый секрет: sudo b2b-support-mail gmail-script --new"
+  echo "-------------------------------------------------------------------------------"
+  sed -e "s|__URL__|https://$domain/api/support-mail/inbound|" -e "s|__SECRET__|$secret|" "$script"
+  echo "-------------------------------------------------------------------------------"
+}
+
 cmd_off() {
   set_env SUPPORT_IMAP_HOST ""
   set_env SUPPORT_IMAP_USER ""
   set_env SUPPORT_IMAP_PASSWORD ""
   set_env SUPPORT_IMAP_PASSWORD_FILE ""
+  set_env SUPPORT_MAIL_WEBHOOK_SECRET ""
   rm -f "$PASS_FILE"
   restart_app
   echo "Почта поддержки отключена. Уже полученные письма остались в разделе «Поддержка»."
@@ -127,6 +153,9 @@ case "${1:-setup}" in
   setup) cmd_setup ;;
   test) cmd_test ;;
   status) cmd_status ;;
+  gmail-script)
+    if [ "${2:-}" = "--new" ]; then set_env SUPPORT_MAIL_WEBHOOK_SECRET ""; fi
+    cmd_gmail_script ;;
   off) cmd_off ;;
-  *) echo "Использование: sudo b2b-support-mail setup|test|status|off" >&2; exit 1 ;;
+  *) echo "Использование: sudo b2b-support-mail setup|test|status|gmail-script|off" >&2; exit 1 ;;
 esac
