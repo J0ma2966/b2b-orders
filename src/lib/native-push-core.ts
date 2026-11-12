@@ -73,7 +73,7 @@ export function fcmErrorSummary(status: number, body: string) {
     const e = (JSON.parse(body) as { error?: { status?: string; message?: string; details?: Detail[] } }).error;
     const code = e?.details?.map((d) => d.errorCode ?? d.reason).find(Boolean) ?? e?.status ?? "";
     // Ссылку на Troubleshooter Google обрезаем — она длинная и одноразовая
-    const message = (e?.message ?? "").replace(/\s*Remediate access.*$/s, "");
+    const message = (e?.message ?? "").replace(/\s*Remediate access[\s\S]*$/, "");
     const hint =
       code === "IAM_PERMISSION_DENIED"
         ? " → у сервисного аккаунта из FCM_SERVICE_ACCOUNT_FILE нет права отправлять push: ключ надо создать в Firebase (Настройки проекта → Сервисные аккаунты) или выдать роль Firebase Cloud Messaging API Admin, см. docs/mobile.md"
