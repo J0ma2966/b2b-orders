@@ -71,3 +71,30 @@ describe("почта техподдержки: чистые функции", () 
     expect(webhookToIncoming({ id: "1", messageId: "<z@q>", date: "мусор" }).date).toBeNull();
   });
 });
+
+import { supportMailto, supportSubject, topicFromSubject } from "@/lib/support-topics";
+
+describe("темы обращений", () => {
+  it("ссылка ставит метку темы в тему письма", () => {
+    const href = supportMailto("support.optolink@gmail.com", "deletion", "ru", "Телефон аккаунта: ");
+    expect(href.startsWith("mailto:support.optolink@gmail.com?subject=")).toBe(true);
+    const u = new URL(href);
+    expect(u.searchParams.get("subject")).toBe("[OptoLink: Удаление аккаунта]");
+    expect(u.searchParams.get("body")).toBe("Телефон аккаунта: ");
+    expect(supportSubject("privacy", "uz")).toBe("[OptoLink: Shaxsiy ma’lumotlar]");
+  });
+  it("тема узнаётся во входящем письме, в том числе в ответе и по-узбекски", () => {
+    expect(topicFromSubject("[OptoLink: Удаление аккаунта] помогите")).toBe("deletion");
+    expect(topicFromSubject("Re: Fwd: [optolink:  удаление  аккаунта]")).toBe("deletion");
+    expect(topicFromSubject("[OptoLink: Shaxsiy ma'lumotlar]")).toBe("privacy");
+    expect(topicFromSubject("[OptoLink: Bloklash]")).toBe("blocked");
+    expect(topicFromSubject("[OptoLink: что-то ещё]")).toBeNull();
+    expect(topicFromSubject("Удаление аккаунта")).toBeNull();
+    expect(topicFromSubject(null)).toBeNull();
+  });
+  it("toRecord сохраняет тему", () => {
+    const r = toRecord({ uid: 1, uidValidity: "1", subject: "[OptoLink: Проверка заявки] ИНН", text: "x" });
+    expect(r.topic).toBe("moderation");
+    expect(toRecord({ uid: 2, uidValidity: "1", subject: "Привет", text: "x" }).topic).toBeNull();
+  });
+});

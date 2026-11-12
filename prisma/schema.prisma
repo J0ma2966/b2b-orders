@@ -1014,6 +1014,10 @@ model SupportEmail {
   fromName    String?
   replyTo     String?
   subject     String
+  // Тема обращения из метки «[OptoLink: …]» в теме письма (src/lib/support-topics.ts)
+  topic       String?
+  // Gmail положил письмо в «Спам» (пересылает скрипт Gmail). Не попадает в «Новые» и счётчик раздела
+  spam        Boolean   @default(false)
   text        String
   attachments Json?
   receivedAt  DateTime
@@ -1023,4 +1027,5 @@ model SupportEmail {
 
   @@index([handledAt, receivedAt])
   @@index([receivedAt])
+  @@index([topic, receivedAt])
 }

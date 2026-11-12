@@ -46,4 +46,17 @@ describe.skipIf(!enabled)("почта поддержки через скрипт
     expect(row.fromName).toBe("Магазин");
     expect(row.fromAddress).toBe(`shop3@gmail.com`);
   });
+
+  it("письма из спама Gmail: пометка, одно общее уведомление, не в счётчике новых", async () => {
+    const spam = (n: string) => ({ ...msg(n), spam: true });
+    const r = await call({ messages: [spam("s1"), spam("s2"), msg("4")] });
+    expect(await r.json()).toEqual({ ok: true, created: 3 });
+    const rows = await db.supportEmail.findMany({ where: { messageKey: { in: [`<${tag}-s1@gmail.com>`, `<${tag}-4@gmail.com>`] } }, orderBy: { messageKey: "asc" } });
+    expect(rows.map((x) => [x.messageKey.includes("-4@"), x.spam])).toEqual([[true, false], [false, true]]);
+    const spamNotes = await db.notification.findMany({ where: { userId: adminId, type: "support.spam" } });
+    expect(spamNotes.map((n) => [n.title, n.link])).toEqual([["В спаме Gmail писем: 2", "/admin/support?status=spam"]]);
+    const mailNotes = await db.notification.findMany({ where: { userId: adminId, type: "support.email" } });
+    expect(mailNotes.map((n) => n.title)).toContain("Письмо в поддержку: Вопрос 4");
+    expect(mailNotes.map((n) => n.title)).not.toContain("Письмо в поддержку: Вопрос s1");
+  });
 });

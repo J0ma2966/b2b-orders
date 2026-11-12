@@ -8,12 +8,14 @@ import { requireSuperAdmin } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { senderLabel, snippet, supportMailConfig } from "@/lib/support-mail-core";
 import { supportMailMode, supportMailState } from "@/lib/support-mail";
-import type { Prisma } from "@/generated/prisma/client";
-import { checkSupportMailAction } from "./actions";
+import { SUPPORT_TOPICS, isSupportTopic, supportTopicLabel } from "@/lib/support-topics";
+import { checkSupportMailAction, markAllSupportEmailsHandledAction } from "./actions";
+import { supportFilter, supportWhere } from "./filter";
 
 const FILTERS: [string, string][] = [
   ["new", "Новые"],
   ["handled", "Обработанные"],
+  ["spam", "Спам Gmail"],
 ];
 
 // Письма из ящика техподдержки (src/lib/support-mail.ts)
@@ -21,29 +23,44 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
   const t = await getT();
   await requireSuperAdmin();
   const sp = await searchParams;
-  const q = typeof sp.q === "string" ? sp.q.trim() : "";
-  const status = typeof sp.status === "string" && sp.status ? sp.status : undefined;
+  const filter = supportFilter((k) => sp[k]);
+  const { q, status, topic } = filter;
   const page = pageFrom(sp);
-  const where: Prisma.SupportEmailWhereInput = {
-    ...(status === "new" && { handledAt: null }),
-    ...(status === "handled" && { handledAt: { not: null } }),
-    ...(q && {
-      OR: [
-        { subject: { contains: q, mode: "insensitive" } },
-        { fromAddress: { contains: q, mode: "insensitive" } },
-        { fromName: { contains: q, mode: "insensitive" } },
-        { text: { contains: q, mode: "insensitive" } },
-      ],
-    }),
-  };
+  const where = supportWhere(filter);
   const cfg = supportMailConfig();
   const mode = supportMailMode();
-  const [total, rows, fresh, state] = await Promise.all([
+  const [total, rows, fresh, state, freshHere, byTopic, spamFresh] = await Promise.all([
     db.supportEmail.count({ where }),
     db.supportEmail.findMany({ where, orderBy: { receivedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
-    db.supportEmail.count({ where: { handledAt: null } }),
+    db.supportEmail.count({ where: { handledAt: null, spam: false } }),
     supportMailState(),
+    db.supportEmail.count({ where: { AND: [where, { handledAt: null }] } }),
+    db.supportEmail.groupBy({ by: ["topic"], where: { handledAt: null, spam: false }, _count: true }),
+    db.supportEmail.count({ where: { handledAt: null, spam: true } }),
   ]);
+  const freshByTopic = new Map(byTopic.map((x) => [x.topic ?? "none", x._count]));
+  // Ссылка на тему с сохранением поиска и статуса
+  const topicHref = (code?: string) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (status) p.set("status", status);
+    if (code) p.set("topic", code);
+    const s = p.toString();
+    return s ? `/admin/support?${s}` : "/admin/support";
+  };
+  const chip = (code: string | undefined, label: string) => {
+    const n = code ? freshByTopic.get(code) : fresh;
+    return (
+      <Link
+        key={code ?? "all"}
+        href={topicHref(code)}
+        className={`inline-flex min-h-9 items-center gap-1 rounded-full px-3 py-1 text-sm ring-1 ${topic === code ? "bg-brand-600 text-on-brand ring-brand-600" : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50"}`}
+      >
+        {t(label)}
+        {!!n && <span className={topic === code ? "text-xs" : "text-xs text-gray-500"}>{n}</span>}
+      </Link>
+    );
+  };
   return (
     <>
       <PageHeader
@@ -69,13 +86,35 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
             {state.lastOkAt ? t("Почта проверена {date}", { date: t.dateTime(state.lastOkAt) }) : t("Почта ещё не проверялась. Первая проверка — через минуту после запуска сервера.")}
           </p>
         )}
+        {spamFresh > 0 && status !== "spam" && (
+          <Alert tone="warning">
+            {t("В спаме Gmail необработанных писем: {n}.", { n: spamFresh })}{" "}
+            <Link href="/admin/support?status=spam" className="underline">{t("Проверить")}</Link>
+          </Alert>
+        )}
         {mode === "webhook" && (
           <p className="text-xs text-gray-500">
             {state.lastOkAt ? t("Письма пересылает скрипт Gmail, последний раз {date}", { date: t.dateTime(state.lastOkAt) }) : t("Ждём первую пересылку от скрипта Gmail (раз в минуту).")}
           </p>
         )}
       </div>
-      <FilterBar q={q} status={status} statuses={FILTERS} allLabel="Все письма" placeholder="Тема, отправитель или текст" />
+      <div className="mb-3 flex flex-wrap gap-2" aria-label={t("Тема обращения")}>
+        {chip(undefined, "Все темы")}
+        {SUPPORT_TOPICS.map((x) => chip(x.code, x.ru))}
+        {chip("none", "Без темы")}
+      </div>
+      <FilterBar q={q} status={status} statuses={FILTERS} allLabel="Все письма" placeholder="Тема, отправитель или текст" hidden={{ topic }} />
+      {freshHere > 0 && (
+        <form action={markAllSupportEmailsHandledAction} className="mb-4 flex flex-wrap items-center gap-3">
+          {q && <input type="hidden" name="q" value={q} />}
+          {status && <input type="hidden" name="status" value={status} />}
+          {topic && <input type="hidden" name="topic" value={topic} />}
+          <SubmitButton variant="secondary" pendingText="Сохранение…" confirm="Отметить все новые письма в этом списке обработанными?">
+            {t("Отметить все обработанными ({n})", { n: freshHere })}
+          </SubmitButton>
+          {(q || topic) && <span className="text-xs text-gray-500">{t("Только письма, которые подходят под поиск и тему")}</span>}
+        </form>
+      )}
       {rows.length === 0 ? (
         <EmptyState>{t("Писем нет")}</EmptyState>
       ) : (
@@ -87,7 +126,9 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
                 <span className="text-xs whitespace-nowrap text-gray-500">{t.dateTime(r.receivedAt)}</span>
               </div>
               <div className="mt-0.5 flex items-center gap-2">
-                {!r.handledAt && <Badge color="blue">{t("Новое")}</Badge>}
+                {r.spam && <Badge color="yellow">{t("Спам Gmail")}</Badge>}
+                {!r.handledAt && !r.spam && <Badge color="blue">{t("Новое")}</Badge>}
+                {isSupportTopic(r.topic) && <Badge color="gray">{t(supportTopicLabel(r.topic))}</Badge>}
                 <span className={r.handledAt ? "text-sm" : "text-sm font-medium"}>{r.subject}</span>
               </div>
               <div className="mt-0.5 line-clamp-2 text-xs text-gray-500">{snippet(r.text, 220)}</div>
@@ -95,7 +136,7 @@ export default async function SupportPage({ searchParams }: PageProps<"/admin/su
           ))}
         </Card>
       )}
-      <Pagination page={page} total={total} basePath="/admin/support" params={{ q, status }} />
+      <Pagination page={page} total={total} basePath="/admin/support" params={{ q, status, topic }} />
     </>
   );
 }

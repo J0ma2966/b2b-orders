@@ -5,6 +5,7 @@
 #   sudo b2b-support-mail status  — что подключено и последние записи журнала
 #   sudo b2b-support-mail gmail-script — без IMAP: выдать скрипт Google для Gmail, который сам пересылает
 #                                  письма на сайт (если хостинг закрывает исходящий порт 993)
+#   sudo b2b-support-mail address АДРЕС — только задать адрес ящика для ссылок «написать в поддержку»
 #   sudo b2b-support-mail off     — отключить (письма, уже сохранённые на платформе, остаются)
 # Ящик открывается только для чтения: письма не удаляются и не помечаются прочитанными.
 set -euo pipefail
@@ -88,6 +89,7 @@ cmd_setup() {
   set_env SUPPORT_IMAP_USER "$user"
   set_env SUPPORT_IMAP_PASSWORD ""
   set_env SUPPORT_IMAP_PASSWORD_FILE "$PASS_FILE"
+  set_env SUPPORT_MAIL_ADDRESS "$user"
   restart_app
   echo "Готово. Письма появятся в кабинете суперадмина: раздел «Поддержка» (/admin/support)."
 }
@@ -121,12 +123,21 @@ cmd_gmail_script() {
   domain="$(get_env APP_DOMAIN)"
   [ -n "$domain" ] || { echo "В $ENV_FILE не задан APP_DOMAIN (sudo b2b-set-domain ДОМЕН)" >&2; exit 1; }
   [ -f "$script" ] || { echo "Не найден $script — сначала sudo b2b-update" >&2; exit 1; }
+  # Адрес ящика — для ссылок «написать в поддержку» на сайте
+  local box restart=""
+  box="$(get_env SUPPORT_MAIL_ADDRESS)"
+  read -r -p "Адрес Gmail поддержки${box:+ [$box]}: " ans || true; box="${ans:-$box}"
+  if [ -n "$box" ]; then
+    [[ "$box" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "Нужен адрес почты, например support.optolink@gmail.com" >&2; exit 1; }
+    [ "$box" = "$(get_env SUPPORT_MAIL_ADDRESS)" ] || { set_env SUPPORT_MAIL_ADDRESS "$box"; restart=1; }
+  fi
   secret="$(get_env SUPPORT_MAIL_WEBHOOK_SECRET)"
   if [ -z "$secret" ]; then
     secret="$(openssl rand -hex 32)"
     set_env SUPPORT_MAIL_WEBHOOK_SECRET "$secret"
-    restart_app
+    restart=1
   fi
+  [ -z "$restart" ] || restart_app
   echo
   echo "1. Войдите в Gmail поддержки и откройте https://script.google.com → «Новый проект»."
   echo "2. Удалите всё в редакторе и вставьте текст между линиями ниже. Сохраните (Ctrl+S)."
@@ -156,6 +167,10 @@ case "${1:-setup}" in
   gmail-script)
     if [ "${2:-}" = "--new" ]; then set_env SUPPORT_MAIL_WEBHOOK_SECRET ""; fi
     cmd_gmail_script ;;
+  address)
+    [[ "${2:-}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "Использование: sudo b2b-support-mail address support.optolink@gmail.com" >&2; exit 1; }
+    set_env SUPPORT_MAIL_ADDRESS "$2"; restart_app
+    echo "Ссылки «написать в поддержку» на сайте теперь ведут на $2." ;;
   off) cmd_off ;;
-  *) echo "Использование: sudo b2b-support-mail setup|test|status|gmail-script|off" >&2; exit 1 ;;
+  *) echo "Использование: sudo b2b-support-mail setup|test|status|gmail-script|address|off" >&2; exit 1 ;;
 esac

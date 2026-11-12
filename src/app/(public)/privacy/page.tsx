@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { legalInfo } from "@/lib/legal";
+import { SupportLink } from "@/components/support-link";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT())("Политика конфиденциальности") };
@@ -14,7 +15,7 @@ export default async function PrivacyPage() {
   const L = legalInfo();
   const contact = (
     <>
-      <a href={`mailto:${L.email}`} className="text-brand-600">{L.email}</a>
+      <SupportLink topic="privacy" />
       {L.phone && <>, {L.phone}</>}
     </>
   );

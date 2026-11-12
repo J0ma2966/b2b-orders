@@ -18,6 +18,7 @@ const schema = z.object({
         text: str(200_000),
         html: str(500_000),
         date: str(100),
+        spam: z.boolean().nullish(),
         attachments: z.array(z.object({ name: str(500), size: z.number().nonnegative().nullish(), type: str(200) })).max(100).optional(),
       }),
     )

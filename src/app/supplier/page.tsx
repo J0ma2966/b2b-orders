@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { requireSupplier } from "@/lib/auth/current";
 import { SUPPLIER_ROLE_LABEL, SUPPLIER_STATUS_COLOR, SUPPLIER_STATUS_LABEL, supplierTransition } from "@/lib/statuses";
 import { resubmitSupplierAction } from "./actions";
+import { SupportLink } from "@/components/support-link";
 import { getT } from "@/lib/i18n/server";
 import { supplierDebtStates } from "@/lib/accounts";
 import { debtSummary, type DebtTone } from "@/lib/finance-core";
@@ -103,11 +104,13 @@ export default async function SupplierHome() {
         <Alert tone="error">
           <p className="font-medium">{t("Заявка отклонена.")}</p>
           {s.moderationComment && <p className="mt-1">{t("Причина: {reason}", { reason: s.moderationComment })}</p>}
+          <p className="mt-2"><SupportLink topic="moderation" className="underline">{t("Написать в поддержку")}</SupportLink></p>
         </Alert>
       )}
       {s.status === "BLOCKED" && (
         <Alert tone="error">
           {t("Компания заблокирована.")} {s.moderationComment && `${t("Причина: {reason}", { reason: s.moderationComment })}. `}{t("Обратитесь к администратору платформы.")}
+          <p className="mt-2"><SupportLink topic="blocked" className="underline">{t("Написать в поддержку")}</SupportLink></p>
         </Alert>
       )}
       {canResubmit && (

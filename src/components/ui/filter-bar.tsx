@@ -11,6 +11,7 @@ export function FilterBar({
   placeholder = "Поиск",
   allLabel = "Все статусы",
   search = true,
+  hidden,
 }: {
   q?: string;
   status?: string;
@@ -18,10 +19,13 @@ export function FilterBar({
   placeholder?: string;
   allLabel?: string;
   search?: boolean;
+  // Другие параметры адреса, которые поиск не должен сбрасывать
+  hidden?: Record<string, string | undefined>;
 }) {
   const t = useT();
   return (
     <form className="mb-4 flex flex-wrap gap-2">
+      {hidden && Object.entries(hidden).map(([k, v]) => v && <input key={k} type="hidden" name={k} value={v} />)}
       {search && (
         <div className="w-full max-w-xs flex-1">
           <Input name="q" defaultValue={q} placeholder={t(placeholder)} aria-label={t(placeholder)} />

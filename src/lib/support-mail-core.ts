@@ -1,5 +1,6 @@
 // Почта техподдержки: чистые функции без сети и базы (разбор настроек, письма, текста уведомления)
 import { readFileSync } from "node:fs";
+import { topicFromSubject } from "@/lib/support-topics";
 
 export type SupportMailConfig = {
   host: string;
@@ -65,6 +66,8 @@ export type WebhookMail = {
   html?: string | null;
   date?: string | null;
   attachments?: { name?: string | null; size?: number | null; type?: string | null }[];
+  // Письмо лежит в «Спаме» Gmail
+  spam?: boolean | null;
 };
 
 export function webhookToIncoming(m: WebhookMail): IncomingMail {
@@ -81,6 +84,7 @@ export function webhookToIncoming(m: WebhookMail): IncomingMail {
     html: m.html,
     date: date && !Number.isNaN(date.getTime()) ? date : null,
     attachments: (m.attachments ?? []).map((a) => ({ filename: a.name, size: a.size, contentType: a.type })),
+    spam: !!m.spam,
   };
 }
 
@@ -98,6 +102,7 @@ export type IncomingMail = {
   date?: Date | null;
   attachments?: { filename?: string | null; size?: number | null; contentType?: string | null }[];
   tooLarge?: boolean;
+  spam?: boolean;
 };
 
 export type SupportEmailRecord = {
@@ -107,6 +112,8 @@ export type SupportEmailRecord = {
   fromName: string | null;
   replyTo: string | null;
   subject: string;
+  topic: string | null;
+  spam: boolean;
   text: string;
   attachments: { name: string; size: number; type: string }[] | undefined;
   receivedAt: Date;
@@ -152,13 +159,16 @@ export function toRecord(m: IncomingMail, now = new Date()): SupportEmailRecord 
     type: clean(a.contentType, 100),
   }));
   const date = m.date && !Number.isNaN(m.date.getTime()) && m.date.getTime() <= now.getTime() + 86_400_000 ? m.date : now;
+  const subject = clean(m.subject, 500) || "(без темы)";
   return {
     messageKey: messageId || `${m.uidValidity}:${m.uid}`,
     uid: m.uid,
     fromAddress: addr(m.from),
     fromName: clean(m.from?.name, 200) || null,
     replyTo: addr(m.replyTo),
-    subject: clean(m.subject, 500) || "(без темы)",
+    subject,
+    topic: topicFromSubject(subject),
+    spam: !!m.spam,
     text: text || "(пустое письмо)",
     attachments: attachments.length ? attachments : undefined,
     receivedAt: date,

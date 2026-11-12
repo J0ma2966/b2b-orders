@@ -6,7 +6,8 @@ import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { replyMailto, senderLabel } from "@/lib/support-mail-core";
-import { setSupportEmailHandledAction } from "../actions";
+import { isSupportTopic, supportTopicLabel } from "@/lib/support-topics";
+import { setSupportEmailHandledAction, setSupportEmailSpamAction } from "../actions";
 
 type Attachment = { name: string; size: number; type: string };
 
@@ -26,7 +27,12 @@ export default async function SupportEmailPage({ params }: PageProps<"/admin/sup
     <>
       <PageHeader
         title={mail.subject}
-        subtitle={mail.handledAt ? <Badge color="green">{t("Обработано")}</Badge> : <Badge color="blue">{t("Новое")}</Badge>}
+        subtitle={
+          <span className="inline-flex flex-wrap gap-1.5">
+            {mail.spam && <Badge color="yellow">{t("Спам Gmail")}</Badge>}
+            {mail.handledAt ? <Badge color="green">{t("Обработано")}</Badge> : <Badge color="blue">{t("Новое")}</Badge>}
+          </span>
+        }
         actions={<Link href="/admin/support" className="text-sm text-brand-600">{t("← Все письма")}</Link>}
       />
       <div className="grid gap-4 lg:grid-cols-5">
@@ -47,6 +53,7 @@ export default async function SupportEmailPage({ params }: PageProps<"/admin/sup
         <Card className="space-y-4 lg:col-span-2">
           <DefinitionList
             items={[
+              ["Тема обращения", isSupportTopic(mail.topic) ? t(supportTopicLabel(mail.topic)) : null],
               ["От кого", senderLabel(mail)],
               ["Ответ на адрес", mail.replyTo && mail.replyTo !== mail.fromAddress ? mail.replyTo : null],
               ["Получено", t.dateTime(mail.receivedAt)],
@@ -63,6 +70,11 @@ export default async function SupportEmailPage({ params }: PageProps<"/admin/sup
               <input type="hidden" name="id" value={mail.id} />
               <input type="hidden" name="handled" value={mail.handledAt ? "0" : "1"} />
               <SubmitButton variant="secondary">{mail.handledAt ? t("Вернуть в новые") : t("Отметить обработанным")}</SubmitButton>
+            </form>
+            <form action={setSupportEmailSpamAction}>
+              <input type="hidden" name="id" value={mail.id} />
+              <input type="hidden" name="spam" value={mail.spam ? "0" : "1"} />
+              <SubmitButton variant="secondary">{mail.spam ? t("Не спам") : t("В спам")}</SubmitButton>
             </form>
           </div>
         </Card>
