@@ -51,10 +51,30 @@ export function apnsBody(m: PushMessage) {
   return { aps: { alert: { title: m.title, body: m.body }, sound: "default" }, url: safePath(m.url) };
 }
 
-// Токен больше не действует (приложение удалено, токен обновился) — его надо удалить из базы
+// Токен больше не действует — его надо удалить из базы:
+// 404 / UNREGISTERED — приложение удалено или токен обновился;
+// SENDER_ID_MISMATCH — токен выдан другим проектом Firebase (например, старой сборкой приложения);
+// INVALID_ARGUMENT про сам токен — токен испорчен.
 export function fcmTokenGone(status: number, body: string) {
   if (status === 404) return true;
-  return status === 400 && /UNREGISTERED|registration token is not a valid/i.test(body);
+  if (/UNREGISTERED|SENDER_ID_MISMATCH/.test(body)) return status === 400 || status === 403;
+  return status === 400 && /registration token is not a valid/i.test(body);
+}
+
+// Временные сбои Google (перегрузка, лимиты) — не повод для алерта, уведомление и так есть на сайте
+export function fcmTransient(status: number) {
+  return status === 429 || status >= 500;
+}
+
+// Ответ FCM одной строкой: «FCM 403 SENDER_ID_MISMATCH: текст» — чтобы в журнале и алерте была причина
+export function fcmErrorSummary(status: number, body: string) {
+  try {
+    const e = (JSON.parse(body) as { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } }).error;
+    const code = e?.details?.find((d) => d.errorCode)?.errorCode ?? e?.status ?? "";
+    return `FCM ${status} ${code}: ${e?.message ?? ""}`.replace(/\s+/g, " ").trim();
+  } catch {
+    return `FCM ${status}: ${body.replace(/\s+/g, " ").slice(0, 300)}`;
+  }
 }
 
 export function apnsTokenGone(status: number, body: string) {

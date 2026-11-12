@@ -2,7 +2,7 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { connect, type ClientHttp2Session } from "node:http2";
 import { db } from "@/lib/db";
-import { apnsBody, apnsJwt, apnsTokenGone, fcmBody, fcmTokenGone, googleAssertion, type PushMessage } from "./native-push-core";
+import { apnsBody, apnsJwt, apnsTokenGone, fcmBody, fcmErrorSummary, fcmTokenGone, fcmTransient, googleAssertion, type PushMessage } from "./native-push-core";
 
 // Push в мобильном приложении. Android — Firebase Cloud Messaging, iOS — Apple Push Notification service.
 // Ключи только в переменных окружения сервера (см. docs/mobile.md); без них push в приложении выключен.
@@ -39,6 +39,13 @@ const apns = loadApns();
 
 export const nativePushConfigured = { android: !!fcm, ios: !!apns };
 
+// Ошибка отправки. transient — временный сбой на стороне Google: пишем предупреждение без алерта.
+class PushError extends Error {
+  constructor(message: string, readonly transient = false) {
+    super(message);
+  }
+}
+
 let googleToken: { value: string; until: number } | null = null;
 
 async function googleAccessToken(acc: ServiceAccount) {
@@ -51,7 +58,7 @@ async function googleAccessToken(acc: ServiceAccount) {
       assertion: googleAssertion(acc, Math.floor(Date.now() / 1000)),
     }),
   });
-  if (!res.ok) throw new Error(`FCM OAuth ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new PushError(`FCM OAuth ${res.status}: ${(await res.text()).replace(/\s+/g, " ").slice(0, 300)}`);
   const data = (await res.json()) as { access_token: string; expires_in: number };
   googleToken = { value: data.access_token, until: Date.now() + (data.expires_in - 300) * 1000 };
   return googleToken.value;
@@ -67,7 +74,7 @@ async function sendFcm(token: string, m: PushMessage): Promise<boolean> {
   if (res.ok) return true;
   const text = await res.text();
   if (fcmTokenGone(res.status, text)) return false;
-  throw new Error(`FCM ${res.status}: ${text}`);
+  throw new PushError(fcmErrorSummary(res.status, text), fcmTransient(res.status));
 }
 
 // Apple просит обновлять JWT не чаще раза в 20 минут и не реже раза в час
@@ -110,7 +117,7 @@ function sendApns(token: string, m: PushMessage): Promise<boolean> {
     req.on("end", () => {
       if (status === 200) resolve(true);
       else if (apnsTokenGone(status, text)) resolve(false);
-      else reject(new Error(`APNs ${status}: ${text}`));
+      else reject(new PushError(`APNs ${status}: ${text}`, status === 429 || status >= 500));
     });
     req.end(JSON.stringify(apnsBody(m)));
   });
@@ -123,7 +130,11 @@ export async function sendNativePush(tokens: { id: string; platform: "ANDROID" |
     try {
       if (!(await send(t.token, m))) await db.deviceToken.delete({ where: { id: t.id } }).catch(() => null);
     } catch (e) {
-      console.error("native push", e);
+      // Одной строкой, с кодом и причиной («native push ANDROID Error: FCM 403 PERMISSION_DENIED: …»),
+      // чтобы в алерте Telegram (deploy/monitor.sh) была видна причина. Временные сбои — без слова Error, без алерта.
+      const msg = (e instanceof Error ? e.message : String(e)).replace(/\s+/g, " ").slice(0, 300);
+      if (e instanceof PushError && e.transient) console.warn(`native push ${t.platform} delayed: ${msg}`);
+      else console.error(`native push ${t.platform} Error: ${msg}`);
     }
   }
 }
