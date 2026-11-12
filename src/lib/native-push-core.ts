@@ -76,7 +76,7 @@ export function fcmErrorSummary(status: number, body: string) {
     const message = (e?.message ?? "").replace(/\s*Remediate access[\s\S]*$/, "");
     const hint =
       code === "IAM_PERMISSION_DENIED"
-        ? " → у сервисного аккаунта из FCM_SERVICE_ACCOUNT_FILE нет права отправлять push: ключ надо создать в Firebase (Настройки проекта → Сервисные аккаунты) или выдать роль Firebase Cloud Messaging API Admin, см. docs/mobile.md"
+        ? " → у сервисного аккаунта из FCM_SERVICE_ACCOUNT_FILE нет права отправлять push: выдайте ему роль Firebase Cloud Messaging API Admin в Google Cloud → IAM (новый ключ того же аккаунта не поможет), см. docs/mobile.md"
         : "";
     return `FCM ${status} ${code}: ${message}${hint}`.replace(/\s+/g, " ").trim();
   } catch {
