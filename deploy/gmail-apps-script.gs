@@ -75,6 +75,9 @@ function forwardSupportMail() {
         return; // письма уйдут при следующем запуске
       }
       batch.forEach(function (b) { sent.push(b.id); });
+      console.log('Отправлено на сайт писем: ' + batch.length + ', новых на сайте: ' + (JSON.parse(res.getContentText()).created || 0));
+    } else {
+      console.log('Новых писем нет (во «Входящих» за ' + (initial ? FIRST_RUN_DAYS : 2) + ' дн.: цепочек ' + threads.length + ')');
     }
     props.setProperty('sentIds', JSON.stringify(sent.slice(-KEEP_IDS)));
   } finally {
