@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import { notifySupplierStaff } from "@/lib/notify";
 import { tashkentDay } from "./order-core";
+import { orderValue } from "./finance-core";
 
 // А1: счёт на комиссию за месяц. Сумма — по ставке, записанной в каждом полученном заказе.
 const OFFSET = 5 * 3_600_000;
@@ -30,7 +31,7 @@ export async function issueCommissionInvoices(now = new Date()) {
   });
   const bySupplier = new Map<string, { orders: number; turnover: number; amount: number }>();
   for (const o of orders) {
-    const value = Number(o.total) + Number(o.correctionTotal);
+    const value = orderValue(Number(o.total), Number(o.correctionTotal));
     const r = bySupplier.get(o.supplierId) ?? { orders: 0, turnover: 0, amount: 0 };
     r.orders++;
     r.turnover += value;

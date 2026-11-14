@@ -166,8 +166,40 @@ const unesc = (s: string) =>
     e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : ({ lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" } as Record<string, string>)[e.toLowerCase()],
   );
 
+// Элементы <tag …>…</tag> и <tag …/> подряд: [атрибуты, содержимое или null]. Поиск через indexOf
+// идёт по строке один раз. Регулярное выражение с ленивым [\s\S]*? на незакрытых тегах из присланного
+// файла пересматривало строку до конца для каждого тега — файл в пару килобайт занимал сервер минутами.
+function* xmlBlocks(xml: string, tag: string): Generator<[string, string | null]> {
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  let i = 0;
+  while ((i = xml.indexOf(open, i)) !== -1) {
+    const next = xml[i + open.length];
+    if (next !== ">" && next !== "/" && next !== " " && next !== "\t" && next !== "\n" && next !== "\r") {
+      i += open.length;
+      continue;
+    }
+    const gt = xml.indexOf(">", i);
+    if (gt === -1) return;
+    if (xml[gt - 1] === "/") {
+      yield [xml.slice(i + open.length, gt - 1), null];
+      i = gt + 1;
+      continue;
+    }
+    const end = xml.indexOf(close, gt + 1);
+    if (end === -1) return;
+    yield [xml.slice(i + open.length, gt), xml.slice(gt + 1, end)];
+    i = end + close.length;
+  }
+}
+
+const firstInner = (xml: string, tag: string) => {
+  for (const [, inner] of xmlBlocks(xml, tag)) return inner ?? "";
+  return undefined;
+};
+
 // Текст ячейки: все <t> внутри (в форматированных строках их несколько)
-const textOf = (xml: string) => [...xml.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)].map((m) => unesc(m[1])).join("");
+const textOf = (xml: string) => [...xmlBlocks(xml, "t")].map(([, inner]) => unesc(inner ?? "")).join("");
 
 function colIndex(ref: string) {
   const letters = /^[A-Z]+/.exec(ref)?.[0] ?? "A";
@@ -196,23 +228,22 @@ export function readXlsx(buf: Buffer): (string | number | null)[][] {
   target = target ? target.replace(/^\/?xl\//, "").replace(/^\//, "") : "worksheets/sheet1.xml";
   const sheet = files.get(`xl/${target}`)?.toString("utf8");
   if (!sheet) throw new XlsxError("В файле нет листа с данными");
-  const shared = [...(files.get("xl/sharedStrings.xml")?.toString("utf8") ?? "").matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1]));
+  const shared = [...xmlBlocks(files.get("xl/sharedStrings.xml")?.toString("utf8") ?? "", "si")].map(([, inner]) => textOf(inner ?? ""));
   const rows: (string | number | null)[][] = [];
-  for (const rm of sheet.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
-    const rAttr = /\br="(\d+)"/.exec(rm[1]);
+  for (const [rowAttrs, rowInner] of xmlBlocks(sheet, "row")) {
+    const rAttr = /\br="(\d+)"/.exec(rowAttrs);
     const rIndex = rAttr ? Number(rAttr[1]) - 1 : rows.length;
     if (!(rIndex >= 0 && rIndex < MAX_ROWS)) throw new XlsxError(`В файле больше ${MAX_ROWS} строк — загрузите его частями`);
     const row: (string | number | null)[] = [];
     let next = 0;
-    for (const cm of (rm[2] ?? "").matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      const attrs = cm[1];
+    for (const [attrs, cellInner] of xmlBlocks(rowInner ?? "", "c")) {
       const ref = /\br="([A-Z]+\d+)"/.exec(attrs)?.[1];
       const ci = ref ? colIndex(ref) : next;
       next = ci + 1;
       if (ci >= MAX_COLS) continue;
       const type = /\bt="(\w+)"/.exec(attrs)?.[1];
-      const inner = cm[2] ?? "";
-      const v = /<v>([\s\S]*?)<\/v>/.exec(inner)?.[1];
+      const inner = cellInner ?? "";
+      const v = firstInner(inner, "v");
       let value: string | number | null = null;
       if (type === "s") value = v !== undefined ? (shared[Number(v)] ?? null) : null;
       else if (type === "inlineStr") value = textOf(inner);

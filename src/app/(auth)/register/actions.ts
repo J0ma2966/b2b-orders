@@ -11,7 +11,7 @@ import { isLocalNetworkHost } from "@/lib/auth/cookie-secure";
 import { getAuth } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
 import { notifySuperAdmins } from "@/lib/notify";
-import { isRealFile, saveImage, UploadError } from "@/lib/storage";
+import { checkImage, isRealFile, storeImage, UploadError, type CheckedImage } from "@/lib/storage";
 import { getLocale } from "@/lib/i18n/server";
 import { coord, formValues, invalid, opt, parseForm, req, type FormState } from "@/lib/forms";
 import { finishLoginAttempt, reserveLoginAttempt } from "@/lib/auth/login-attempts";
@@ -93,7 +93,7 @@ function phoneConfirmationRequired() {
   return phoneConfirmChannels() !== null;
 }
 
-type NewAccount = { phone: string; fullName: string; passwordHash: string; locale: string; telegramChatId?: string };
+type NewAccount = { phone: string; fullName: string; passwordHash: string; locale: string; telegramChatId?: string; phoneVerifiedAt?: Date };
 
 // Проверка кода подтверждения номера. Вызывается перед самым созданием учётной записи.
 // Возвращает ошибку формы или ничего; чат Telegram, из которого поделились номером, привязывается к аккаунту.
@@ -106,6 +106,7 @@ async function confirmPhone(acc: { phoneCode?: string; ip?: string | null; accou
   const ok = await verifyRegisterCode(acc.account.phone, acc.phoneCode);
   await finishLoginAttempt(attemptId, !!ok);
   if (!ok) return { fieldErrors: { phoneCode: ["Неверный или устаревший код"] }, values };
+  acc.account.phoneVerifiedAt = new Date();
   if (ok.chatId) {
     // Один чат — один пользователь (как при подключении бота из профиля)
     await db.user.updateMany({ where: { telegramChatId: ok.chatId }, data: { telegramChatId: null } });
@@ -159,10 +160,12 @@ export async function registerShopAction(_prev: FormState, formData: FormData): 
   const territory = await db.territory.findUnique({ where: { id: d.territoryId } });
   if (!territory || territory.type === "COUNTRY") return { fieldErrors: { territoryId: ["Выберите регион и город"] }, values };
 
-  let photoPath: string | undefined;
+  // Файл проверяется заранее, а на диск пишется только после кода подтверждения: иначе запросы
+  // с неверным кодом оставляли бы файлы до 10 МБ каждый и могли заполнить диск сервера
+  let photoImage: CheckedImage | undefined;
   const photo = formData.get("photo");
   try {
-    if (isRealFile(photo)) photoPath = await saveImage(photo, "shops");
+    if (isRealFile(photo)) photoImage = await checkImage(photo);
   } catch (e) {
     if (e instanceof UploadError) return { fieldErrors: { photo: [e.message] }, values };
     throw e;
@@ -170,6 +173,7 @@ export async function registerShopAction(_prev: FormState, formData: FormData): 
 
   const phoneError = await confirmPhone(acc, formData);
   if (phoneError) return phoneError;
+  const photoPath = photoImage ? await storeImage(photoImage, "shops") : undefined;
 
   const shop = await db.$transaction(async (tx) => {
     const userId = acc.userId ?? (await tx.user.create({ data: acc.account! })).id;
@@ -244,10 +248,12 @@ export async function registerSupplierAction(_prev: FormState, formData: FormDat
   const validTerritories = await db.territory.count({ where: { id: { in: territoryIds } } });
   if (validTerritories !== territoryIds.length) return { error: "Неверная территория доставки", values };
 
-  let logoPath: string | undefined;
+  // Файл проверяется заранее, а на диск пишется только после кода подтверждения: иначе запросы
+  // с неверным кодом оставляли бы файлы до 10 МБ каждый и могли заполнить диск сервера
+  let logoImage: CheckedImage | undefined;
   const logo = formData.get("logo");
   try {
-    if (isRealFile(logo)) logoPath = await saveImage(logo, "logos");
+    if (isRealFile(logo)) logoImage = await checkImage(logo);
   } catch (e) {
     if (e instanceof UploadError) return { fieldErrors: { logo: [e.message] }, values };
     throw e;
@@ -255,6 +261,7 @@ export async function registerSupplierAction(_prev: FormState, formData: FormDat
 
   const phoneError = await confirmPhone(acc, formData);
   if (phoneError) return phoneError;
+  const logoPath = logoImage ? await storeImage(logoImage, "logos") : undefined;
 
   const supplier = await db.$transaction(async (tx) => {
     const userId = acc.userId ?? (await tx.user.create({ data: acc.account! })).id;

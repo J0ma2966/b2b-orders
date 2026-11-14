@@ -3,6 +3,7 @@ import type { OrderStatus, Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { loadTerritoryMap } from "@/lib/territory";
 import { groupSum } from "./report-core";
+import { orderValue } from "./finance-core";
 
 export type ReportFilter = {
   from: Date;
@@ -69,7 +70,7 @@ export async function buildReport(f: ReportFilter) {
     }),
   ]);
 
-  const value = (o: (typeof sold)[number]) => n(o.total) + n(o.correctionTotal);
+  const value = (o: (typeof sold)[number]) => orderValue(n(o.total), n(o.correctionTotal));
   const turnover = sold.reduce((s, o) => s + value(o), 0);
   const commission = sold.reduce((s, o) => s + (value(o) * n(o.commissionRate)) / 100, 0);
   const lines = items.map((i) => ({

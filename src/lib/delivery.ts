@@ -361,6 +361,9 @@ export async function correctBalance(supplierId: string, shopId: string, amount:
       const order = await lockOrder(tx, orderId);
       if (order.supplierId !== supplierId || order.shopId !== shopId) throw new OrderError("Заказ не найден");
       if (!["COMPLETED", "PARTIALLY_ACCEPTED"].includes(order.status)) throw new OrderError("Корректировать можно только полученный заказ");
+      // Сумма заказа после корректировок не уходит в минус: иначе одна корректировка обнуляла комиссию
+      // платформы по всем заказам месяца, а долг магазина возвращался второй корректировкой без заказа
+      if (Number(order.total) + Number(order.correctionTotal) + amount < 0) throw new OrderError("Корректировка больше суммы заказа");
       await tx.order.update({ where: { id: order.id }, data: { correctionTotal: { increment: amount } } });
       await addEvent(tx, order.id, { type: "correction", comment: reason, actorRole, data: { amount: formatMoney(amount) } }, actor);
     } else if (!(await supplierServesShop(tx, supplierId, shopId))) {

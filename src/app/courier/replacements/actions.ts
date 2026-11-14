@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireDeliverer } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
+import { db } from "@/lib/db";
 import { OrderError } from "@/lib/orders";
 import { completeReplacement } from "@/lib/replacements";
 import { realFiles, saveImage, UploadError } from "@/lib/storage";
@@ -22,7 +23,7 @@ export async function completeReplacementAction(_prev: FormState, formData: Form
     if (e instanceof OrderError || e instanceof StockError || e instanceof UploadError) return { error: e.message };
     throw e;
   }
-  await writeAudit({ entity: "Replacement", entityId: id, action: "complete", actorRole: actorRoleTag(ctx.membership.role), supplierId: ctx.supplier.id, comment });
+  await writeAudit({ entity: "Replacement", entityId: id, action: "complete", actorRole: actorRoleTag(ctx.membership.role), supplierId: (await db.replacement.findUnique({ where: { id }, select: { supplierId: true } }))?.supplierId ?? null, comment });
   revalidatePath("/courier", "layout");
   return success("Замена выполнена, забранный товар передан в «Возвращённые»");
 }

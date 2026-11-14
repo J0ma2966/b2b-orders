@@ -142,3 +142,9 @@ export function debtSummary(accounts: { balance: number; tone: DebtTone }[]) {
   }
   return { ...sum, owed: r2(sum.overdue.amount + sum.due.amount) };
 }
+
+// Сумма полученного заказа с корректировками — база комиссии платформы. Не меньше нуля: корректировка
+// одного заказа не должна уменьшать комиссию по другим заказам поставщика.
+export function orderValue(total: number, correctionTotal: number) {
+  return Math.max(0, total + correctionTotal);
+}

@@ -221,4 +221,36 @@ describe.skipIf(!enabled)("вход по коду", () => {
     await requestLoginCode(u.phone, "SMS", null);
     expect(sent).toHaveLength(0);
   });
+
+  it("первый вход по коду в учётную запись, заведённую другим, закрывает чужие сессии и сбрасывает пароль", async () => {
+    const u = await user({ passwordHash: "known-to-adder" });
+    await db.session.createMany({ data: [{ userId: u.id, tokenHash: `a${tag}${n}`, expiresAt: new Date(Date.now() + 3600_000) }, { userId: u.id, tokenHash: `b${tag}${n}`, expiresAt: new Date(Date.now() + 3600_000) }] });
+    const issue = async (target: { phone: string }) => {
+      const rec = await db.loginCode.create({ data: { phone: target.phone, purpose: "LOGIN", channel: "SMS", expiresAt: new Date(Date.now() + 300_000), sentAt: new Date() } });
+      await db.loginCode.update({ where: { id: rec.id }, data: { codeHash: hashCode(rec.id, "123456") } });
+    };
+    await issue(u);
+    const claimed = await verifyLoginCode(u.phone, "123456");
+    expect(claimed?.id).toBe(u.id);
+    expect(claimed?.phoneVerifiedAt).toBeInstanceOf(Date);
+    expect(claimed?.mustChangePassword).toBe(true);
+    expect(claimed?.passwordHash).not.toBe("known-to-adder");
+    expect(await db.session.count({ where: { userId: u.id } })).toBe(0);
+
+    // Подтверждённый номер: другие устройства остаются в системе
+    await db.session.create({ data: { userId: u.id, tokenHash: `c${tag}${n}`, expiresAt: new Date(Date.now() + 3600_000) } });
+    await issue(u);
+    const again = await verifyLoginCode(u.phone, "123456");
+    expect(again?.passwordHash).toBe(claimed?.passwordHash);
+    expect(await db.session.count({ where: { userId: u.id } })).toBe(1);
+  });
+
+  it("пересланная ссылка регистрации не перепривязывает чат, в который уже ушёл код", async () => {
+    process.env.TELEGRAM_LOGIN_BOT_TOKEN = "1:test";
+    const phone = newPhone();
+    const rec = await db.loginCode.create({ data: { phone, purpose: "REGISTER", channel: "TELEGRAM", linkToken: `tok${tag}${n}`, chatId: `7${tag}5`, sentAt: new Date(), expiresAt: new Date(Date.now() + 600_000) } });
+    await handleTelegramUpdate(start(`7${tag}6`, rec.linkToken!));
+    expect((await db.loginCode.findUniqueOrThrow({ where: { id: rec.id } })).chatId).toBe(`7${tag}5`);
+    expect(botMessages(`7${tag}6`).at(-1)).toBeTruthy();
+  });
 });
