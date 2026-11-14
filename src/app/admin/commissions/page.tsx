@@ -3,6 +3,7 @@ import { PeriodTabs } from "@/components/reports/report-view";
 import { db } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/auth/current";
 import { defaultCommissionRate } from "@/lib/orders";
+import { orderValue } from "@/lib/finance-core";
 import { parsePeriod, periodRange, toLocalDateInput } from "@/lib/report-core";
 import { getT } from "@/lib/i18n/server";
 import { InvoiceList } from "@/components/commission/invoice-list";
@@ -24,8 +25,9 @@ export default async function CommissionsPage({ searchParams }: PageProps<"/admi
   ]);
   const rows = suppliers.map((s) => {
     const mine = orders.filter((o) => o.supplierId === s.id);
-    const turnover = mine.reduce((t, o) => t + Number(o.total) + Number(o.correctionTotal), 0);
-    const commission = mine.reduce((t, o) => t + ((Number(o.total) + Number(o.correctionTotal)) * Number(o.commissionRate ?? 0)) / 100, 0);
+    const value = (o: (typeof mine)[number]) => orderValue(Number(o.total), Number(o.correctionTotal));
+    const turnover = mine.reduce((t, o) => t + value(o), 0);
+    const commission = mine.reduce((t, o) => t + (value(o) * Number(o.commissionRate ?? 0)) / 100, 0);
     return { ...s, orders: mine.length, turnover, commission, rate: s.commissionRate !== null ? Number(s.commissionRate) : def };
   }).filter((r) => r.orders > 0).sort((a, b) => b.commission - a.commission);
   const to = toLocalDateInput(new Date(range.to.getTime() - 1));

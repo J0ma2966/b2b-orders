@@ -468,6 +468,7 @@ const uz: Record<string, string> = {
   "Корзина пуста": "Savat boʻsh",
   "Корзина пуста.": "Savat boʻsh.",
   "Корректировать можно только полученный заказ": "Faqat qabul qilingan buyurtmani tuzatish mumkin",
+  "Корректировка больше суммы заказа": "Tuzatish buyurtma summasidan katta",
   "Корректировка": "Tuzatish",
   "Корректировка ±": "Tuzatish ±",
   "Корректировка задолженности {0}{1}": "Qarzdorlikni tuzatish {0}{1}",

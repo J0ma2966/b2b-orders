@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { randomBytes } from "node:crypto";
+import { hashPassword } from "@/lib/auth/password";
 import { Prisma, type CodeChannel } from "@/generated/prisma/client";
 import { isTxTimeout } from "@/lib/auth/login-attempts";
 import { formatPhone } from "@/lib/phone";
@@ -131,7 +133,22 @@ async function sendCodeToChat(recordId: string, chatId: string, locale: string, 
 export async function verifyLoginCode(phone: string, code: string) {
   if (!(await consumeCode(phone, code, "LOGIN"))) return null;
   const user = await db.user.findUnique({ where: { phone } });
-  return user?.status === "ACTIVE" ? user : null;
+  if (user?.status !== "ACTIVE") return null;
+  return user.phoneVerifiedAt ? user : claimUnverifiedAccount(user.id);
+}
+
+// Первый вход по коду в учётную запись, которую завёл кто-то другой (поставщик или магазин добавил
+// сотрудника и получил временный пароль). Теперь номер подтвердил его владелец: все прежние сессии
+// закрываются, а пароль, который мог знать добавивший, заменяется случайным — владелец задаёт свой
+// на следующем шаге. Иначе добавивший сохранял бы доступ к кабинету, который владелец откроет позже.
+async function claimUnverifiedAccount(userId: string) {
+  return db.$transaction(async (tx) => {
+    await tx.session.deleteMany({ where: { userId } });
+    return tx.user.update({
+      where: { id: userId },
+      data: { phoneVerifiedAt: new Date(), mustChangePassword: true, passwordHash: await hashPassword(randomBytes(24).toString("base64url")) },
+    });
+  });
 }
 
 // Код подтверждения номера при регистрации. Возвращает чат Telegram, из которого поделились номером
@@ -191,6 +208,9 @@ export async function handleTelegramUpdate(update: TgUpdate) {
     if (msg.token) {
       const rec = await db.loginCode.findUnique({ where: { linkToken: msg.token } });
       if (!rec || rec.usedAt || rec.expiresAt < new Date()) return botSend(msg.chatId, t(msg.lang, BOT_TEXT.expired));
+      // Код по этой ссылке уже ушёл в другой чат: ссылку переслали. Чат не перепривязываем — иначе при
+      // регистрации к новой учётной записи привязался бы Telegram того, кто нажал пересланную ссылку
+      if (rec.sentAt && rec.chatId && rec.chatId !== msg.chatId) return botSend(msg.chatId, t(msg.lang, BOT_TEXT.expired));
       // Ссылку открыли в этом чате; номер ещё нужно подтвердить кнопкой — ссылкой мог поделиться кто угодно
       await db.loginCode.update({ where: { id: rec.id }, data: { chatId: msg.chatId } });
       const owner = await db.user.findUnique({ where: { telegramChatId: msg.chatId } });

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireDeliverer } from "@/lib/auth/current";
 import { writeAudit } from "@/lib/audit";
+import { db } from "@/lib/db";
 import { parseAmount } from "@/lib/catalog";
 import { confirmDelivery, markNotDelivered, reportProblem, startDelivery } from "@/lib/delivery";
 import { OrderError } from "@/lib/orders";
@@ -19,6 +20,12 @@ function fail(e: unknown, formData: FormData): FormState {
   throw e;
 }
 
+// Журнал пишется в кабинет поставщика, которому принадлежит заказ, а не того, что выбран в сессии:
+// доставщик может работать на двух поставщиков и провести заказ одного, находясь в кабинете другого
+async function orderSupplierId(orderId: string) {
+  return (await db.order.findUnique({ where: { id: orderId }, select: { supplierId: true } }))?.supplierId ?? null;
+}
+
 async function courier() {
   const ctx = await requireDeliverer();
   return { ctx, courierId: ctx.auth.user.id, actorRole: actorRoleTag(ctx.membership.role) };
@@ -32,7 +39,7 @@ export async function startDeliveryAction(_prev: FormState, formData: FormData):
   } catch (e) {
     return fail(e, formData);
   }
-  await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.start", actorRole, supplierId: ctx.supplier.id });
+  await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.start", actorRole, supplierId: await orderSupplierId(orderId) });
   revalidatePath("/courier", "layout");
   return success("Отмечено: заказ в пути");
 }
@@ -59,7 +66,7 @@ export async function problemAction(_prev: FormState, formData: FormData): Promi
     return fail(e, formData);
   }
   const text = problemText(reason, note);
-  await writeAudit({ entity: "Order", entityId: orderId, action: kind === "not_delivered" ? "delivery.not_delivered" : "delivery.problem", actorRole, supplierId: ctx.supplier.id, comment: text });
+  await writeAudit({ entity: "Order", entityId: orderId, action: kind === "not_delivered" ? "delivery.not_delivered" : "delivery.problem", actorRole, supplierId: await orderSupplierId(orderId), comment: text });
   revalidatePath("/courier", "layout");
   return success(kind === "not_delivered" ? "Заказ отмечен как недоставленный, товар вернётся на склад" : "Поставщик получил сообщение о проблеме");
 }
@@ -86,7 +93,7 @@ export async function confirmDeliveryAction(_prev: FormState, formData: FormData
     return fail(e, formData);
   }
   if (r.already) return success("Эта приёмка уже была отправлена и проведена");
-  await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.confirm", actorRole, supplierId: ctx.supplier.id, changes: [{ field: "status", old: "IN_TRANSIT", new: r.status }, { field: "receivedAmount", old: null, new: received }] });
+  await writeAudit({ entity: "Order", entityId: orderId, action: "delivery.confirm", actorRole, supplierId: await orderSupplierId(orderId), changes: [{ field: "status", old: "IN_TRANSIT", new: r.status }, { field: "receivedAmount", old: null, new: received }] });
   revalidatePath("/courier", "layout");
   return success(`Получение подтверждено. Сумма заказа ${formatMoney(r.total)}${r.orderDebt > 0 ? `, долг по заказу ${formatMoney(r.orderDebt)}` : ""}`);
 }

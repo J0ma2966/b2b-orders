@@ -52,16 +52,19 @@ function forwardSupportMail() {
           if (me && m.getFrom().toLowerCase().indexOf(me) !== -1) { seen[id] = true; sent.push(id); continue; }
           // Удалённые письма из цепочки не пересылаем
           if (m.isInTrash()) continue;
-          var atts = m.getAttachments({ includeInlineImages: false }).map(function (a) {
-            return { name: a.getName(), size: a.getSize(), type: a.getContentType() };
+          // Поля обрезаются до пределов сайта: письмо с огромной темой или сотней вложений
+          // не должно мешать пересылке остальных
+          var cut = function (v, n) { return v == null ? null : String(v).slice(0, n); };
+          var atts = m.getAttachments({ includeInlineImages: false }).slice(0, 100).map(function (a) {
+            return { name: cut(a.getName(), 500), size: a.getSize(), type: cut(a.getContentType(), 200) };
           });
           seen[id] = true;
           batch.push({
             id: id,
-            messageId: m.getHeader('Message-ID') || null,
-            from: m.getFrom(),
-            replyTo: m.getReplyTo() || null,
-            subject: m.getSubject(),
+            messageId: cut(m.getHeader('Message-ID') || null, 1000),
+            from: cut(m.getFrom(), 1000),
+            replyTo: cut(m.getReplyTo() || null, 1000),
+            subject: cut(m.getSubject(), 2000),
             text: (m.getPlainBody() || '').slice(0, MAX_TEXT),
             date: m.getDate().toISOString(),
             attachments: atts,

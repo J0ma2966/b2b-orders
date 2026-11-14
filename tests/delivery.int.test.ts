@@ -191,4 +191,15 @@ describe.skipIf(!enabled)("чужой поставщик не трогает с�
     expect(await db.order.findUniqueOrThrow({ where: { id: assigned.order.id } })).toMatchObject({ status: "READY", courierId: null });
     expect((await db.order.findUniqueOrThrow({ where: { id: inTransit.order.id } })).status).toBe("DELIVERY_PROBLEM");
   });
+
+  it("корректировка по заказу не уводит его сумму в минус (комиссия платформы)", async () => {
+    const a = await shopWithOrder(2);
+    const items = a.order.items.map((i) => ({ id: i.id, delivered: 2, accepted: 2 }));
+    await confirmDelivery(courierId, a.order.id, { items, received: 2000, method: "CASH", qr: a.order.qrToken! });
+    await expect(correctBalance(supplierId, a.shop.id, -100_000_000, "Ошибка в сумме", a.order.id, "SUPPLIER_OWNER")).rejects.toThrow("Корректировка больше суммы заказа");
+    await correctBalance(supplierId, a.shop.id, -1500, "Брак", a.order.id, "SUPPLIER_OWNER");
+    await expect(correctBalance(supplierId, a.shop.id, -501, "Брак", a.order.id, "SUPPLIER_OWNER")).rejects.toThrow("Корректировка больше суммы заказа");
+    await correctBalance(supplierId, a.shop.id, -500, "Брак", a.order.id, "SUPPLIER_OWNER");
+    expect(Number((await db.order.findUniqueOrThrow({ where: { id: a.order.id } })).correctionTotal)).toBe(-2000);
+  });
 });

@@ -29,17 +29,20 @@ describe.skipIf(!enabled)("почта поддержки через скрипт
     vi.stubEnv("SUPPORT_MAIL_WEBHOOK_SECRET", "");
     expect((await call({ messages: [] }, "")).status).toBe(403);
     vi.stubEnv("SUPPORT_MAIL_WEBHOOK_SECRET", "s3cret");
-    expect((await call({ messages: [{ subject: "без id" }] })).status).toBe(400);
+    expect((await call({ messages: "не список" })).status).toBe(400);
+    // Письмо без идентификатора пропускается, пачка принимается
+    expect(await (await call({ messages: [{ subject: "без id" }] })).json()).toEqual({ ok: true, created: 0, skipped: 1 });
   });
+
 
   it("первая отправка — одно общее уведомление, дальше по письму, повтор не дублирует", async () => {
     const r1 = await call({ initial: true, messages: [msg("1"), msg("2")] });
-    expect(await r1.json()).toEqual({ ok: true, created: 2 });
+    expect(await r1.json()).toEqual({ ok: true, created: 2, skipped: 0 });
     let notes = await db.notification.findMany({ where: { userId: adminId }, orderBy: { createdAt: "asc" } });
     expect(notes.map((n) => n.type)).toEqual(["support.connected"]);
 
     const r2 = await call({ messages: [msg("2"), msg("3")] });
-    expect(await r2.json()).toEqual({ ok: true, created: 1 });
+    expect(await r2.json()).toEqual({ ok: true, created: 1, skipped: 0 });
     notes = await db.notification.findMany({ where: { userId: adminId, type: "support.email" } });
     const row = await db.supportEmail.findUniqueOrThrow({ where: { messageKey: `<${tag}-3@gmail.com>` } });
     expect(notes.map((n) => [n.title, n.link])).toEqual([["Письмо в поддержку: Вопрос 3", `/admin/support/${row.id}`]]);
@@ -50,7 +53,7 @@ describe.skipIf(!enabled)("почта поддержки через скрипт
   it("письма из спама Gmail: пометка, одно общее уведомление, не в счётчике новых", async () => {
     const spam = (n: string) => ({ ...msg(n), spam: true });
     const r = await call({ messages: [spam("s1"), spam("s2"), msg("4")] });
-    expect(await r.json()).toEqual({ ok: true, created: 3 });
+    expect(await r.json()).toEqual({ ok: true, created: 3, skipped: 0 });
     const rows = await db.supportEmail.findMany({ where: { messageKey: { in: [`<${tag}-s1@gmail.com>`, `<${tag}-4@gmail.com>`] } }, orderBy: { messageKey: "asc" } });
     expect(rows.map((x) => [x.messageKey.includes("-4@"), x.spam])).toEqual([[true, false], [false, true]]);
     const spamNotes = await db.notification.findMany({ where: { userId: adminId, type: "support.spam" } });
@@ -58,5 +61,16 @@ describe.skipIf(!enabled)("почта поддержки через скрипт
     const mailNotes = await db.notification.findMany({ where: { userId: adminId, type: "support.email" } });
     expect(mailNotes.map((n) => n.title)).toContain("Письмо в поддержку: Вопрос 4");
     expect(mailNotes.map((n) => n.title)).not.toContain("Письмо в поддержку: Вопрос s1");
+  });
+
+  it("одно письмо с длинной темой и сотней вложений не останавливает пачку", async () => {
+    const huge = { ...msg("big"), subject: "x".repeat(5000), from: "A".repeat(3000) + " <a@b.uz>", attachments: Array.from({ length: 150 }, (_, i) => ({ name: `f${i}.txt`.padEnd(900, "_"), size: 1, type: "text/plain" })) };
+    const r = await call({ messages: [msg("ok1"), huge] });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true, created: 2, skipped: 0 });
+    const row = await db.supportEmail.findUniqueOrThrow({ where: { messageKey: `<${tag}-big@gmail.com>` } });
+    expect(row.subject!.length).toBeGreaterThan(0);
+    expect(row.subject!.length).toBeLessThanOrEqual(2000);
+    expect(await db.supportEmail.count({ where: { messageKey: `<${tag}-ok1@gmail.com>` } })).toBe(1);
   });
 });
