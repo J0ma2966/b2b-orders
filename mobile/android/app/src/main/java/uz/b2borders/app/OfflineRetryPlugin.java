@@ -1,6 +1,8 @@
 package uz.b2borders.app;
 
 import android.net.Uri;
+import android.util.Log;
+import android.webkit.WebBackForwardList;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -14,6 +16,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import org.json.JSONObject;
 
 // Возврат в приложение со страницы «Нет связи» (mobile/www/offline.html).
 //
@@ -45,8 +48,14 @@ public class OfflineRetryPlugin extends Plugin {
         private final Bridge bridge;
         // Идёт проверка связи: второй раз не запускаем
         private volatile boolean probing;
-        // После возврата со страницы «Нет связи» она убирается из истории, чтобы «Назад» на неё не вёл
+        // Пока шла проверка, попросили ещё одну (например, сеть появилась в момент нажатия «Повторить»)
+        private boolean again;
+        // Сколько ещё раз проверить связь самим, если проверка не удалась
+        private int autoLeft;
+        // Запасной путь возврата (loadUrl): страница «Нет связи» убирается из истории целиком
         private boolean clearHistoryOnLoad;
+        // Возврат начат и страница сервера пошла грузиться
+        private boolean leaving;
 
         Client(Bridge bridge) {
             super(bridge);
@@ -60,26 +69,82 @@ public class OfflineRetryPlugin extends Plugin {
             return current != null && error != null && current.startsWith(error);
         }
 
+        // Интернет вернулся или приложение снова открыли: пробуем вернуться сами, с несколькими попытками —
+        // сеть уже «есть», а соединение с сервером может подняться на пару секунд позже.
+        void recover(WebView view) {
+            autoLeft = 4;
+            retry(view, false);
+        }
+
         // Проверить связь и, если сервер отвечает, открыть страницу, которая не загрузилась.
         // notify — сообщить странице «Нет связи», что связи всё ещё нет (после нажатия «Повторить»).
         void retry(final WebView view, final boolean notify) {
             final String url = targetUrl(bridge);
-            if (url == null || probing) return;
+            if (url == null) return;
+            if (probing) {
+                again = true;
+                return;
+            }
+            // Нажали «Повторить» ровно когда сеть возвращается: одна неудачная проверка не должна оставить на «Нет связи»
+            if (notify) autoLeft = Math.max(autoLeft, 3);
             probing = true;
             new Thread(() -> {
                 final boolean ok = reachable(url);
                 view.post(() -> {
                     probing = false;
+                    // Пока проверяли связь, страницу могли сменить — дальше только поверх «Нет связи»
+                    if (!onErrorPage(view)) {
+                        again = false;
+                        autoLeft = 0;
+                        return;
+                    }
                     if (ok) {
-                        // Пока проверяли связь, страницу могли сменить — открываем только поверх «Нет связи»
-                        if (!onErrorPage(view)) return;
-                        clearHistoryOnLoad = true;
-                        view.loadUrl(url);
-                    } else if (notify) {
-                        view.evaluateJavascript("window.offlineRetryFailed && window.offlineRetryFailed()", null);
+                        again = false;
+                        autoLeft = 0;
+                        leave(view, url);
+                        return;
+                    }
+                    if (notify) view.evaluateJavascript("window.offlineRetryFailed && window.offlineRetryFailed()", null);
+                    if (again || autoLeft > 0) {
+                        again = false;
+                        if (autoLeft > 0) autoLeft--;
+                        view.postDelayed(() -> {
+                            if (onErrorPage(view)) retry(view, false);
+                        }, 3000);
                     }
                 });
             }).start();
+        }
+
+        // Уйти со страницы «Нет связи» на страницу сервера так, чтобы «Назад» потом работал как обычно:
+        // страница «Нет связи» не должна остаться в истории, а остальная история должна сохраниться.
+        private void leave(final WebView view, final String url) {
+            leaving = false;
+            WebBackForwardList list = view.copyBackForwardList();
+            int current = list.getCurrentIndex();
+            String previous = current > 0 ? list.getItemAtIndex(current - 1).getUrl() : null;
+            Log.d("OfflineRetry", "leave: entries=" + list.getSize() + " current=" + current + " previous=" + previous + " target=" + url);
+            if (url.equals(previous)) {
+                // Перед «Нет связи» в истории стоит сама незагрузившаяся страница — возвращаемся на неё, она загрузится заново
+                view.goBack();
+            } else {
+                // Иначе страница «Нет связи» заменяется нужной страницей на своём месте в истории
+                view.evaluateJavascript("location.replace(" + JSONObject.quote(url) + ")", null);
+            }
+            // Запасной путь: если за 2,5 с ничего не началось, открываем страницу напрямую
+            view.postDelayed(() -> {
+                if (leaving || !onErrorPage(view)) return;
+                Log.d("OfflineRetry", "leave: fallback loadUrl");
+                clearHistoryOnLoad = true;
+                view.loadUrl(url);
+            }, 2500);
+        }
+
+        @Override
+        public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+            super.onPageStarted(view, url, favicon);
+            String error = bridge.getErrorUrl();
+            if (url != null && (error == null || !url.startsWith(error))) leaving = true;
         }
 
         @Override

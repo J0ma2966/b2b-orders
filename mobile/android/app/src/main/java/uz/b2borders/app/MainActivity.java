@@ -53,7 +53,7 @@ public class MainActivity extends BridgeActivity {
     private void recoverIfOffline() {
         if (bridge == null || webClient == null) return;
         WebView view = bridge.getWebView();
-        if (view != null && webClient.onErrorPage(view)) webClient.retry(view, false);
+        if (view != null && webClient.onErrorPage(view)) webClient.recover(view);
     }
 
     @Override
