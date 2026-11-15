@@ -231,6 +231,25 @@ export async function setCartQty(shopId: string, itemId: string, qty: number) {
   });
 }
 
+// «Удалить выбранные» в корзине: позиции могут быть из корзин разных поставщиков
+export async function removeCartItems(shopId: string, itemIds: string[]) {
+  const items = await db.orderItem.findMany({ where: { id: { in: itemIds }, order: { shopId, status: "DRAFT" } }, select: { id: true, orderId: true } });
+  const byOrder = new Map<string, string[]>();
+  for (const i of items) byOrder.set(i.orderId, [...(byOrder.get(i.orderId) ?? []), i.id]);
+  let removed = 0;
+  for (const [orderId, ids] of byOrder) {
+    removed += await db.$transaction(async (tx) => {
+      const order = await lockOrder(tx, orderId);
+      // Корзину успели оформить — оформленный заказ не трогаем
+      if (order.status !== "DRAFT") return 0;
+      const r = await tx.orderItem.deleteMany({ where: { id: { in: ids }, orderId } });
+      await recalcTotal(tx, orderId);
+      return r.count;
+    });
+  }
+  return removed;
+}
+
 // Кнопка «−» на карточке товара: на одну единицу меньше, на последней — позиция убирается из корзины.
 // Ищется по единице товара, потому что только что добавленная позиция на карточке ещё без номера.
 export async function removeOneFromCart(shopId: string, unitId: string) {
@@ -239,6 +258,26 @@ export async function removeOneFromCart(shopId: string, unitId: string) {
   const next = Math.max(0, Math.round((num(item.qty) - 1) * 1000) / 1000);
   await setCartQty(shopId, item.id, next);
   return next;
+}
+
+// Количество, набранное на карточке товара с клавиатуры: позиция ищется по единице товара.
+// Больше остатка заказать нельзя — количество урезается до доступного (clamped = true).
+export async function setCartQtyByUnit(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, unitId: string, qty: number) {
+  const unit = await db.productUnit.findUnique({ where: { id: unitId }, select: { physicalQty: true, reservedQty: true, kind: true } });
+  if (!unit) throw new OrderError("Товар недоступен для заказа");
+  const available = Math.max(0, num(unit.physicalQty) - num(unit.reservedQty));
+  const fit = validQty(unit.kind, available) ? available : Math.floor(available);
+  const want = Math.min(qty, fit);
+  const clamped = want < qty;
+  const item = await db.orderItem.findFirst({ where: { productUnitId: unitId, order: { shopId: shop.id, supplierId, status: "DRAFT" } }, select: { id: true, qty: true } });
+  if (item) {
+    if (want !== num(item.qty)) await setCartQty(shop.id, item.id, want);
+  } else if (want > 0) {
+    await addToCart(shop, supplierId, unitId, want);
+  } else if (qty > 0) {
+    throw new OrderError("Товара нет в наличии");
+  }
+  return { qty: want, clamped };
 }
 
 // Приводит корзину к актуальному состоянию каталога и остатков (ТЗ п. 22).
@@ -326,17 +365,22 @@ export async function previewBonuses(supplierId: string, items: { productUnitId:
 // Оформление: повторная проверка, резерв, бонусы, фиксация цены и комиссии (ТЗ п. 19, 22, 25, 51, 53).
 // М5: «Оформить все» — каждая корзина становится отдельным заказом со своей проверкой
 // (минимальная сумма, кредит, дата доставки берётся первая доступная); неудача одной не мешает остальным.
-export async function checkoutAll(shop: { id: string; territoryId: string; isBlocked: boolean }, input: Omit<CheckoutInput, "deliveryDate">) {
+// itemIds — оформить только отмеченные в корзине позиции: корзины без отмеченных пропускаются,
+// неотмеченные позиции остаются в корзине.
+export async function checkoutAll(shop: { id: string; territoryId: string; isBlocked: boolean }, input: Omit<CheckoutInput, "deliveryDate">, itemIds?: string[]) {
   const carts = await db.order.findMany({
     where: { shopId: shop.id, status: "DRAFT", items: { some: {} } },
-    include: { supplier: { select: { displayName: true } } },
+    include: { supplier: { select: { displayName: true } }, items: { select: { id: true } } },
     orderBy: { updatedAt: "desc" },
   });
+  const pick = itemIds ? new Set(itemIds) : null;
   const placed: string[] = [];
   const problems: string[] = [];
   for (const c of carts) {
+    const chosen = pick ? c.items.filter((i) => pick.has(i.id)).map((i) => i.id) : null;
+    if (chosen && chosen.length === 0) continue;
     try {
-      const r = await checkout(shop, c.supplierId, { ...input, deliveryDate: null });
+      const r = await checkout(shop, c.supplierId, { ...input, deliveryDate: null }, chosen && chosen.length < c.items.length ? chosen : undefined);
       if (r.placed) placed.push(r.orderId);
       else problems.push(`Не оформлен заказ ${c.supplier.displayName}: корзина изменилась, проверьте её`);
     } catch (e) {
@@ -347,7 +391,8 @@ export async function checkoutAll(shop: { id: string; territoryId: string; isBlo
   return { placed, problems };
 }
 
-export async function checkout(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, input: CheckoutInput): Promise<CheckoutResult> {
+// itemIds — оформить только эти позиции корзины; остальные переезжают в новую корзину того же поставщика.
+export async function checkout(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, input: CheckoutInput, itemIds?: string[]): Promise<CheckoutResult> {
   if (shop.isBlocked) throw new OrderError("Магазин заблокирован, заказы недоступны");
   const supplier = await supplierForShop(shop.territoryId, supplierId);
   if (!supplier) throw new OrderError("Поставщик недоступен для вашей территории");
@@ -366,8 +411,14 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
         if (order.status !== "DRAFT") throw new OrderError("Заказ уже оформлен");
         const changes = await refreshCart(tx, order.id);
         if (changes.length > 0) return { placed: false as const, changes };
-        const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
-        if (items.length === 0) throw new OrderError("Корзина пуста");
+        const all = await tx.orderItem.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
+        if (all.length === 0) throw new OrderError("Корзина пуста");
+        // Выбранные позиции оформляются, остальные вынимаются и после оформления кладутся в новую корзину
+        const pick = itemIds ? new Set(itemIds) : null;
+        const items = pick ? all.filter((i) => pick.has(i.id)) : all;
+        const rest = pick ? all.filter((i) => !pick.has(i.id)) : [];
+        if (items.length === 0) throw new OrderError("Выберите товары для оформления");
+        if (rest.length > 0) await tx.orderItem.deleteMany({ where: { id: { in: rest.map((i) => i.id) } } });
 
         const now = new Date();
         const promos = await activePromotions(tx, supplierId, now);
@@ -443,6 +494,23 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
           },
         });
         await addEvent(tx, order.id, { type: "status", from: "DRAFT", to: "PLACED", actorRole: "SHOP", comment: bonusNotes.join("\n") || null }, actor);
+        if (rest.length > 0) {
+          // Заказ уже не черновик — у магазина снова может быть корзина этого поставщика
+          const draft = await tx.order.create({ data: { shopId: shop.id, supplierId, createdByUserId: order.createdByUserId } });
+          await tx.orderItem.createMany({
+            data: rest.map((i) => ({
+              orderId: draft.id,
+              productUnitId: i.productUnitId,
+              productName: i.productName,
+              unitLabel: i.unitLabel,
+              price: i.price,
+              qty: i.qty,
+              addedByUserId: i.addedByUserId,
+              createdAt: i.createdAt,
+            })),
+          });
+          await recalcTotal(tx, draft.id);
+        }
         await notifySupplierStaff(supplierId, {
           type: "order.new",
           title: `Новый заказ №${number}`,

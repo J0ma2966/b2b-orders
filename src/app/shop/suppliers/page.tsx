@@ -1,4 +1,5 @@
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
+import { SupplierSearchList } from "@/components/shop/supplier-search";
 import { SupplierCard } from "@/components/supplier-card";
 import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop } from "@/lib/territory";
@@ -23,11 +24,7 @@ export default async function ShopSuppliersPage() {
       {suppliers.length === 0 ? (
         <EmptyState>{t("Пока ни один поставщик не доставляет в ваш район.")}</EmptyState>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {suppliers.map((s) => (
-            <SupplierCard key={s.id} s={s} />
-          ))}
-        </div>
+        <SupplierSearchList items={suppliers.map((s) => ({ id: s.id, text: `${s.displayName} ${s.description ?? ""}`, node: <SupplierCard s={s} /> }))} />
       )}
     </>
   );

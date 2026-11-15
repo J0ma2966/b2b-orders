@@ -58,14 +58,22 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
+/** Красная звёздочка обязательного поля */
+export function RequiredMark() {
+  return <span className="text-red-600" aria-hidden="true" data-required> *</span>;
+}
+
 export function Field({
   label,
   error,
   hint,
+  required,
   children,
 }: {
   label: string;
   name?: string;
+  /** Пометить поле звёздочкой как обязательное */
+  required?: boolean;
   error?: string[] | string;
   hint?: ReactNode;
   children: ReactNode;
@@ -75,7 +83,7 @@ export function Field({
   return (
     <div>
       <label className="block">
-        <span className="mb-1 block text-sm font-medium text-gray-700">{tr(label)}</span>
+        <span className="mb-1 block text-sm font-medium text-gray-700">{tr(label)}{required && <RequiredMark />}</span>
         {children}
       </label>
       {hint && !message && <span className="mt-1 block text-xs text-gray-500">{tr(hint)}</span>}

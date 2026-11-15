@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { nextSku } from "@/lib/sku";
+import { PRODUCT_PHOTO_BYTES } from "@/lib/image-compress";
 import { requireActiveSupplier } from "@/lib/auth/current";
 import { diffFields, writeAudit } from "@/lib/audit";
 import { applyStock, StockError } from "@/lib/stock";
@@ -32,7 +33,7 @@ async function loadOwnProduct(productId: string) {
 
 async function savePhotos(formData: FormData) {
   const paths: string[] = [];
-  for (const f of realFiles(formData, "photos", MAX_PHOTOS)) paths.push(await saveImage(f, "products"));
+  for (const f of realFiles(formData, "photos", MAX_PHOTOS)) paths.push(await saveImage(f, "products", PRODUCT_PHOTO_BYTES));
   return paths;
 }
 
@@ -73,7 +74,6 @@ const productSchema = z.object({
   name: req(),
   description: opt(),
   brand: opt(),
-  sku: opt(),
   categoryId: opt(),
   weightKg: opt(),
   attributes: opt(),
@@ -87,7 +87,6 @@ function productData(d: z.infer<typeof productSchema>, formData: FormData) {
       name: d.name,
       description: d.description ?? null,
       brand: d.brand ?? null,
-      sku: d.sku ?? null,
       categoryId: d.categoryId ?? null,
       weightKg: Number.isNaN(weight) ? null : weight,
       attributes: parseAttributes(d.attributes),
@@ -151,8 +150,8 @@ export async function createProductAction(_prev: FormState, formData: FormData):
   }
 
   const product = await db.$transaction(async (tx) => {
-    // Артикул не указан — присваиваем следующий по порядку (A-00001…)
-    const sku = data.sku ?? (await nextSku(tx, ctx.supplier.id));
+    // Артикул вручную не вводится — присваиваем следующий по порядку (A-00001…)
+    const sku = await nextSku(tx, ctx.supplier.id);
     const p = await tx.product.create({ data: { ...data, sku, supplierId: ctx.supplier.id, photoPaths } });
     for (const [i, row] of units.rows.entries()) {
       const unit = await tx.productUnit.create({
@@ -198,8 +197,8 @@ export async function updateProductAction(_prev: FormState, formData: FormData):
     throw e;
   }
   const photoPaths = [...product.photoPaths.filter((p) => !remove.has(p)), ...added].slice(0, MAX_PHOTOS);
-  // Артикул стёрли — товар получает новый автоматический (у товара артикул есть всегда)
-  const next = { ...data, sku: data.sku ?? (await nextSku(db, ctx.supplier.id)), photoPaths };
+  // Артикул в форме не меняется; у старого товара без артикула — присваиваем автоматический
+  const next = { ...data, sku: product.sku ?? (await nextSku(db, ctx.supplier.id)), photoPaths };
   const changes = diffFields(product as unknown as Record<string, unknown>, next, [
     "name", "description", "brand", "sku", "categoryId", "weightKg", "attributes", "isAvailable", "allowReplacement", "photoPaths",
   ]);

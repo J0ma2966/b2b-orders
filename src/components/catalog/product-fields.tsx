@@ -3,6 +3,7 @@
 import { Field, Input, Select, Textarea } from "@/components/ui";
 import type { FormState } from "@/lib/forms";
 import { useT } from "@/lib/i18n/client";
+import { PRODUCT_PHOTO_BYTES } from "@/lib/image-compress";
 import { PhotoInput } from "@/components/ui/photo-input";
 
 export type ProductDefaults = Partial<Record<"name" | "description" | "brand" | "sku" | "categoryId" | "weightKg" | "attributes", string>> & {
@@ -40,9 +41,12 @@ export function ProductFields({
         <Field label="Бренд" name="brand" error={e.brand}>
           <Input name="brand" defaultValue={v.brand} />
         </Field>
-        <Field label="Артикул" name="sku" error={e.sku} hint="Оставьте пустым — присвоим автоматически">
-          <Input name="sku" defaultValue={v.sku} placeholder="A-00001" />
-        </Field>
+        <div data-testid="sku-readonly">
+          <div className="mb-1 block text-sm font-medium text-gray-700">{t("Артикул")}</div>
+          <div className="flex min-h-11 items-center rounded-xl bg-gray-100 px-3 py-2.5 text-base text-gray-700 sm:text-sm">
+            {defaults.sku ? <span className="font-medium tabular-nums">{defaults.sku}</span> : <span className="text-gray-500">{t("Присвоится автоматически")}</span>}
+          </div>
+        </div>
         <Field label="Вес, кг" name="weightKg" error={e.weightKg}>
           <Input name="weightKg" inputMode="decimal" defaultValue={v.weightKg} />
         </Field>
@@ -63,7 +67,7 @@ export function ProductFields({
           {t("Можно заменить по заявке")}
         </label>
       </div>
-      <PhotoInput name="photos" label="Фотографии" error={e.photos} hint="До 8 фото, JPG/PNG/WEBP до 10 МБ каждое" max={8} />
+      <PhotoInput name="photos" label="Фотографии" error={e.photos} hint="До 8 фото, JPG/PNG/WEBP. Большие фото сжимаются до 1 МБ автоматически" max={8} compressTo={PRODUCT_PHOTO_BYTES} />
     </div>
   );
 }

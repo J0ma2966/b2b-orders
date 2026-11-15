@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { TriangleAlert } from "lucide-react";
+import { OrderFlags } from "./order-notes";
 import { Badge, Card, DefinitionList } from "@/components/ui";
 import { formatQty } from "@/lib/catalog";
 import { getT } from "@/lib/i18n/server";
@@ -36,13 +38,17 @@ export async function OrderItems({ items, total, action }: { items: ItemView[]; 
         return (
           <div key={kind} className="border-b border-gray-100 last:border-0">
             {kind !== "REGULAR" && (
-              <div className={kind === "FORCED" ? "bg-yellow-50 px-4 py-2 text-xs font-medium text-yellow-800" : "bg-green-50 px-4 py-2 text-xs font-medium text-green-800"}>
+              <div
+                data-kind={kind}
+                className={kind === "FORCED" ? "flex items-center gap-1.5 border-l-4 border-red-600 bg-red-50 px-3 py-2 text-xs font-semibold tracking-wide text-red-700 uppercase" : "bg-green-50 px-4 py-2 text-xs font-medium text-green-800"}
+              >
+                {kind === "FORCED" && <TriangleAlert className="size-4" strokeWidth={2.2} aria-hidden />}
                 {t(ITEM_KIND_LABEL[kind])}
               </div>
             )}
             <ul className="divide-y divide-gray-100">
               {list.map((i) => (
-                <li key={i.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                <li key={i.id} className={kind === "FORCED" ? "flex items-start justify-between gap-3 border-l-4 border-red-600 py-3 pr-4 pl-3" : "flex items-start justify-between gap-3 px-4 py-3"}>
                   <div className="min-w-0">
                     <div className="text-sm font-medium">{i.productName}</div>
                     <div className="text-xs text-gray-500">
@@ -110,6 +116,9 @@ type OrderRow = {
   total: { toString(): string };
   placedAt: Date | null;
   deliveryDate?: Date | null;
+  // Пометки в строке: комментарий магазина и принудительная продажа (если страница их загрузила)
+  comment?: string | null;
+  items?: { kind: OrderItemKind }[];
 };
 
 // Список заказов для любой роли; party — кого показать в строке (магазин или поставщик).
@@ -145,6 +154,7 @@ export async function OrdersList<R extends OrderRow>({
                   {t.dateTime(o.placedAt)} · {t.money(o.total)}
                 </div>
                 {extra?.(o)}
+                <OrderFlags comment={o.comment} forced={o.items?.some((i) => i.kind === "FORCED")} />
               </div>
               <span className="shrink-0"><OrderStatusBadge status={o.status} /></span>
             </Link>

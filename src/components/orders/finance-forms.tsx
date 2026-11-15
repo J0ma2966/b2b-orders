@@ -116,7 +116,7 @@ export function DebtPaymentForm({ shopId, today, balance, overdueAmount = 0 }: {
   );
 }
 
-const METHOD_LABEL = { CASH: "Наличные", CARD: "Карта", TRANSFER: "Безналичный" } as const;
+const METHOD_LABEL = { CASH: "Наличные", CARD: "Банковская карта", TRANSFER: "Безналичный" } as const;
 const AFTER_TONE = {
   overdue: "bg-red-50 text-red-700",
   due: "bg-amber-50 text-amber-700",

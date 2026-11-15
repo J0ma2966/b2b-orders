@@ -4,6 +4,7 @@ import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import QRCode from "qrcode";
 import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
 import { CancelOrderForm, ConfirmReceiptQr, RepeatOrderForm, RequestCancelForm } from "@/components/orders/shop-forms";
+import { ForcedNotice } from "@/components/orders/order-notes";
 import { db } from "@/lib/db";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
@@ -68,6 +69,7 @@ export default async function ShopOrderPage({ params, searchParams }: PageProps<
         )}
         {sp.placed && <Alert tone="success">{t("Заказ оформлен, товар зарезервирован. Поставщик получил уведомление.")}</Alert>}
         {sp.placed && placedEvent?.comment && <Alert tone="warning">{placedEvent.comment}</Alert>}
+        <ForcedNotice items={order.items} viewer="shop" />
         {order.cancelReason && (
           <Alert tone="error">
             {t(order.cancelledBy === "SHOP" ? "Вы отменили заказ {date}. Причина: {reason}" : order.cancelledBy === "PLATFORM" ? "Заказ отменён автоматически {date}. Причина: {reason}" : "Поставщик отменил заказ {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}

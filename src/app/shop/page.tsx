@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Alert, EmptyState, cn } from "@/components/ui";
 import { ProductCard } from "@/components/shop/product-card";
 import { CategoryTiles, HomeHero, SupplierStrip } from "@/components/shop/home";
-import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
+import { LoadMore } from "@/components/ui/load-more";
+import { shownFrom } from "@/lib/load-more";
 import { requireShop } from "@/lib/auth/current";
 import { availableSuppliersForShop } from "@/lib/territory";
 import { db } from "@/lib/db";
@@ -30,14 +31,15 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
   const supplierId = str(sp.s);
   const filter = (["fav", "often", "promo"].includes(String(sp.f)) ? sp.f : "") as CatalogFilter;
   const sort: FeedSort = sp.sort === "name" ? "name" : "new";
-  const page = pageFrom(sp);
-  const narrowed = !!(q || category || supplierId || filter || page > 1);
+  // Лента подгружается по 10 карточек при прокрутке (?n=…)
+  const shown = shownFrom(sp);
+  const narrowed = !!(q || category || supplierId || filter);
 
   const suppliers = await availableSuppliersForShop(shop.territoryId);
   const supplierById = new Map(suppliers.map((s) => [s.id, s]));
   const ids = suppliers.map((s) => s.id);
   const [{ total, products, categories }, promos, activeCount, carts] = await Promise.all([
-    shopFeed(ids, { q, category, supplierId, filter, sort, shopId: shop.id, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    shopFeed(ids, { q, category, supplierId, filter, sort, shopId: shop.id, skip: 0, take: shown }),
     activePromotions(ids),
     narrowed ? 0 : db.order.count({ where: { shopId: shop.id, status: orderStatusFilter("active") } }),
     narrowed
@@ -180,7 +182,7 @@ export default async function ShopHome({ searchParams }: PageProps<"/shop">) {
                 })}
               </div>
             )}
-            <Pagination page={page} total={total} basePath="/shop" params={params} />
+            <LoadMore shown={products.length} total={total} basePath="/shop" params={params} />
           </>
         )}
       </section>

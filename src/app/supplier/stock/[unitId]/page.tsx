@@ -63,18 +63,22 @@ export default async function StockJournalPage({ params }: PageProps<"/supplier/
           <tbody className="divide-y divide-gray-100">
             {moves.map((m) => (
               <tr key={m.id} className="align-top">
-                <td className="px-4 py-2 whitespace-nowrap text-gray-500">{t.dateTime(m.createdAt)}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-gray-500 max-sm:font-medium max-sm:text-gray-700">{t.dateTime(m.createdAt)}</td>
                 <td data-label={t("Операция")} className="px-4 py-2">{t(MOVEMENT_LABEL[m.type])}</td>
                 <td data-label={t("Физ.")} className="px-4 py-2 text-right tabular-nums">{signed(m.physicalDelta)}</td>
                 <td data-label={t("Резерв")} className="px-4 py-2 text-right tabular-nums">{signed(m.reservedDelta)}</td>
                 <td data-label={t("Остаток после")} className="px-4 py-2 text-right tabular-nums">
                   {formatQty(m.physicalAfter)} / {formatQty(m.reservedAfter)}
                 </td>
-                <td data-label={t("Кто · основание")} className="px-4 py-2 text-xs">
+                <td data-label={t("Кто · основание")} className="stack-wide px-4 py-2 text-xs max-sm:text-sm">
                   {m.userId ? users.get(m.userId) : t("Система")}
                   {m.onBehalfOfUserId && <span className="text-yellow-700"> {t("(от имени {name})", { name: users.get(m.onBehalfOfUserId) })}</span>}
                   {m.reason && <div className="text-gray-500">{t(m.reason)}</div>}
-                  {m.relatedEntity && <div className="text-gray-400">{m.relatedEntity} {m.relatedId}</div>}
+                  {m.relatedEntity === "Order" && m.relatedId ? (
+                    <Link href={`/supplier/orders/${m.relatedId}`} className="text-brand-600 hover:underline">{t("Открыть заказ →")}</Link>
+                  ) : (
+                    m.relatedEntity && <div className="hidden text-gray-400 sm:block">{m.relatedEntity} {m.relatedId}</div>
+                  )}
                 </td>
               </tr>
             ))}

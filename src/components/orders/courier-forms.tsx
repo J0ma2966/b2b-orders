@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActionForm } from "@/components/ui/action-form";
-import { Button, Field, Input, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Input, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { formValues, initialFormState, type FormState } from "@/lib/forms";
@@ -205,7 +205,6 @@ export function AcceptanceForm({ orderId, userId, title, items, balanceBefore, t
   }
   return (
     <ActionForm ref={formRef} key={restored?.round ?? 0} action={action} pending={pending} className="space-y-4" onChange={saveNow}>
-      <FormMessage state={shown} />
       <input type="hidden" name="orderId" value={orderId} />
 
       <Step n={1} title={t("Проверьте товар")}>
@@ -216,7 +215,7 @@ export function AcceptanceForm({ orderId, userId, title, items, balanceBefore, t
               <input type="hidden" name="itemId" value={i.id} />
               <div className="font-medium">
                 {i.name}
-                {i.kind !== "REGULAR" && <span className="ml-1 rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">{i.kind === "BONUS" ? t("бонус") : t("принуд. продажа")}</span>}
+                {i.kind !== "REGULAR" && <span className={cn("ml-1 rounded px-1.5 py-0.5 text-xs font-semibold", i.kind === "BONUS" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700")}>{i.kind === "BONUS" ? t("бонус") : t("принудительная продажа")}</span>}
               </div>
               <div className="text-sm text-gray-500">{t("заказано {qty} {unit}", { qty: i.qty, unit: t(i.unitLabel) })}</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -303,12 +302,19 @@ export function AcceptanceForm({ orderId, userId, title, items, balanceBefore, t
         </div>
       </Step>
 
+      {/* Предупреждения и ответ сервера — рядом с кнопкой: наверху длинной формы их не видно */}
+      <div className="space-y-2" data-testid="accept-warnings">
+        {!terms.creditAllowed && minimum > 0 && <Alert tone="warning">{t("Магазину не разрешена работа в долг: нужно получить всю сумму")} — <b className="tabular-nums">{t.money(minimum)}</b></Alert>}
+        {terms.creditAllowed && terms.overdue && minimum > 0 && <Alert tone="warning">{t("У магазина просрочен долг: в долг отдавать нельзя")} — <b className="tabular-nums">{t.money(minimum)}</b></Alert>}
+        {Number.isFinite(receivedNum) && receivedNum < minimum && <Alert tone="error">{t("Получено меньше, чем нужно: не хватает {sum}", { sum: t.money(Math.round((minimum - receivedNum) * 100) / 100) })}</Alert>}
+        <FormMessage state={shown} />
+      </div>
       <SubmitButton className="min-h-14 w-full rounded-xl text-lg font-bold" pendingText="Подтверждаю…">{t("Подтвердить получение")}</SubmitButton>
     </ActionForm>
   );
 }
 
-const METHOD_LABEL = { CASH: "Наличные", CARD: "Карта", TRANSFER: "Безналичный" } as const;
+const METHOD_LABEL = { CASH: "Наличные", CARD: "Банковская карта", TRANSFER: "Безналичный" } as const;
 
 // Шаг приёмки: доставщик идёт по ним сверху вниз
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {

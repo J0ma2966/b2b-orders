@@ -7,7 +7,7 @@ import { requireShop } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { supplierForShop } from "@/lib/shop-catalog";
 import { writeAudit } from "@/lib/audit";
-import { addToCart, cancelByShop, checkout, checkoutAll, OrderError, removeOneFromCart, repeatOrder, setCartQty } from "@/lib/orders";
+import { addToCart, cancelByShop, checkout, checkoutAll, OrderError, removeCartItems, removeOneFromCart, repeatOrder, setCartQty, setCartQtyByUnit } from "@/lib/orders";
 import { requestCancel } from "@/lib/delivery";
 import { askOwnerToCheckout } from "@/lib/shop-team";
 import { parseAmount } from "@/lib/catalog";
@@ -48,6 +48,25 @@ export async function removeOneFromCartAction(_prev: FormState, formData: FormDa
   }
 }
 
+// Количество, набранное с клавиатуры на карточке товара (целое число; больше остатка — урезается)
+export async function setCartQtyByUnitAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  const supplierId = String(formData.get("supplierId") ?? "");
+  const unitId = String(formData.get("unitId") ?? "");
+  const raw = String(formData.get("qty") ?? "").trim();
+  if (!/^\d{1,9}$/.test(raw)) return { error: "Укажите количество" };
+  try {
+    const r = await setCartQtyByUnit(ctx.shop, supplierId, unitId, Number(raw));
+    revalidatePath("/shop", "layout");
+    return {
+      ...success(r.qty > 0 ? `В корзине: ${formatQty(r.qty)}` : "Позиция убрана"),
+      values: { qty: String(r.qty), clamped: r.clamped ? "1" : "" },
+    };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function setCartQtyAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const ctx = await requireShop();
   const itemId = String(formData.get("itemId") ?? "");
@@ -61,6 +80,16 @@ export async function setCartQtyAction(_prev: FormState, formData: FormData): Pr
   } catch (e) {
     return fail(e);
   }
+}
+
+// «Удалить выбранные» в корзине
+export async function removeCartItemsAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ctx = await requireShop();
+  const ids = formData.getAll("itemIds[]").map(String).filter(Boolean).slice(0, 500);
+  if (ids.length === 0) return { error: "Выберите товары" };
+  const removed = await removeCartItems(ctx.shop.id, ids);
+  revalidatePath("/shop", "layout");
+  return success(`Убрано из корзины: ${removed}`);
 }
 
 const checkoutSchema = z.object({
@@ -91,14 +120,21 @@ export async function checkoutAction(_prev: FormState, formData: FormData): Prom
   }
   let result;
   try {
-    result = await checkout(ctx.shop, d.supplierId, {
-      paymentMethod: d.paymentMethod,
-      comment: d.comment,
-      deliveryAddress: d.deliveryAddress,
-      contactName: d.contactName,
-      contactPhone: phone,
-      deliveryDate,
-    });
+    // Оформление части корзины: отмеченные на странице «Корзина» позиции
+    const picked = formData.getAll("itemIds[]").map(String).filter(Boolean);
+    result = await checkout(
+      ctx.shop,
+      d.supplierId,
+      {
+        paymentMethod: d.paymentMethod,
+        comment: d.comment,
+        deliveryAddress: d.deliveryAddress,
+        contactName: d.contactName,
+        contactPhone: phone,
+        deliveryDate,
+      },
+      picked.length > 0 ? picked : undefined,
+    );
   } catch (e) {
     return fail(e, formData);
   }
@@ -200,7 +236,10 @@ export async function checkoutAllAction(_prev: FormState, formData: FormData): P
   const d = parsed.data;
   const phone = normalizePhone(d.contactPhone);
   if (!phone) return { fieldErrors: { contactPhone: ["Неверный номер телефона"] }, values: formValues(formData) };
-  const r = await checkoutAll(ctx.shop, { paymentMethod: d.paymentMethod, comment: d.comment, deliveryAddress: d.deliveryAddress, contactName: d.contactName, contactPhone: phone });
+  // Корзина с галочками присылает отмеченные позиции; без поля оформляется всё
+  const picked = formData.has("selection") ? formData.getAll("itemIds[]").map(String).filter(Boolean) : undefined;
+  if (picked && picked.length === 0) return { error: "Выберите товары для оформления", values: formValues(formData) };
+  const r = await checkoutAll(ctx.shop, { paymentMethod: d.paymentMethod, comment: d.comment, deliveryAddress: d.deliveryAddress, contactName: d.contactName, contactPhone: phone }, picked);
   for (const id of r.placed) await writeAudit({ entity: "Order", entityId: id, action: "place", actorRole: "SHOP", shopId: ctx.shop.id });
   revalidatePath("/shop", "layout");
   if (r.problems.length === 0) redirect(`/shop/orders?placed=${r.placed.length}`);

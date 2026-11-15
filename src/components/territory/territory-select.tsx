@@ -28,7 +28,7 @@ export function TerritorySelect({
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Регион" error={error}>
+      <Field label="Регион" required error={error}>
         <Select
           value={regionId}
           onChange={(e) => {
@@ -45,7 +45,7 @@ export function TerritorySelect({
           ))}
         </Select>
       </Field>
-      <Field label="Город или район">
+      <Field label="Город или район" required>
         <Select value={localId} onChange={(e) => setLocalId(e.target.value)} disabled={locals.length === 0} required={locals.length > 0}>
           <option value="">{locals.length ? t("Выберите") : "—"}</option>
           {locals.map((c) => (

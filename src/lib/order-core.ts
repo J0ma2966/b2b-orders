@@ -41,7 +41,7 @@ export const ORDER_STATUS_COLOR = {
 
 export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
   CASH: "Наличные",
-  CARD: "Карта",
+  CARD: "Банковская карта",
   TRANSFER: "Безналичный расчёт",
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Field, Input, Textarea } from "@/components/ui";
+import { Field, Input, RequiredMark, Textarea } from "@/components/ui";
 import { MapPicker } from "@/components/map/map-picker";
 import { TerritorySelect } from "@/components/territory/territory-select";
 import { TerritoryMultiSelect } from "@/components/territory/territory-multi-select";
@@ -32,27 +32,27 @@ export function SupplierFields({
     <>
       <fieldset className="space-y-4">
         <legend className="mb-2 text-base font-semibold">{t("Компания")}</legend>
-        <Field label="Название юридического лица" name="legalName" error={e.legalName}>
+        <Field label="Название юридического лица" name="legalName" required error={e.legalName}>
           <Input name="legalName" defaultValue={v.legalName} placeholder={t("ООО «Пример»")} required />
         </Field>
         <Field label="Название для магазинов" name="displayName" error={e.displayName} hint="Если пусто — как у юрлица">
           <Input name="displayName" defaultValue={v.displayName} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="ИНН" name="inn" error={e.inn}>
+          <Field label="ИНН" name="inn" required={!innReadOnly} error={e.inn}>
             <Input name="inn" inputMode="numeric" defaultValue={v.inn} required={!innReadOnly} disabled={innReadOnly} />
           </Field>
-          <Field label="Телефон компании" name="companyPhone" error={e.companyPhone}>
+          <Field label="Телефон компании" name="companyPhone" required error={e.companyPhone}>
             <Input name="companyPhone" type="tel" inputMode="tel" defaultValue={v.companyPhone} required />
           </Field>
-          <Field label="Email" name="email" error={e.email}>
+          <Field label="Email" name="email" required error={e.email}>
             <Input name="email" type="email" defaultValue={v.email} required />
           </Field>
           <Field label="Сайт" name="website" error={e.website}>
             <Input name="website" defaultValue={v.website} />
           </Field>
         </div>
-        <Field label="Юридический адрес" name="legalAddress" error={e.legalAddress}>
+        <Field label="Юридический адрес" name="legalAddress" required error={e.legalAddress}>
           <Input name="legalAddress" defaultValue={v.legalAddress} required />
         </Field>
         <Field label="Контактное лицо" name="contactPerson" error={e.contactPerson}>
@@ -68,14 +68,15 @@ export function SupplierFields({
       <fieldset className="space-y-4">
         <legend className="mb-2 text-base font-semibold">{t("Главный офис")}</legend>
         <TerritorySelect territories={territories} name="officeTerritoryId" defaultValue={v.officeTerritoryId} error={e.officeTerritoryId} />
-        <Field label="Адрес офиса" name="officeAddress" error={e.officeAddress}>
+        <Field label="Адрес офиса" name="officeAddress" required error={e.officeAddress}>
           <Input name="officeAddress" defaultValue={v.officeAddress} required />
         </Field>
+        <span className="mb-1 block text-sm font-medium text-gray-700">{t("Расположение на карте")}<RequiredMark /></span>
         <MapPicker latName="officeLat" lngName="officeLng" defaultValue={office} error={e.officeLat?.[0]} />
       </fieldset>
       {showDeliveryTerritory && (
         <fieldset className="space-y-2">
-          <legend className="mb-2 text-base font-semibold">{t("Территория доставки")}</legend>
+          <legend className="mb-2 text-base font-semibold">{t("Территория доставки")}<RequiredMark /></legend>
           <p className="text-sm text-gray-500">{t("Отметьте регионы целиком или отдельные города и районы. Магазины из этих мест увидят ваш каталог.")}</p>
           <TerritoryMultiSelect
             territories={territories}
