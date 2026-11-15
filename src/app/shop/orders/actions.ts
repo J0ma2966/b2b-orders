@@ -60,7 +60,7 @@ export async function setCartQtyByUnitAction(_prev: FormState, formData: FormDat
     revalidatePath("/shop", "layout");
     return {
       ...success(r.qty > 0 ? `В корзине: ${formatQty(r.qty)}` : "Позиция убрана"),
-      values: { qty: String(r.qty), clamped: r.clamped ? "1" : "" },
+      values: { qty: String(r.qty), clamped: r.clamped ? "1" : "", raised: r.raised ? "1" : "" },
     };
   } catch (e) {
     return fail(e);

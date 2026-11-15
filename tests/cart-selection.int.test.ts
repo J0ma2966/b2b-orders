@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/auth/current", () => ({ getAuth: async () => null }));
 
 import { db } from "@/lib/db";
-import { addToCart, checkout, checkoutAll, OrderError, removeCartItems, setCartQtyByUnit } from "@/lib/orders";
+import { addToCart, checkout, checkoutAll, OrderError, removeCartItems, removeOneFromCart, setCartQty, setCartQtyByUnit } from "@/lib/orders";
 import { applyStock } from "@/lib/stock";
 
 const enabled = !!process.env.TEST_DATABASE_URL;
@@ -136,17 +136,55 @@ describe.skipIf(!enabled)("корзина: выбор товаров для оф
 
   it("количество с клавиатуры: ставится точное число, сверх остатка урезается, 0 убирает позицию", async () => {
     const [shop, sup] = [await newShop(), await newSupplier()];
-    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 12)).toEqual({ qty: 12, clamped: false });
+    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 12)).toEqual({ qty: 12, clamped: false, raised: false });
     expect(Number((await cartItems(shop.id, sup.id))[0].qty)).toBe(12);
-    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 7)).toEqual({ qty: 7, clamped: false });
+    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 7)).toEqual({ qty: 7, clamped: false, raised: false });
     // Товара В всего 5
-    expect(await setCartQtyByUnit(shop, sup.id, sup.c, 59)).toEqual({ qty: 5, clamped: true });
+    expect(await setCartQtyByUnit(shop, sup.id, sup.c, 59)).toEqual({ qty: 5, clamped: true, raised: false });
     const items = await cartItems(shop.id, sup.id);
     expect(items.map((i) => Number(i.qty))).toEqual([7, 5]);
-    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 0)).toEqual({ qty: 0, clamped: false });
+    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 0)).toEqual({ qty: 0, clamped: false, raised: false });
     expect((await cartItems(shop.id, sup.id)).map((i) => i.productUnitId)).toEqual([sup.c]);
     // Единица чужого поставщика в корзину не попадает
     const foreign = await newSupplier();
     await expect(setCartQtyByUnit(shop, sup.id, foreign.a, 1)).rejects.toThrow(OrderError);
+  });
+  it("минимальное количество товара: меньше минимума заказать нельзя, 0 — без минимума", async () => {
+    const [shop, sup] = [await newShop(), await newSupplier()];
+    await db.productUnit.update({ where: { id: sup.a }, data: { minOrderQty: 6 } });
+    const qtyOf = async (unitId: string) => Number((await cartItems(shop.id, sup.id)).find((i) => i.productUnitId === unitId)?.qty ?? 0);
+
+    // «+» кладёт сразу минимум, следующий «+» добавляет по одной
+    expect((await addToCart(shop, sup.id, sup.a, 1)).qty).toBe(6);
+    expect((await addToCart(shop, sup.id, sup.a, 1)).qty).toBe(7);
+    // «−» ниже минимума убирает позицию целиком
+    expect(await removeOneFromCart(shop.id, sup.a)).toBe(6);
+    expect(await removeOneFromCart(shop.id, sup.a)).toBe(0);
+    expect(await qtyOf(sup.a)).toBe(0);
+
+    // Ввод с клавиатуры: меньше минимума поднимается до минимума
+    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 3)).toEqual({ qty: 6, clamped: false, raised: true });
+    expect(await setCartQtyByUnit(shop, sup.id, sup.a, 10)).toEqual({ qty: 10, clamped: false, raised: false });
+    // В корзине меньше минимума поставить нельзя
+    const item = (await cartItems(shop.id, sup.id))[0];
+    await expect(setCartQty(shop.id, item.id, 5)).rejects.toThrow(OrderError);
+    expect(await qtyOf(sup.a)).toBe(10);
+
+    // У товара без минимума (0) всё как раньше
+    expect((await addToCart(shop, sup.id, sup.b, 1)).qty).toBe(1);
+
+    // Остатка меньше минимума (5 шт. при минимуме 6): заказать нельзя
+    await db.productUnit.update({ where: { id: sup.c }, data: { minOrderQty: 6 } });
+    await expect(addToCart(shop, sup.id, sup.c, 1)).rejects.toThrow(OrderError);
+
+    // Поставщик поднял минимум, пока товар лежал в корзине: при оформлении количество вырастает, магазин видит изменение
+    await db.productUnit.update({ where: { id: sup.a }, data: { minOrderQty: 12 } });
+    const r = await checkout(shop, sup.id, delivery);
+    expect(r.placed).toBe(false);
+    expect((r as { changes: string[] }).changes.join(" ")).toContain("минимум для заказа 12");
+    expect(await qtyOf(sup.a)).toBe(12);
+    const r2 = await checkout(shop, sup.id, delivery);
+    expect(r2.placed).toBe(true);
+    expect(await reserved(sup.a)).toBe(12);
   });
 });

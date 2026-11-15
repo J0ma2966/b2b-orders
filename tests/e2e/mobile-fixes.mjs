@@ -440,6 +440,45 @@ let placedOrderId = "";
   log("журнал склада, чек и накладная ровные на 360, 390 и 430 px");
 }
 
+// ───── 15. Минимальное количество товара в заказе ─────
+{
+  await sup.goto(`${BASE}/supplier/catalog/fx-p-${sfx}-a10`);
+  const min = sup.locator("[name=existingMin]:visible").first();
+  await min.scrollIntoViewIfNeeded();
+  assert.equal(await min.inputValue(), "", "по умолчанию минимума нет");
+  await min.fill("6");
+  await shot(sup, "min-qty-supplier");
+  await sup.locator("form", { has: min }).locator("button[type=submit]").click();
+  await until(() => sql(`SELECT "minOrderQty"::int FROM "ProductUnit" WHERE id = 'fx-u-${sfx}-a10'`) === "6", "минимум сохранён");
+
+  const unit = `fx-u-${sfx}-a10`;
+  const inCart = () => sql(`SELECT COALESCE((SELECT qty::int FROM "OrderItem" i JOIN "Order" o ON o.id = i."orderId" WHERE o.status = 'DRAFT' AND o."shopId" = '${shopId}' AND i."productUnitId" = '${unit}'), 0)`);
+  await shop.goto(`${BASE}/shop/suppliers/${supplierId}?q=${encodeURIComponent(`Лимонад 10 ${sfx}`)}`);
+  await shop.locator("[data-testid=min-qty]:visible").first().waitFor();
+  await shop.locator(`button[aria-label^="${L("Добавить в корзину", "Savatga qoʻshish")}"]:visible`).first().click();
+  await until(() => inCart() === "6", "«+» кладёт сразу минимум");
+  const qty = shop.locator("[data-testid=stepper-qty]:visible").first();
+  await until(async () => (await qty.inputValue()) === "6", "в счётчике 6");
+  // Меньше минимума с клавиатуры не ставится
+  await qty.click();
+  await qty.pressSequentially("2");
+  await qty.press("Enter");
+  await shop.getByText(L("Минимум для заказа: 6", "Buyurtma uchun minimum: 6")).first().waitFor();
+  assert.equal(inCart(), "6");
+  await shot(shop, "min-qty-shop");
+  // «−» на минимуме убирает товар
+  await shop.locator(`button[aria-label^="${L("Убрать одну", "Bittaga kamaytirish")}"]:visible`).first().click();
+  await until(() => inCart() === "0", "«−» на минимуме убирает позицию");
+  // 0 снова снимает минимум
+  await sup.reload();
+  const again = sup.locator("[name=existingMin]:visible").first();
+  assert.equal(await again.inputValue(), "6");
+  await again.fill("0");
+  await sup.locator("form", { has: again }).locator("button[type=submit]").click();
+  await until(() => sql(`SELECT "minOrderQty"::int FROM "ProductUnit" WHERE id = 'fx-u-${sfx}-a10'`) === "0", "минимум снят");
+  log("минимальное количество: поставщик задаёт, магазин не может заказать меньше, 0 снимает минимум");
+}
+
 await browser.close();
 // Убираем за собой: тестовый поставщик и условия не мешают следующим сценариям
 sql(`UPDATE "Supplier" SET status = 'BLOCKED', "hiddenFromShops" = true WHERE id = '${otherId}'`);

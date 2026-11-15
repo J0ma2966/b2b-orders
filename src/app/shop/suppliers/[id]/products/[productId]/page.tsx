@@ -37,6 +37,7 @@ export default async function ShopProductPage({ params }: PageProps<"/shop/suppl
       avail: Math.max(0, Number(u.physicalQty) - Number(u.reservedQty)),
       inCart: inCart.get(u.id) ?? 0,
       fraction: allowsFraction(u.kind),
+      min: Number(u.minOrderQty),
     };
   });
   const facts = [

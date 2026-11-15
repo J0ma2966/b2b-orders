@@ -30,6 +30,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
     label: unitName(u),
     price: u.price?.toString() ?? "",
     isActive: u.isActive,
+    minQty: Number(u.minOrderQty) > 0 ? String(Number(u.minOrderQty)) : "",
     physical: Number(u.physicalQty),
     reserved: Number(u.reservedQty),
     baseUnitId: u.baseUnitId,

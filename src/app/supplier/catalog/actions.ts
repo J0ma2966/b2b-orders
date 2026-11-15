@@ -13,6 +13,7 @@ import { setUnitLink } from "@/lib/unit-links";
 import { OrderError } from "@/lib/orders";
 import { changeUnitPrice } from "@/lib/pricing";
 import { isSuspiciousDrop } from "@/lib/stock-core";
+import { validQty } from "@/lib/order-core";
 import { realFiles, saveImage, UploadError } from "@/lib/storage";
 import { parseAmount, parseAttributes, parseSignedAmount, UNIT_KINDS } from "@/lib/catalog";
 import { formValues, invalid, opt, parseForm, req, success, type FormState } from "@/lib/forms";
@@ -216,13 +217,16 @@ export async function saveUnitsAction(_prev: FormState, formData: FormData): Pro
   if (!product) return { error: "Товар не найден" };
   const ids = formData.getAll("existingId").map(String);
   const prices = formData.getAll("existingPrice").map(String);
-  const updates: { unit: (typeof product.units)[number]; price: number | null; isActive: boolean }[] = [];
+  const mins = formData.getAll("existingMin").map(String);
+  const updates: { unit: (typeof product.units)[number]; price: number | null; isActive: boolean; min: number }[] = [];
   for (const [i, id] of ids.entries()) {
     const unit = product.units.find((u) => u.id === id);
     if (!unit) return { error: "Единица не найдена" };
     const price = parseAmount(prices[i]);
     if (Number.isNaN(price)) return { error: "Цена — число, например 12 500" };
-    updates.push({ unit, price, isActive: formData.get(`active_${id}`) === "on" });
+    const min = parseAmount(mins[i]) ?? 0;
+    if (Number.isNaN(min) || (min > 0 && !validQty(unit.kind, min)) || min > 999999) return { error: "Минимум в заказе: число, 0 или пусто означает без минимума" };
+    updates.push({ unit, price, isActive: formData.get(`active_${id}`) === "on", min });
   }
   const added = readUnitRows(formData, true);
   if (added.error) return { error: added.error };
@@ -238,6 +242,10 @@ export async function saveUnitsAction(_prev: FormState, formData: FormData): Pro
       if (priceChange) {
         changes.push({ field: `price:${u.unit.kind}${u.unit.customName ? `:${u.unit.customName}` : ""}`, old: priceChange.old, new: priceChange.new });
         if (isSuspiciousDrop(priceChange.old, priceChange.new)) antifraud++;
+      }
+      if (u.min !== Number(u.unit.minOrderQty)) {
+        await tx.productUnit.update({ where: { id: u.unit.id }, data: { minOrderQty: u.min } });
+        changes.push({ field: `minOrderQty:${u.unit.kind}`, old: Number(u.unit.minOrderQty), new: u.min });
       }
       if (u.isActive !== u.unit.isActive) {
         await tx.productUnit.update({ where: { id: u.unit.id }, data: { isActive: u.isActive } });

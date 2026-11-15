@@ -37,6 +37,7 @@ export function CartStepper({
   unitId,
   qty,
   max,
+  min = 0,
   label,
   unit,
   row,
@@ -45,14 +46,18 @@ export function CartStepper({
   unitId: string;
   qty: number;
   max: number;
+  // Минимум поставщика: «+» кладёт сразу столько, «−» на минимуме убирает позицию
+  min?: number;
   label: string;
   unit: string;
   row?: boolean;
 }) {
   const t = useT();
-  const [shown, step] = useOptimistic(qty, (cur: number, op: number | { set: number }) =>
-    typeof op === "number" ? Math.max(0, Math.round((cur + op) * 1000) / 1000) : op.set,
-  );
+  const [shown, step] = useOptimistic(qty, (cur: number, op: number | { set: number }) => {
+    if (typeof op !== "number") return op.set;
+    const next = Math.max(0, Math.round((cur + op) * 1000) / 1000);
+    return next < min ? (op > 0 ? min : 0) : next;
+  });
   const [error, setError] = useState<string | null>(null);
   // Количество, которое набирают с клавиатуры (null — поле не редактируется)
   const [draft, setDraft] = useState<string | null>(null);
@@ -63,7 +68,8 @@ export function CartStepper({
     if (draft === null) return;
     const typed = draft === "" ? 0 : Number(draft);
     setDraft(null);
-    const next = Math.min(typed, Math.max(0, Math.floor(max)));
+    const capped = Math.min(typed, Math.max(0, Math.floor(max)));
+    const next = capped > 0 && capped < min && max >= min ? min : capped;
     if (next === shown && typed === shown) return;
     setError(null);
     tapHaptic();
@@ -75,6 +81,7 @@ export function CartStepper({
       fd.set("qty", String(typed));
       const r = await setCartQtyByUnitAction(initialFormState, fd);
       if (r.error) setError(r.error);
+      else if (r.values?.raised) setError(t("Минимум для заказа: {qty}", { qty: `${formatQty(Number(r.values.qty))} ${unit}` }));
       else if (r.values?.clamped) setError(t("Доступно только {qty}", { qty: `${formatQty(Number(r.values.qty))} ${unit}` }));
     });
   }
@@ -124,7 +131,7 @@ export function CartStepper({
           aria-label={t("Убрать одну: {name}", { name: label })}
           className={cn("grid place-items-center rounded-full hover:bg-black/10", row ? "size-9" : "size-8 bg-black/10")}
         >
-          {shown > 1 ? <Minus className="size-4" strokeWidth={2.6} aria-hidden /> : <Trash2 className="size-4" strokeWidth={2.2} aria-hidden />}
+          {shown > Math.max(1, min) ? <Minus className="size-4" strokeWidth={2.6} aria-hidden /> : <Trash2 className="size-4" strokeWidth={2.2} aria-hidden />}
         </button>
         <label className={cn("flex min-w-0 flex-1 items-center justify-center gap-1 px-1 font-bold tabular-nums", row ? "text-base" : "text-sm")}>
           <input
@@ -171,7 +178,7 @@ export function CartStepper({
   );
 }
 
-export type BuyUnit = { id: string; label: string; price: number; priceText: string; avail: number; inCart: number; fraction: boolean };
+export type BuyUnit = { id: string; label: string; price: number; priceText: string; avail: number; inCart: number; fraction: boolean; min: number };
 
 // Страница товара (макет): выбор единицы продажи карточками и нижняя тёмная плашка «− N +» и «В корзину · сумма»
 export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string; units: BuyUnit[]; canOrder: boolean }) {
@@ -179,7 +186,9 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
   const first = units.find((u) => u.avail > 0) ?? units[0];
   const [unitId, setUnitId] = useState(first?.id);
   // Количество можно и набрать с клавиатуры (опт — десятки штук), и менять «−» / «+»
-  const [text, setText] = useState("1");
+  // С чего начинается счётчик: минимум поставщика, если этой единицы ещё нет в корзине
+  const startQty = (u?: BuyUnit) => String(u && u.inCart <= 0 && u.min > 1 ? u.min : 1);
+  const [text, setText] = useState(() => startQty(first));
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
   const [pending, start] = useTransition();
   const unit = units.find((u) => u.id === unitId) ?? first;
@@ -189,7 +198,8 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
   const parsed = Number(text.replace(",", "."));
   const valid = Number.isFinite(parsed) && parsed > 0 && (unit.fraction || Number.isInteger(parsed));
   const qty = valid ? parsed : 0;
-  const step = (d: number) => setText(String(Math.min(Math.max(1, max), Math.max(1, Math.floor(qty || 1) + d))));
+  const floor = unit.inCart <= 0 && unit.min > 1 ? unit.min : 1;
+  const step = (d: number) => setText(String(Math.min(Math.max(floor, max), Math.max(floor, Math.floor(qty || floor) + d))));
 
   function add() {
     setState({});
@@ -218,7 +228,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
                 type="button"
                 onClick={() => {
                   setUnitId(u.id);
-                  setText("1");
+                  setText(startQty(u));
                   setState({});
                 }}
                 aria-pressed={u.id === unit.id}
@@ -228,6 +238,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
                 <span className={cn("block font-display text-lg font-bold whitespace-nowrap tabular-nums", u.id === unit.id && "text-lime")}>{u.priceText}</span>
                 <span className={cn("block text-xs", u.avail > 0 ? (u.id === unit.id ? "text-white/60" : "text-gray-500") : "text-red-600")}>
                   {u.avail > 0 ? t("в наличии {qty}", { qty: formatQty(u.avail) }) : t("нет в наличии")}
+                  {u.min > 0 && ` · ${t("от {qty}", { qty: formatQty(u.min) })}`}
                   {u.inCart > 0 && ` · ${t("в корзине {qty}", { qty: formatQty(u.inCart) })}`}
                 </span>
               </button>
@@ -245,7 +256,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
           )}
           <div className="pointer-events-auto mx-auto flex max-w-xl gap-2 rounded-[1.75rem] bg-night p-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.45)]">
             <div className="flex h-16 items-center rounded-[1.25rem] bg-night-2 px-1 text-white">
-              <button type="button" onClick={() => step(-1)} disabled={valid && qty <= 1} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
+              <button type="button" onClick={() => step(-1)} disabled={valid && qty <= floor} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
                 <Minus className="size-5" strokeWidth={2.4} aria-hidden />
               </button>
               <input

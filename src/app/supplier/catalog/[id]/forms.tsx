@@ -48,7 +48,7 @@ export function EditProductForm({
   );
 }
 
-type UnitView = { id: string; label: string; price: string; isActive: boolean; physical: number; reserved: number; baseUnitId: string | null; baseQty: number | null; baseLabel: string | null };
+type UnitView = { id: string; label: string; price: string; isActive: boolean; minQty: string; physical: number; reserved: number; baseUnitId: string | null; baseQty: number | null; baseLabel: string | null };
 
 export function UnitsForm({ productId, units }: { productId: string; units: UnitView[] }) {
   const t = useT();
@@ -66,11 +66,14 @@ export function UnitsForm({ productId, units }: { productId: string; units: Unit
               <input type="checkbox" name={`active_${u.id}`} defaultChecked={u.isActive} /> {t("продаётся")}
             </label>
           </div>
-          <div className="mt-2 grid grid-cols-2 items-end gap-2">
+          <div className="mt-2 grid grid-cols-2 items-start gap-2">
             <Field label="Цена, сум">
               <Input name="existingPrice" inputMode="decimal" defaultValue={u.price} placeholder={t("без цены")} />
             </Field>
-            <div className="text-xs text-gray-600">
+            <Field label="Минимум в заказе" hint="0 или пусто: без минимума">
+              <Input name="existingMin" inputMode="decimal" defaultValue={u.minQty} placeholder="0" />
+            </Field>
+            <div className="col-span-2 text-xs text-gray-600">
               <div>{t("Доступно:")} <b>{formatQty(u.physical - u.reserved)}</b></div>
               {u.baseLabel ? (
                 <div>{t("1 = {n} {unit}, остаток ведётся в «{unit}»", { n: formatQty(u.baseQty ?? 0), unit: t(u.baseLabel) })}</div>
