@@ -4,6 +4,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { useActionState } from "react";
 import { Alert } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { RequiredNote } from "@/components/forms/required-note";
 import { PrivacyNote } from "@/components/forms/privacy-note";
 import { AccountFields, type PhoneConfirmChannels } from "@/components/forms/account-fields";
 import { SupplierFields } from "@/components/forms/supplier-fields";
@@ -18,6 +19,7 @@ export function SupplierRegisterForm({ territories, loggedIn, confirm }: { terri
   return (
     <ActionForm action={action} pending={pending} className="space-y-6">
       {state.error && <Alert tone="error">{state.error}</Alert>}
+      <RequiredNote />
       {!loggedIn && <AccountFields state={state} confirm={confirm} />}
       <SupplierFields state={state} territories={territories} />
       <PrivacyNote />

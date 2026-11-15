@@ -51,10 +51,10 @@ export type CheckedImage = { data: Buffer; ext: string };
 
 // Проверка картинки без записи на диск: формы, где сохранение зависит от следующих шагов
 // (регистрация ждёт код подтверждения), проверяют файл заранее, а пишут его только в конце.
-export async function checkImage(file: File): Promise<CheckedImage> {
+export async function checkImage(file: File, maxBytes = MAX_IMAGE_BYTES): Promise<CheckedImage> {
   const ext = IMAGE_TYPES[file.type];
   if (!ext) throw new UploadError("Допустимы изображения JPG, PNG или WEBP");
-  if (file.size > MAX_IMAGE_BYTES) throw new UploadError("Файл больше 10 МБ");
+  if (file.size > maxBytes) throw new UploadError(maxBytes === MAX_IMAGE_BYTES ? "Файл больше 10 МБ" : "Фото больше 1 МБ");
   const data = Buffer.from(await file.arrayBuffer());
   if (!hasSignature(data, ext)) throw new UploadError("Допустимы изображения JPG, PNG или WEBP");
   return { data, ext };
@@ -68,8 +68,8 @@ export async function storeImage(image: CheckedImage, folder: string): Promise<s
   return rel;
 }
 
-export async function saveImage(file: File, folder: string): Promise<string> {
-  return storeImage(await checkImage(file), folder);
+export async function saveImage(file: File, folder: string, maxBytes?: number): Promise<string> {
+  return storeImage(await checkImage(file, maxBytes), folder);
 }
 
 const VIDEO_TYPES: Record<string, string> = {

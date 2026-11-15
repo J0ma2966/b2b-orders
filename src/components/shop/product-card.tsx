@@ -16,6 +16,7 @@ type Unit = {
   reservedQty: { toString(): string };
   baseUnitId?: string | null;
   baseQty?: { toString(): string } | null;
+  minOrderQty?: { toString(): string } | null;
 };
 type Product = { id: string; name: string; photoPaths: string[]; units: Unit[] };
 
@@ -82,6 +83,7 @@ export async function ProductCard({
         {p.units.map((u) => {
           const avail = Number(u.physicalQty) - Number(u.reservedQty);
           const unit = t(unitName(u));
+          const min = Number(u.minOrderQty ?? 0);
           return (
             <li key={u.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
               <div className="min-w-0 leading-tight">
@@ -97,9 +99,10 @@ export async function ProductCard({
                     t("нет в наличии")
                   )}
                 </div>
+                {min > 0 && <div data-testid="min-qty" className="truncate text-xs font-semibold text-brand-700">{t("от {qty}", { qty: `${formatQty(min)} ${unit}` })}</div>}
               </div>
               {canOrder && (avail > 0 || (cart?.get(u.id) ?? 0) > 0) && (
-                <CartStepper supplierId={supplierId} unitId={u.id} qty={cart?.get(u.id) ?? 0} max={avail} label={`${p.name}, ${unit}`} unit={unit} />
+                <CartStepper supplierId={supplierId} unitId={u.id} qty={cart?.get(u.id) ?? 0} max={avail} min={min} label={`${p.name}, ${unit}`} unit={unit} />
               )}
             </li>
           );
@@ -146,18 +149,20 @@ export async function ProductRow({
             const unit = t(unitName(u));
             const base = u.baseUnitId ? p.units.find((b) => b.id === u.baseUnitId) : null;
             const inCart = cart?.get(u.id) ?? 0;
+            const min = Number(u.minOrderQty ?? 0);
             return (
-              <li key={u.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0 leading-tight">
+              <li key={u.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <div className="min-w-0 flex-1 leading-tight">
                   <div className={cn("truncate text-[13px]", avail > 0 ? "text-gray-500" : "text-red-600")}>
                     {base && u.baseQty ? t("{unit} по {n} {base}", { unit, n: formatQty(u.baseQty), base: t(unitName(base)) }) : unit}
                     {avail <= 0 && ` · ${t("нет в наличии")}`}
+                    {min > 0 && avail > 0 && <span data-testid="min-qty" className="font-semibold text-brand-700"> · {t("от {qty}", { qty: formatQty(min) })}</span>}
                   </div>
                   <div className="font-display text-[17px] font-bold tabular-nums">
                     {t.money(u.price).replace(/\s(\S+)$/, "")} <span className="font-sans text-xs font-semibold text-gray-500">{t.money(0).replace(/^0\s/, "")}</span>
                   </div>
                 </div>
-                {canOrder && (avail > 0 || inCart > 0) && <CartStepper supplierId={supplierId} unitId={u.id} qty={inCart} max={avail} label={`${p.name}, ${unit}`} unit={unit} row />}
+                {canOrder && (avail > 0 || inCart > 0) && <CartStepper supplierId={supplierId} unitId={u.id} qty={inCart} max={avail} min={min} label={`${p.name}, ${unit}`} unit={unit} row />}
               </li>
             );
           })}

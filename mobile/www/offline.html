@@ -60,6 +60,10 @@
   var statusLine = document.getElementById("status");
   var buttonText = button.textContent;
   var retrying = false;
+  var giveUp = 0;
+  var androidApp = /Android/i.test(navigator.userAgent) && /B2BOrdersApp/.test(navigator.userAgent);
+  // Приложение сообщает, что связи всё ещё нет
+  window.offlineRetryFailed = function () { clearTimeout(giveUp); stillOffline(); };
   function busy(on) {
     retrying = on;
     button.disabled = on;
@@ -77,6 +81,15 @@
     if (offlineRetry && offlineRetry.open) {
       // Удачно — приложение само откроет страницу; busy не снимаем
       offlineRetry.open().then(function (r) { if (!r || !r.ok) stillOffline(); }).catch(stillOffline);
+      return;
+    }
+    if (androidApp) {
+      // Android с зашитым адресом сервера: моста Capacitor на этой странице нет. Переход на служебный
+      // адрес перехватывает само приложение (OfflineRetryPlugin.Client): проверяет связь и открывает
+      // страницу, которая не загрузилась. Если связи нет — вызывает offlineRetryFailed().
+      clearTimeout(giveUp);
+      giveUp = setTimeout(stillOffline, 15000);
+      window.location.href = "https://localhost/__offline_retry";
       return;
     }
     // iOS и сборка с выбором адреса: страница лежит в приложении вместе с app-config.js

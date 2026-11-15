@@ -22,7 +22,7 @@ export default async function ShopOrdersPage({ searchParams }: PageProps<"/shop/
     db.order.count({ where: { shopId: ctx.shop.id, status: orderStatusFilter("active") } }),
     db.order.findMany({
       where,
-      include: { supplier: true, _count: { select: { items: true } } },
+      include: { supplier: true, _count: { select: { items: true } }, items: { where: { kind: "FORCED" }, select: { kind: true } } },
       orderBy: status === "active" ? [{ status: "asc" }, { placedAt: "desc" }] : { placedAt: "desc" },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,

@@ -461,6 +461,8 @@ model ProductUnit {
   sortOrder   Int      @default(0)
   // П6: порог «мало на складе» по доступному остатку; уведомление — при переходе ниже порога
   lowStockThreshold Decimal? @db.Decimal(14, 3)
+  // Меньше этого количества в одном заказе заказать нельзя; 0 — минимума нет
+  minOrderQty Decimal  @default(0) @db.Decimal(14, 3)
   // Л4: «коробка = 24 шт.» — остаток ведётся в базовой единице (baseUnit), а у этой единицы
   // physicalQty хранит готовое число целых коробок из доступного остатка (reservedQty = 0)
   baseUnitId  String?

@@ -55,6 +55,8 @@
 
     <!-- Разрешения: каждое запрашивается у пользователя только в момент использования -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Узнать, что интернет вернулся, и самим уйти со страницы «Нет связи» -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Push-уведомления (Android 13+ спрашивает пользователя) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Сканер QR при приёмке, фото и видео брака в заявке на замену -->

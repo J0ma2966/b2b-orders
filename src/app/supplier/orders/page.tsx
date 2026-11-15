@@ -29,7 +29,7 @@ export default async function SupplierOrdersPage({ searchParams }: PageProps<"/s
   };
   const [total, rows, couriers, placedCount] = await Promise.all([
     db.order.count({ where }),
-    db.order.findMany({ where, include: { shop: true, courier: true }, orderBy: { placedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    db.order.findMany({ where, include: { shop: true, courier: true, items: { where: { kind: "FORCED" }, select: { kind: true } } }, orderBy: { placedAt: "desc" }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
     db.supplierMember.findMany({ where: { supplierId: ctx.supplier.id, ...delivererWhere }, include: { user: true } }),
     db.order.count({ where: { supplierId: ctx.supplier.id, status: "PLACED" } }),
   ]);

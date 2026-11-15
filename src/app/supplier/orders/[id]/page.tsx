@@ -4,6 +4,7 @@ import { Alert, Card, DefinitionList, PageHeader } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { OrderFinance, OrderHistory, OrderItems, OrderStatusBadge } from "@/components/orders/order-view";
 import { AssignCourierForm, CancelRequestDecisionForm, CorrectionForm, ForcedItemForm, OrderStatusForm, ReadyAndAssignForm, ResolveProblemForm } from "@/components/orders/supplier-forms";
+import { ForcedNotice, OrderComment } from "@/components/orders/order-notes";
 import { paymentDue, supplierDebtStates } from "@/lib/accounts";
 import { DebtFlag, DebtTag, NO_DEBT } from "@/components/supplier/debt";
 import { fileUrl } from "@/lib/storage";
@@ -72,6 +73,8 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
         actions={<Link href="/supplier/orders" className="text-sm text-brand-600">{t("← Все заказы")}</Link>}
       />
       <div className="space-y-4">
+        <OrderComment text={order.comment} />
+        <ForcedNotice items={order.items} viewer="supplier" />
         {order.cancelReason && (
           <Alert tone="error">
             {t(order.cancelledBy === "SHOP" ? "Магазин отменил заказ {date}. Причина: {reason}" : order.cancelledBy === "PLATFORM" ? "Заказ отменён автоматически {date}. Причина: {reason}" : "Заказ отменён поставщиком {date}. Причина: {reason}", { date: t.dateTime(order.cancelledAt), reason: order.cancelReason })}
@@ -169,7 +172,6 @@ export default async function SupplierOrderPage({ params }: PageProps<"/supplier
                   ["Дата доставки", order.deliveryDate ? t.date(order.deliveryDate) : null],
                   ["К оплате при получении", due ? t.money(due.required) : null],
                   ["Оплата", order.paymentMethod ? t(PAYMENT_LABEL[order.paymentMethod]) : null],
-                  ["Комментарий", order.comment],
                   ["Комиссия платформы", order.commissionRate !== null ? `${order.commissionRate.toString()}%` : null],
                 ]}
               />

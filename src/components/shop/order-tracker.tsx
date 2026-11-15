@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/components/ui";
-import { FileText, Phone, Truck } from "lucide-react";
+import { FileText, Phone, TriangleAlert, Truck } from "lucide-react";
 import { db } from "@/lib/db";
 import { ORDER_CHANGED, ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/lib/order-core";
 import { Avatar } from "./ui";
@@ -71,7 +71,29 @@ export async function OrderTracker({ status, compact = false }: { status: OrderS
   );
 }
 
-type TrackRow = { id: string; number: number | null; status: OrderStatus; placedAt: Date | null; total: { toString(): string }; supplier: { displayName: string } };
+type TrackRow = {
+  id: string;
+  number: number | null;
+  status: OrderStatus;
+  placedAt: Date | null;
+  total: { toString(): string };
+  supplier: { displayName: string };
+  // Принудительные позиции заказа (если страница их загрузила) — для постоянной пометки в списке
+  items?: { kind: string }[];
+};
+
+const hasForced = (o: TrackRow) => !!o.items?.some((i) => i.kind === "FORCED");
+
+// Постоянная пометка «в заказе есть принудительная продажа» (не гаснет после просмотра)
+async function ForcedMark({ dark }: { dark?: boolean }) {
+  const t = await getT();
+  return (
+    <span data-testid="order-forced" className={cn("inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold", dark ? "bg-coral text-white" : "bg-red-100 text-red-800")}>
+      <TriangleAlert className="size-3.5 shrink-0" strokeWidth={2.4} aria-hidden />
+      <span className="truncate">{t("Принудительная продажа")}</span>
+    </span>
+  );
+}
 
 // Непрочитанные уведомления пользователя по заказам: «Изменён» (поставщик поменял состав) или «Обновлён» (новый статус).
 // Гаснут, когда пользователь открывает заказ (SeenTracker).
@@ -135,9 +157,10 @@ export async function ActiveOrderCard({ o, mark }: { o: HeroOrder; mark?: Mark }
       <span aria-hidden className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-white/[0.05]" />
       <div className="relative flex items-start justify-between gap-3">
         <Link href={`/shop/orders/${o.id}`} className="min-w-0">
-          {mark && (
-            <div className="mb-2">
+          {(mark || hasForced(o)) && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
               <OrderMark mark={mark} dark />
+              {hasForced(o) && <ForcedMark dark />}
             </div>
           )}
           <div className="truncate text-sm text-white/60">№ {o.number} · {o.supplier.displayName}</div>
@@ -185,7 +208,12 @@ export async function OrderRows({ rows, marks }: { rows: TrackRow[]; marks: Map<
             <Link href={`/shop/orders/${o.id}`} className={cn("flex items-center gap-3 rounded-[1.5rem] bg-surface p-3.5", mark === "changed" && "ring-2 ring-yellow-400")}>
               <Avatar name={o.supplier.displayName} className="size-14 text-base" />
               <span className="min-w-0 flex-1">
-                {mark && <OrderMark mark={mark} />}
+                {(mark || hasForced(o)) && (
+                  <span className="mb-0.5 flex flex-wrap gap-1.5">
+                    <OrderMark mark={mark} />
+                    {hasForced(o) && <ForcedMark />}
+                  </span>
+                )}
                 <span className="block truncate font-display text-[17px] leading-tight font-bold">{o.supplier.displayName}</span>
                 <span className="block truncate text-sm text-gray-500 tabular-nums">№ {o.number} · {t.money(o.total)}</span>
               </span>

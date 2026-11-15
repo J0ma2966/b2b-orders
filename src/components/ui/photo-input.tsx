@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useT } from "@/lib/i18n/client";
+import { compressImage } from "@/lib/image-compress";
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -18,12 +19,15 @@ export function PhotoInput({
   hint,
   error,
   max = 1,
+  compressTo,
 }: {
   name: string;
   label: string;
   hint?: string;
   error?: string[] | string;
   max?: number;
+  /** Сжимать каждое фото в браузере до этого размера в байтах (фото товаров — 1 МБ) */
+  compressTo?: number;
 }) {
   const t = useT();
   const field = useRef<HTMLInputElement>(null);
@@ -31,6 +35,7 @@ export function PhotoInput({
   const gallery = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const itemsRef = useRef(items);
   useEffect(() => {
@@ -58,14 +63,30 @@ export function PhotoInput({
     return () => form?.removeEventListener("reset", clear);
   }, []);
 
-  function add(e: ChangeEvent<HTMLInputElement>) {
+  async function add(e: ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = "";
-    const ok = picked.filter((f) => TYPES.includes(f.type) && f.size <= MAX_BYTES);
-    setProblem(
-      ok.length === picked.length ? null : t(picked.some((f) => !TYPES.includes(f.type)) ? "Допустимы изображения JPG, PNG или WEBP" : "Файл больше 10 МБ"),
-    );
+    // С сжатием исходник может быть большим: на сервер уйдёт уже уменьшенный файл
+    const limit = compressTo ? 40 * 1024 * 1024 : MAX_BYTES;
+    let ok = picked.filter((f) => TYPES.includes(f.type) && f.size <= limit);
+    let failed: string | null =
+      ok.length === picked.length ? null : t(picked.some((f) => !TYPES.includes(f.type)) ? "Допустимы изображения JPG, PNG или WEBP" : compressTo ? "Файл слишком большой" : "Файл больше 10 МБ");
+    if (compressTo && ok.length) {
+      setBusy(true);
+      const done: File[] = [];
+      for (const f of ok) {
+        try {
+          done.push(await compressImage(f, compressTo));
+        } catch {
+          failed = t("Не удалось сжать фото, выберите другое");
+        }
+      }
+      ok = done;
+      setBusy(false);
+    }
+    setProblem(failed);
     if (!ok.length) return;
+    const items = itemsRef.current;
     const added = ok.map((file) => ({ file, url: URL.createObjectURL(file) }));
     const all = max === 1 ? added.slice(-1) : [...items, ...added];
     const kept = all.slice(0, max);
@@ -94,9 +115,10 @@ export function PhotoInput({
       <input ref={camera} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={add} />
       <input ref={gallery} type="file" accept={TYPES.join(",")} multiple={max > 1} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={add} />
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={button} disabled={full} onClick={() => camera.current?.click()}>{t("📷 Снять фото")}</button>
-        <button type="button" className={button} disabled={full} onClick={() => gallery.current?.click()}>{t("🖼 Из галереи")}</button>
+        <button type="button" className={button} disabled={full || busy} onClick={() => camera.current?.click()}>{t("📷 Снять фото")}</button>
+        <button type="button" className={button} disabled={full || busy} onClick={() => gallery.current?.click()}>{t("🖼 Из галереи")}</button>
       </div>
+      {busy && <span className="mt-1 block text-xs text-gray-500" role="status">{t("Сжимаем фото…")}</span>}
       {items.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-2">
           {items.map((i, index) => (

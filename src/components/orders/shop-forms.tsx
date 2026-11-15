@@ -8,7 +8,7 @@ import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
-import { addToCartAction, removeOneFromCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
+import { addToCartAction, removeOneFromCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, setCartQtyByUnitAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
 import { useT } from "@/lib/i18n/client";
 import { tapHaptic } from "@/lib/native";
 import { formatQty } from "@/lib/catalog";
@@ -37,6 +37,7 @@ export function CartStepper({
   unitId,
   qty,
   max,
+  min = 0,
   label,
   unit,
   row,
@@ -45,14 +46,45 @@ export function CartStepper({
   unitId: string;
   qty: number;
   max: number;
+  // Минимум поставщика: «+» кладёт сразу столько, «−» на минимуме убирает позицию
+  min?: number;
   label: string;
   unit: string;
   row?: boolean;
 }) {
   const t = useT();
-  const [shown, step] = useOptimistic(qty, (cur: number, delta: number) => Math.max(0, Math.round((cur + delta) * 1000) / 1000));
+  const [shown, step] = useOptimistic(qty, (cur: number, op: number | { set: number }) => {
+    if (typeof op !== "number") return op.set;
+    const next = Math.max(0, Math.round((cur + op) * 1000) / 1000);
+    return next < min ? (op > 0 ? min : 0) : next;
+  });
   const [error, setError] = useState<string | null>(null);
+  // Количество, которое набирают с клавиатуры (null — поле не редактируется)
+  const [draft, setDraft] = useState<string | null>(null);
   const [, start] = useTransition();
+
+  // Набранное число: только цифры, не больше остатка; пусто или 0 — позиция убирается
+  function commit() {
+    if (draft === null) return;
+    const typed = draft === "" ? 0 : Number(draft);
+    setDraft(null);
+    const capped = Math.min(typed, Math.max(0, Math.floor(max)));
+    const next = capped > 0 && capped < min && max >= min ? min : capped;
+    if (next === shown && typed === shown) return;
+    setError(null);
+    tapHaptic();
+    start(async () => {
+      step({ set: next });
+      const fd = new FormData();
+      fd.set("supplierId", supplierId);
+      fd.set("unitId", unitId);
+      fd.set("qty", String(typed));
+      const r = await setCartQtyByUnitAction(initialFormState, fd);
+      if (r.error) setError(r.error);
+      else if (r.values?.raised) setError(t("Минимум для заказа: {qty}", { qty: `${formatQty(Number(r.values.qty))} ${unit}` }));
+      else if (r.values?.clamped) setError(t("Доступно только {qty}", { qty: `${formatQty(Number(r.values.qty))} ${unit}` }));
+    });
+  }
 
   function change(delta: 1 | -1) {
     setError(null);
@@ -99,11 +131,37 @@ export function CartStepper({
           aria-label={t("Убрать одну: {name}", { name: label })}
           className={cn("grid place-items-center rounded-full hover:bg-black/10", row ? "size-9" : "size-8 bg-black/10")}
         >
-          {shown > 1 ? <Minus className="size-4" strokeWidth={2.6} aria-hidden /> : <Trash2 className="size-4" strokeWidth={2.2} aria-hidden />}
+          {shown > Math.max(1, min) ? <Minus className="size-4" strokeWidth={2.6} aria-hidden /> : <Trash2 className="size-4" strokeWidth={2.2} aria-hidden />}
         </button>
-        <span key={shown} className={cn("count-pop min-w-0 truncate px-1 font-bold tabular-nums", row ? "text-base" : "text-sm")}>
-          {formatQty(shown)} {!row && <span className="font-medium opacity-75">{unit}</span>}
-        </span>
+        <label className={cn("flex min-w-0 flex-1 items-center justify-center gap-1 px-1 font-bold tabular-nums", row ? "text-base" : "text-sm")}>
+          <input
+            data-testid="stepper-qty"
+            value={draft ?? formatQty(shown)}
+            onFocus={(e) => {
+              setDraft("");
+              e.target.select();
+            }}
+            onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") {
+                setDraft(null);
+                e.currentTarget.blur();
+              }
+            }}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            enterKeyHint="done"
+            autoComplete="off"
+            placeholder={formatQty(shown)}
+            aria-label={t("Количество: {name}", { name: label })}
+            style={{ width: `${Math.max(2, (draft ?? formatQty(shown)).length) + 1}ch` }}
+            className={cn("min-w-0 rounded-md bg-transparent text-center font-bold tabular-nums placeholder:text-current placeholder:opacity-50 focus:bg-white/60 focus:outline-none")}
+          />
+          {!row && <span className="truncate font-medium opacity-75">{unit}</span>}
+        </label>
         <button
           type="button"
           onClick={() => change(1)}
@@ -120,7 +178,7 @@ export function CartStepper({
   );
 }
 
-export type BuyUnit = { id: string; label: string; price: number; priceText: string; avail: number; inCart: number; fraction: boolean };
+export type BuyUnit = { id: string; label: string; price: number; priceText: string; avail: number; inCart: number; fraction: boolean; min: number };
 
 // Страница товара (макет): выбор единицы продажи карточками и нижняя тёмная плашка «− N +» и «В корзину · сумма»
 export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string; units: BuyUnit[]; canOrder: boolean }) {
@@ -128,7 +186,9 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
   const first = units.find((u) => u.avail > 0) ?? units[0];
   const [unitId, setUnitId] = useState(first?.id);
   // Количество можно и набрать с клавиатуры (опт — десятки штук), и менять «−» / «+»
-  const [text, setText] = useState("1");
+  // С чего начинается счётчик: минимум поставщика, если этой единицы ещё нет в корзине
+  const startQty = (u?: BuyUnit) => String(u && u.inCart <= 0 && u.min > 1 ? u.min : 1);
+  const [text, setText] = useState(() => startQty(first));
   const [state, setState] = useState<{ ok?: string; error?: string }>({});
   const [pending, start] = useTransition();
   const unit = units.find((u) => u.id === unitId) ?? first;
@@ -138,7 +198,8 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
   const parsed = Number(text.replace(",", "."));
   const valid = Number.isFinite(parsed) && parsed > 0 && (unit.fraction || Number.isInteger(parsed));
   const qty = valid ? parsed : 0;
-  const step = (d: number) => setText(String(Math.min(Math.max(1, max), Math.max(1, Math.floor(qty || 1) + d))));
+  const floor = unit.inCart <= 0 && unit.min > 1 ? unit.min : 1;
+  const step = (d: number) => setText(String(Math.min(Math.max(floor, max), Math.max(floor, Math.floor(qty || floor) + d))));
 
   function add() {
     setState({});
@@ -167,7 +228,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
                 type="button"
                 onClick={() => {
                   setUnitId(u.id);
-                  setText("1");
+                  setText(startQty(u));
                   setState({});
                 }}
                 aria-pressed={u.id === unit.id}
@@ -177,6 +238,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
                 <span className={cn("block font-display text-lg font-bold whitespace-nowrap tabular-nums", u.id === unit.id && "text-lime")}>{u.priceText}</span>
                 <span className={cn("block text-xs", u.avail > 0 ? (u.id === unit.id ? "text-white/60" : "text-gray-500") : "text-red-600")}>
                   {u.avail > 0 ? t("в наличии {qty}", { qty: formatQty(u.avail) }) : t("нет в наличии")}
+                  {u.min > 0 && ` · ${t("от {qty}", { qty: formatQty(u.min) })}`}
                   {u.inCart > 0 && ` · ${t("в корзине {qty}", { qty: formatQty(u.inCart) })}`}
                 </span>
               </button>
@@ -194,7 +256,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
           )}
           <div className="pointer-events-auto mx-auto flex max-w-xl gap-2 rounded-[1.75rem] bg-night p-2 shadow-[0_14px_34px_-10px_rgb(0_0_0/0.45)]">
             <div className="flex h-16 items-center rounded-[1.25rem] bg-night-2 px-1 text-white">
-              <button type="button" onClick={() => step(-1)} disabled={valid && qty <= 1} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
+              <button type="button" onClick={() => step(-1)} disabled={valid && qty <= floor} aria-label={t("Меньше")} className="grid size-12 place-items-center rounded-full disabled:opacity-40">
                 <Minus className="size-5" strokeWidth={2.4} aria-hidden />
               </button>
               <input
@@ -250,7 +312,8 @@ export function CartQtyForm({ itemId, qty, step }: { itemId: string; qty: string
 
 export type CheckoutDefaults = { address: string; contactName: string; contactPhone: string };
 
-export function CheckoutForm({ supplierId, defaults, dates }: { supplierId: string; defaults: CheckoutDefaults; dates?: { value: string; label: string }[] }) {
+// itemIds — оформить только эти позиции корзины (отмечены на странице «Корзина»)
+export function CheckoutForm({ supplierId, defaults, dates, itemIds }: { supplierId: string; defaults: CheckoutDefaults; dates?: { value: string; label: string }[]; itemIds?: string[] }) {
   const t = useT();
   const [state, action, pending] = useActionState(checkoutAction, initialFormState);
   const v = state.values ?? {};
@@ -259,10 +322,11 @@ export function CheckoutForm({ supplierId, defaults, dates }: { supplierId: stri
     <ActionForm action={action} pending={pending} className="space-y-4">
       <FormMessage state={state} />
       <input type="hidden" name="supplierId" value={supplierId} />
+      {itemIds?.map((id) => <input key={id} type="hidden" name="itemIds[]" value={id} />)}
       <Field label="Способ оплаты" name="paymentMethod" error={fe.paymentMethod} hint="Платформа только фиксирует способ оплаты, деньги передаются напрямую поставщику">
         <Select name="paymentMethod" defaultValue={v.paymentMethod ?? "CASH"}>
           <option value="CASH">{t("Наличные")}</option>
-          <option value="CARD">{t("Карта")}</option>
+          <option value="CARD">{t("Банковская карта")}</option>
           <option value="TRANSFER">{t("Безналичный расчёт")}</option>
         </Select>
       </Field>
@@ -405,7 +469,8 @@ export function AskOwnerForm({ supplierId }: { supplierId: string }) {
 }
 
 // М5: одна форма на все корзины; дата доставки — ближайшая доступная у каждого поставщика
-export function CheckoutAllForm({ count, total, defaults }: { count: number; total: string; defaults: CheckoutDefaults }) {
+// itemIds — отмеченные в корзине позиции: оформляются только они
+export function CheckoutAllForm({ count, total, defaults, itemIds }: { count: number; total: string; defaults: CheckoutDefaults; itemIds?: string[] }) {
   const t = useT();
   const [state, action, pending] = useActionState(checkoutAllAction, initialFormState);
   const v = state.values ?? {};
@@ -413,11 +478,13 @@ export function CheckoutAllForm({ count, total, defaults }: { count: number; tot
   return (
     <ActionForm action={action} pending={pending} className="space-y-4">
       <FormMessage state={state} />
+      {itemIds && <input type="hidden" name="selection" value="1" />}
+      {itemIds?.map((id) => <input key={id} type="hidden" name="itemIds[]" value={id} />)}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Способ оплаты" name="paymentMethod" error={fe.paymentMethod}>
           <Select name="paymentMethod" defaultValue={v.paymentMethod ?? "CASH"}>
             <option value="CASH">{t("Наличные")}</option>
-            <option value="CARD">{t("Карта")}</option>
+            <option value="CARD">{t("Банковская карта")}</option>
             <option value="TRANSFER">{t("Безналичный расчёт")}</option>
           </Select>
         </Field>

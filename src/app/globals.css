@@ -442,7 +442,11 @@ main:has(> .nav-pending) > :not(.nav-pending) {
     border-top: 1px solid var(--color-gray-200);
   }
   .stack-table td {
-    display: block;
+    /* flow-root: ячейка сама вмещает свою подпись (float). Иначе при мелком тексте значения
+       подписи соседних строк цепляются друг за друга и уезжают «лесенкой» вправо */
+    display: flow-root;
+    min-height: 1.5rem;
+    line-height: 1.5rem;
     padding: 0.125rem 0 !important;
     text-align: right !important;
     white-space: normal !important;

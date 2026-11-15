@@ -13,8 +13,8 @@ import { supplierTermsForShop } from "@/lib/supplier-terms";
 import { previewBonuses } from "@/lib/orders";
 import { supplierForShop } from "@/lib/shop-catalog";
 
-export default async function CartPage({ params }: PageProps<"/shop/cart/[supplierId]">) {
-  const [ctx, t] = await Promise.all([requireShop(), getT()]);
+export default async function CartPage({ params, searchParams }: PageProps<"/shop/cart/[supplierId]">) {
+  const [ctx, t, sp] = await Promise.all([requireShop(), getT(), searchParams]);
   const { supplierId } = await params;
   const supplier = await supplierForShop(ctx.shop.territoryId, supplierId);
   if (!supplier) notFound();
@@ -22,7 +22,12 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
     where: { shopId: ctx.shop.id, supplierId, status: "DRAFT" },
     include: { items: { include: { productUnit: { include: { product: true } } }, orderBy: { createdAt: "asc" } } },
   });
-  const items = cart?.items ?? [];
+  const allItems = cart?.items ?? [];
+  // ?items=a,b — на странице «Корзина» отметили только часть товаров: оформляются они, остальные остаются
+  const wanted = typeof sp.items === "string" ? new Set(sp.items.split(",").filter(Boolean)) : null;
+  const chosen = wanted ? allItems.filter((i) => wanted.has(i.id)) : [];
+  const partial = chosen.length > 0 && chosen.length < allItems.length;
+  const items = partial ? chosen : allItems;
   const bonuses = items.length > 0 ? await previewBonuses(supplierId, items) : [];
   const owner = await db.user.findFirst({ where: { shopMembers: { some: { shopId: ctx.shop.id, role: "OWNER" } } } });
   const blocked = ctx.shop.isBlocked || supplier.ordersDisabled;
@@ -51,6 +56,12 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
       ) : (
         <div className="grid gap-4 lg:grid-cols-5">
           <div className="space-y-4 lg:col-span-3">
+            {partial && (
+              <Alert tone="info">
+                {t("Оформляются выбранные товары: {n} из {m}. Остальные останутся в корзине.", { n: items.length, m: allItems.length })}{" "}
+                <Link href={`/shop/cart/${supplier.id}`} className="font-semibold underline">{t("Показать всю корзину")}</Link>
+              </Alert>
+            )}
             <Card className="p-0 sm:p-0">
               <ul className="divide-y divide-gray-100">
                 {items.map((i) => {
@@ -110,6 +121,7 @@ export default async function CartPage({ params }: PageProps<"/shop/cart/[suppli
               ) : (
                 <CheckoutForm
                   supplierId={supplier.id}
+                  itemIds={partial ? items.map((i) => i.id) : undefined}
                   dates={dates}
                   defaults={{ address: ctx.shop.address, contactName: ctx.shop.contactName, contactPhone: formatPhone(ctx.shop.phone ?? owner?.phone ?? "") }}
                 />

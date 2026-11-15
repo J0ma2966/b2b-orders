@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Alert, EmptyState, Input, cn } from "@/components/ui";
 import { ProductRow } from "@/components/shop/product-card";
 import { CartSummaryBar, SupplierHero } from "@/components/shop/supplier-parts";
-import { PAGE_SIZE, Pagination, pageFrom } from "@/components/ui/pagination";
+import { LoadMore } from "@/components/ui/load-more";
+import { shownFrom } from "@/lib/load-more";
 import { requireShop } from "@/lib/auth/current";
 import { getT } from "@/lib/i18n/server";
 import { activePromotions, cartQtyByUnit, shopCatalog, supplierForShop, type CatalogFilter } from "@/lib/shop-catalog";
@@ -18,8 +19,9 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const categoryId = typeof sp.c === "string" ? sp.c : "";
   const filter = (["fav", "often", "promo"].includes(String(sp.f)) ? sp.f : "") as CatalogFilter;
-  const page = pageFrom(sp);
-  const { total, products, categories } = await shopCatalog(supplier.id, { q, categoryId, filter, shopId: ctx.shop.id, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE });
+  // Каталог подгружается по 10 товаров при прокрутке (?n=…)
+  const shown = shownFrom(sp);
+  const { total, products, categories } = await shopCatalog(supplier.id, { q, categoryId, filter, shopId: ctx.shop.id, skip: 0, take: shown });
   const [promos, inCart] = await Promise.all([activePromotions(supplier.id), cartQtyByUnit(ctx.shop.id, products.flatMap((p) => p.units.map((u) => u.id)))]);
   const base = `/shop/suppliers/${supplier.id}`;
   return (
@@ -76,7 +78,7 @@ export default async function ShopSupplierPage({ params, searchParams }: PagePro
           ))}
         </div>
       )}
-      <Pagination page={page} total={total} basePath={base} params={{ q, c: categoryId, f: filter }} />
+      <LoadMore shown={products.length} total={total} basePath={base} params={{ q, c: categoryId, f: filter }} />
       {!supplier.ordersDisabled && <CartSummaryBar supplierId={supplier.id} shopId={ctx.shop.id} shopTerritoryId={ctx.shop.territoryId} />}
     </>
   );

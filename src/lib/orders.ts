@@ -146,9 +146,12 @@ export async function addToCart(shop: { id: string; territoryId: string; isBlock
       // Корзину только что оформили — товар ляжет в новую
       if (order.status !== "DRAFT") return null;
       const existing = order.items.find((i) => i.productUnitId === unit.id);
-      const newQty = num(existing?.qty) + qty;
+      // Минимум поставщика: первое «+» кладёт сразу минимальное количество
+      const min = num(unit.minOrderQty);
+      const newQty = Math.max(num(existing?.qty) + qty, min);
       const available = num(unit.physicalQty) - num(unit.reservedQty);
       if (newQty > available) {
+        if (available > 0 && available < min) throw new OrderError(`Минимум для заказа ${formatQty(min)} ${unitName(unit)}, а доступно только ${formatQty(available)}`);
         throw new OrderError(available > 0 ? `Доступно только ${formatQty(available)} ${unitName(unit)}` : "Товара нет в наличии");
       }
       if (existing) {
@@ -161,7 +164,7 @@ export async function addToCart(shop: { id: string; territoryId: string; isBlock
             productName: unit.product.name,
             unitLabel: unitName(unit),
             price: unit.price!,
-            qty,
+            qty: newQty,
             addedByUserId: actor.userId,
           },
         });
@@ -219,6 +222,8 @@ export async function setCartQty(shopId: string, itemId: string, qty: number) {
   const item = await db.orderItem.findUnique({ where: { id: itemId }, include: { order: true, productUnit: true } });
   if (!item || item.order.shopId !== shopId || item.order.status !== "DRAFT") throw new OrderError("Позиция не найдена");
   if (qty !== 0 && !validQty(item.productUnit.kind, qty)) throw new OrderError("Неверное количество");
+  const min = num(item.productUnit.minOrderQty);
+  if (qty !== 0 && qty < min) throw new OrderError(`Минимум для заказа: ${formatQty(min)} ${item.unitLabel}`);
   const available = num(item.productUnit.physicalQty) - num(item.productUnit.reservedQty);
   if (qty > available) throw new OrderError(`Доступно только ${formatQty(Math.max(0, available))} ${item.unitLabel}`);
   // Под блокировкой корзины: если её успели оформить, оформленный заказ не меняется
@@ -231,14 +236,63 @@ export async function setCartQty(shopId: string, itemId: string, qty: number) {
   });
 }
 
+// «Удалить выбранные» в корзине: позиции могут быть из корзин разных поставщиков
+export async function removeCartItems(shopId: string, itemIds: string[]) {
+  const items = await db.orderItem.findMany({ where: { id: { in: itemIds }, order: { shopId, status: "DRAFT" } }, select: { id: true, orderId: true } });
+  const byOrder = new Map<string, string[]>();
+  for (const i of items) byOrder.set(i.orderId, [...(byOrder.get(i.orderId) ?? []), i.id]);
+  let removed = 0;
+  for (const [orderId, ids] of byOrder) {
+    removed += await db.$transaction(async (tx) => {
+      const order = await lockOrder(tx, orderId);
+      // Корзину успели оформить — оформленный заказ не трогаем
+      if (order.status !== "DRAFT") return 0;
+      const r = await tx.orderItem.deleteMany({ where: { id: { in: ids }, orderId } });
+      await recalcTotal(tx, orderId);
+      return r.count;
+    });
+  }
+  return removed;
+}
+
 // Кнопка «−» на карточке товара: на одну единицу меньше, на последней — позиция убирается из корзины.
 // Ищется по единице товара, потому что только что добавленная позиция на карточке ещё без номера.
 export async function removeOneFromCart(shopId: string, unitId: string) {
-  const item = await db.orderItem.findFirst({ where: { productUnitId: unitId, order: { shopId, status: "DRAFT" } }, select: { id: true, qty: true } });
+  const item = await db.orderItem.findFirst({ where: { productUnitId: unitId, order: { shopId, status: "DRAFT" } }, select: { id: true, qty: true, productUnit: { select: { minOrderQty: true } } } });
   if (!item) return 0;
-  const next = Math.max(0, Math.round((num(item.qty) - 1) * 1000) / 1000);
+  let next = Math.max(0, Math.round((num(item.qty) - 1) * 1000) / 1000);
+  // Меньше минимума поставщика оставить нельзя — позиция убирается целиком
+  if (next < num(item.productUnit.minOrderQty)) next = 0;
   await setCartQty(shopId, item.id, next);
   return next;
+}
+
+// Количество, набранное на карточке товара с клавиатуры: позиция ищется по единице товара.
+// Больше остатка заказать нельзя — количество урезается до доступного (clamped = true).
+// Меньше минимума поставщика тоже нельзя — количество поднимается до минимума (raised = true).
+export async function setCartQtyByUnit(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, unitId: string, qty: number) {
+  const unit = await db.productUnit.findUnique({ where: { id: unitId }, select: { physicalQty: true, reservedQty: true, kind: true, minOrderQty: true } });
+  if (!unit) throw new OrderError("Товар недоступен для заказа");
+  const available = Math.max(0, num(unit.physicalQty) - num(unit.reservedQty));
+  const fit = validQty(unit.kind, available) ? available : Math.floor(available);
+  let want = Math.min(qty, fit);
+  const clamped = want < qty;
+  const min = num(unit.minOrderQty);
+  let raised = false;
+  if (want > 0 && want < min) {
+    if (fit < min) throw new OrderError(`Минимум для заказа ${formatQty(min)}, а доступно только ${formatQty(fit)}`);
+    want = min;
+    raised = true;
+  }
+  const item = await db.orderItem.findFirst({ where: { productUnitId: unitId, order: { shopId: shop.id, supplierId, status: "DRAFT" } }, select: { id: true, qty: true } });
+  if (item) {
+    if (want !== num(item.qty)) await setCartQty(shop.id, item.id, want);
+  } else if (want > 0) {
+    await addToCart(shop, supplierId, unitId, want);
+  } else if (qty > 0) {
+    throw new OrderError("Товара нет в наличии");
+  }
+  return { qty: want, clamped: clamped && !raised, raised };
 }
 
 // Приводит корзину к актуальному состоянию каталога и остатков (ТЗ п. 22).
@@ -275,11 +329,24 @@ async function refreshCart(tx: Tx, orderId: string) {
       changes.push(`${name} закончился и убран из корзины`);
       continue;
     }
-    if (num(item.qty) > fit) {
+    // Минимум поставщика (мог появиться или вырасти, пока товар лежал в корзине)
+    const min = num(u.minOrderQty);
+    if (fit < min) {
+      await tx.orderItem.delete({ where: { id: item.id } });
+      changes.push(`${name}: осталось меньше минимума для заказа (${formatQty(min)}), товар убран из корзины`);
+      continue;
+    }
+    let qty = num(item.qty);
+    if (qty > fit) {
+      qty = fit;
       data.qty = fit;
       changes.push(`${name}: осталось ${formatQty(fit)}, количество уменьшено`);
+    } else if (qty < min) {
+      qty = min;
+      data.qty = min;
+      changes.push(`${name}: минимум для заказа ${formatQty(min)}, количество увеличено`);
     }
-    used.set(stock.id, (used.get(stock.id) ?? 0) + Math.min(num(item.qty), fit) * ratio);
+    used.set(stock.id, (used.get(stock.id) ?? 0) + qty * ratio);
     if (Object.keys(data).length > 0) await tx.orderItem.update({ where: { id: item.id }, data });
   }
   await recalcTotal(tx, orderId);
@@ -326,17 +393,22 @@ export async function previewBonuses(supplierId: string, items: { productUnitId:
 // Оформление: повторная проверка, резерв, бонусы, фиксация цены и комиссии (ТЗ п. 19, 22, 25, 51, 53).
 // М5: «Оформить все» — каждая корзина становится отдельным заказом со своей проверкой
 // (минимальная сумма, кредит, дата доставки берётся первая доступная); неудача одной не мешает остальным.
-export async function checkoutAll(shop: { id: string; territoryId: string; isBlocked: boolean }, input: Omit<CheckoutInput, "deliveryDate">) {
+// itemIds — оформить только отмеченные в корзине позиции: корзины без отмеченных пропускаются,
+// неотмеченные позиции остаются в корзине.
+export async function checkoutAll(shop: { id: string; territoryId: string; isBlocked: boolean }, input: Omit<CheckoutInput, "deliveryDate">, itemIds?: string[]) {
   const carts = await db.order.findMany({
     where: { shopId: shop.id, status: "DRAFT", items: { some: {} } },
-    include: { supplier: { select: { displayName: true } } },
+    include: { supplier: { select: { displayName: true } }, items: { select: { id: true } } },
     orderBy: { updatedAt: "desc" },
   });
+  const pick = itemIds ? new Set(itemIds) : null;
   const placed: string[] = [];
   const problems: string[] = [];
   for (const c of carts) {
+    const chosen = pick ? c.items.filter((i) => pick.has(i.id)).map((i) => i.id) : null;
+    if (chosen && chosen.length === 0) continue;
     try {
-      const r = await checkout(shop, c.supplierId, { ...input, deliveryDate: null });
+      const r = await checkout(shop, c.supplierId, { ...input, deliveryDate: null }, chosen && chosen.length < c.items.length ? chosen : undefined);
       if (r.placed) placed.push(r.orderId);
       else problems.push(`Не оформлен заказ ${c.supplier.displayName}: корзина изменилась, проверьте её`);
     } catch (e) {
@@ -347,7 +419,8 @@ export async function checkoutAll(shop: { id: string; territoryId: string; isBlo
   return { placed, problems };
 }
 
-export async function checkout(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, input: CheckoutInput): Promise<CheckoutResult> {
+// itemIds — оформить только эти позиции корзины; остальные переезжают в новую корзину того же поставщика.
+export async function checkout(shop: { id: string; territoryId: string; isBlocked: boolean }, supplierId: string, input: CheckoutInput, itemIds?: string[]): Promise<CheckoutResult> {
   if (shop.isBlocked) throw new OrderError("Магазин заблокирован, заказы недоступны");
   const supplier = await supplierForShop(shop.territoryId, supplierId);
   if (!supplier) throw new OrderError("Поставщик недоступен для вашей территории");
@@ -366,8 +439,14 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
         if (order.status !== "DRAFT") throw new OrderError("Заказ уже оформлен");
         const changes = await refreshCart(tx, order.id);
         if (changes.length > 0) return { placed: false as const, changes };
-        const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
-        if (items.length === 0) throw new OrderError("Корзина пуста");
+        const all = await tx.orderItem.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
+        if (all.length === 0) throw new OrderError("Корзина пуста");
+        // Выбранные позиции оформляются, остальные вынимаются и после оформления кладутся в новую корзину
+        const pick = itemIds ? new Set(itemIds) : null;
+        const items = pick ? all.filter((i) => pick.has(i.id)) : all;
+        const rest = pick ? all.filter((i) => !pick.has(i.id)) : [];
+        if (items.length === 0) throw new OrderError("Выберите товары для оформления");
+        if (rest.length > 0) await tx.orderItem.deleteMany({ where: { id: { in: rest.map((i) => i.id) } } });
 
         const now = new Date();
         const promos = await activePromotions(tx, supplierId, now);
@@ -443,6 +522,23 @@ export async function checkout(shop: { id: string; territoryId: string; isBlocke
           },
         });
         await addEvent(tx, order.id, { type: "status", from: "DRAFT", to: "PLACED", actorRole: "SHOP", comment: bonusNotes.join("\n") || null }, actor);
+        if (rest.length > 0) {
+          // Заказ уже не черновик — у магазина снова может быть корзина этого поставщика
+          const draft = await tx.order.create({ data: { shopId: shop.id, supplierId, createdByUserId: order.createdByUserId } });
+          await tx.orderItem.createMany({
+            data: rest.map((i) => ({
+              orderId: draft.id,
+              productUnitId: i.productUnitId,
+              productName: i.productName,
+              unitLabel: i.unitLabel,
+              price: i.price,
+              qty: i.qty,
+              addedByUserId: i.addedByUserId,
+              createdAt: i.createdAt,
+            })),
+          });
+          await recalcTotal(tx, draft.id);
+        }
         await notifySupplierStaff(supplierId, {
           type: "order.new",
           title: `Новый заказ №${number}`,

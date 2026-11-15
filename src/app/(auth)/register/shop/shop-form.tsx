@@ -2,8 +2,9 @@
 
 import { ActionForm } from "@/components/ui/action-form";
 import { useActionState } from "react";
-import { Alert, Field, Input } from "@/components/ui";
+import { Alert, Field, Input, RequiredMark } from "@/components/ui";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { RequiredNote } from "@/components/forms/required-note";
 import { PrivacyNote } from "@/components/forms/privacy-note";
 import { AccountFields, type PhoneConfirmChannels } from "@/components/forms/account-fields";
 import { MapPicker } from "@/components/map/map-picker";
@@ -23,10 +24,11 @@ export function ShopRegisterForm({ territories, loggedIn, confirm }: { territori
   return (
     <ActionForm action={action} pending={pending} className="space-y-6">
       {state.error && <Alert tone="error">{state.error}</Alert>}
+      <RequiredNote />
       {!loggedIn && <AccountFields state={state} confirm={confirm} />}
       <fieldset className="space-y-4">
         <legend className="mb-2 text-base font-semibold">{t("Магазин")}</legend>
-        <Field label="Название магазина" name="name" error={e.name}>
+        <Field label="Название магазина" name="name" required error={e.name}>
           <Input name="name" defaultValue={v.name} required />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -36,7 +38,7 @@ export function ShopRegisterForm({ territories, loggedIn, confirm }: { territori
           <Field label="Контактное лицо" name="contactName" error={e.contactName} hint={loggedIn ? undefined : "По умолчанию — ваше ФИО"}>
             <Input name="contactName" defaultValue={v.contactName} />
           </Field>
-          <Field label="Основной телефон магазина" name="shopPhone" error={e.shopPhone} hint={loggedIn ? undefined : "По умолчанию — телефон для входа"}>
+          <Field label="Основной телефон магазина" name="shopPhone" required={loggedIn} error={e.shopPhone} hint={loggedIn ? undefined : "По умолчанию — телефон для входа"}>
             <Input name="shopPhone" type="tel" inputMode="tel" defaultValue={v.shopPhone} required={loggedIn} />
           </Field>
           <Field label="Запасной телефон" name="phone2" error={e.phone2}>
@@ -44,11 +46,11 @@ export function ShopRegisterForm({ territories, loggedIn, confirm }: { territori
           </Field>
         </div>
         <TerritorySelect territories={territories} defaultValue={v.territoryId} error={e.territoryId} />
-        <Field label="Адрес" name="address" error={e.address}>
+        <Field label="Адрес" name="address" required error={e.address}>
           <Input name="address" defaultValue={v.address} placeholder={t("Улица, дом, ориентир")} required />
         </Field>
         <div>
-          <span className="mb-1 block text-sm font-medium text-gray-700">{t("Расположение на карте")}</span>
+          <span className="mb-1 block text-sm font-medium text-gray-700">{t("Расположение на карте")}<RequiredMark /></span>
 
           <MapPicker defaultValue={point} error={e.lat?.[0]} />
         </div>

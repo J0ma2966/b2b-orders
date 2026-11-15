@@ -5,6 +5,7 @@ import { formatQty } from "@/lib/catalog";
 import { formatPhone } from "@/lib/phone";
 import { ITEM_KIND_LABEL } from "@/lib/order-core";
 import { OrderStatusBadge } from "./order-view";
+import { OrderComment, OrderFlags } from "./order-notes";
 import type { OrderItemKind, OrderStatus } from "@/generated/prisma/enums";
 import { getT } from "@/lib/i18n/server";
 
@@ -85,7 +86,8 @@ export async function DeliveryHero({ o, replacements = 0 }: { o: Delivery; repla
           {o.contactPhone && `, ${formatPhone(o.contactPhone)}`}
         </p>
       )}
-      {o.comment && <p className="mt-3 rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800">💬 {o.comment}</p>}
+      <OrderComment text={o.comment} className="mt-3" />
+      {o.items.some((i) => i.kind === "FORCED") && <OrderFlags forced className="mt-3" />}
       {replacements > 0 && <p className="mt-2 text-sm font-medium text-yellow-700">{t("🔁 Замен для этого магазина: {n}", { n: replacements })}</p>}
       <div className="mt-3 flex items-baseline justify-between text-sm text-gray-500">
         <span>
@@ -101,7 +103,11 @@ export async function DeliveryHero({ o, replacements = 0 }: { o: Delivery; repla
 }
 
 // Строка очереди: следующие доставки, история
-export async function DeliveryRow({ o }: { o: Pick<Delivery, "id" | "number" | "status" | "deliveryAddress" | "deliveryDate" | "total" | "shop"> }) {
+export async function DeliveryRow({
+  o,
+}: {
+  o: Pick<Delivery, "id" | "number" | "status" | "deliveryAddress" | "deliveryDate" | "total" | "shop"> & { comment?: string | null; items?: { kind: OrderItemKind }[] };
+}) {
   const t = await getT();
   return (
     <Link href={`/courier/orders/${o.id}`} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-gray-200 hover:ring-brand-600">
@@ -112,6 +118,7 @@ export async function DeliveryRow({ o }: { o: Pick<Delivery, "id" | "number" | "
         </div>
         <div className="truncate text-sm text-gray-500">{o.deliveryAddress}</div>
         {o.deliveryDate && <div className="mt-0.5 text-xs text-gray-500">📅 {t.date(o.deliveryDate)}</div>}
+        <OrderFlags comment={o.comment} forced={o.items?.some((i) => i.kind === "FORCED")} />
       </div>
       <div className="shrink-0 text-right">
         <div className="font-bold tabular-nums">{t.money(o.total)}</div>
@@ -130,7 +137,9 @@ export async function DeliveryItems({ items }: { items: Delivery["items"] }) {
         <li key={i.id} className="flex items-start justify-between gap-3 py-2.5">
           <span>
             {i.productName}
-            {i.kind !== "REGULAR" && <span className="ml-1 rounded bg-yellow-100 px-1.5 py-0.5 text-xs text-yellow-800">{t(ITEM_KIND_LABEL[i.kind])}</span>}
+            {i.kind !== "REGULAR" && (
+              <span className={cn("ml-1 rounded px-1.5 py-0.5 text-xs font-semibold", i.kind === "FORCED" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>{t(ITEM_KIND_LABEL[i.kind])}</span>
+            )}
           </span>
           <span className="shrink-0 text-lg font-bold tabular-nums">
             {formatQty(i.qty)} <span className="text-sm font-medium text-gray-500">{t(i.unitLabel)}</span>

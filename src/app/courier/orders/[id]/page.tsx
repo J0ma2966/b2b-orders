@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Alert, Card } from "@/components/ui";
 import { DeliveryActions, DeliveryItems, OtherMapLinks } from "@/components/orders/delivery-card";
 import { OrderStatusBadge } from "@/components/orders/order-view";
+import { ForcedNotice, OrderComment } from "@/components/orders/order-notes";
 import { formatPhone } from "@/lib/phone";
 import { AcceptanceForm, ProblemForm, StartDeliveryForm } from "@/components/orders/courier-forms";
 import { db } from "@/lib/db";
@@ -39,9 +40,10 @@ export default async function CourierOrderPage({ params }: PageProps<"/courier/o
         )}
       </div>
       <div className="space-y-4">
+        <OrderComment text={order.comment} />
+        <ForcedNotice items={order.items} viewer="courier" />
         <DeliveryActions o={order} />
         <OtherMapLinks lat={order.deliveryLat} lng={order.deliveryLng} />
-        {order.comment && <p className="rounded-lg bg-yellow-50 px-3 py-2 text-sm text-yellow-800">💬 {order.comment}</p>}
         {order.status === "ASSIGNED" && <StartDeliveryForm orderId={order.id} />}
         {order.status === "NEEDS_CONFIRMATION" && <Alert tone="warning">{t("Магазин просит отменить заказ: {reason}. Дождитесь решения поставщика.", { reason: order.cancelRequestReason })}</Alert>}
         {order.status === "DELIVERY_PROBLEM" && <Alert tone="warning">{t("Вы сообщили о проблеме: {note}. Ждём решения поставщика.", { note: order.problemNote })}</Alert>}

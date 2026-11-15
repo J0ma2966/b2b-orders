@@ -4,8 +4,9 @@ import { useActionState } from "react";
 import { ActionForm } from "@/components/ui/action-form";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormMessage } from "@/components/ui/form-message";
-import { Field, Input } from "@/components/ui";
+import { Field } from "@/components/ui";
 import { initialFormState } from "@/lib/forms";
+import { NumInput } from "@/components/ui/num-input";
 import { useT } from "@/lib/i18n/client";
 import { updateOrderTermsAction } from "../actions";
 
@@ -21,10 +22,10 @@ export function OrderTermsForm({ defaults }: { defaults: TermsDefaults }) {
       <FormMessage state={state} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Минимальная сумма заказа, сум" name="minOrderTotal" error={fe.minOrderTotal} hint="Пусто — без минимума">
-          <Input name="minOrderTotal" inputMode="numeric" defaultValue={v?.minOrderTotal ?? defaults.minOrderTotal} />
+          <NumInput name="minOrderTotal" group defaultValue={v?.minOrderTotal ?? defaults.minOrderTotal} />
         </Field>
         <Field label="Приём заказов до, час" name="orderCutoffHour" error={fe.orderCutoffHour} hint="Например 16: заказ до 16:00 — доставка завтра, позже — послезавтра. Пусто — можно на сегодня">
-          <Input name="orderCutoffHour" type="number" min={1} max={23} defaultValue={v?.orderCutoffHour ?? defaults.orderCutoffHour} />
+          <NumInput name="orderCutoffHour" maxLength={2} max={23} defaultValue={v?.orderCutoffHour ?? defaults.orderCutoffHour} />
         </Field>
       </div>
       <label className="flex items-start gap-2 text-sm">
