@@ -54,7 +54,8 @@ export function ShopShell({ nav, mobileNav, children }: { nav: NavItem[]; mobile
           </Suspense>
         </div>
       </header>
-      <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-32 md:pt-5 md:pb-10">
+      {/* Нижний отступ не меньше высоты плавающей панели (--bottom-bar ставит FixedBottom), чтобы она не закрывала последний товар */}
+      <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(8rem,calc(var(--bottom-bar,0px)_+_0.5rem))] md:pt-5 md:pb-[max(2.5rem,calc(var(--bottom-bar,0px)_+_0.5rem))]">
         <Suspense fallback={<Spinner />}>{children}</Suspense>
         <NavPendingOverlay />
       </main>

@@ -9,6 +9,7 @@ import { Avatar, Money, Progress } from "@/components/shop/ui";
 import { removeCartItemsAction } from "@/app/shop/orders/actions";
 import { initialFormState } from "@/lib/forms";
 import { useT } from "@/lib/i18n/client";
+import { FixedBottom } from "@/components/ui/fixed-bottom";
 import { tapHaptic } from "@/lib/native";
 
 export type CartView = {
@@ -183,7 +184,7 @@ export function CartBoard({ carts, owner, blocked, defaults }: { carts: CartView
         )}
       </div>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.25rem+max(0.625rem,env(safe-area-inset-bottom)))] z-[999] px-3 md:bottom-4">
+      <FixedBottom className="pointer-events-none fixed inset-x-0 bottom-[calc(5.25rem+max(0.625rem,env(safe-area-inset-bottom)))] z-[999] px-3 md:bottom-4">
         <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-[1.75rem] bg-lime py-3 pr-3 pl-5 text-night shadow-[0_10px_30px_-10px_rgb(0_0_0/0.35)]" data-testid="cart-total-bar">
           <div className="min-w-0 flex-1 overflow-hidden">
             <div className="truncate text-sm font-semibold">
@@ -206,7 +207,7 @@ export function CartBoard({ carts, owner, blocked, defaults }: { carts: CartView
             </Link>
           )}
         </div>
-      </div>
+      </FixedBottom>
     </>
   );
 }
