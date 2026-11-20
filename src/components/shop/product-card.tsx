@@ -66,7 +66,9 @@ export async function ProductCard({
       )}
       <Link href={href} className="group block">
         {photo ? (
-          <img src={photo} alt="" className="aspect-[4/3] w-full object-cover transition-transform group-hover:scale-[1.02]" />
+          <div className="relative aspect-[4/3] w-full bg-white">
+            <img src={photo} alt="" className="absolute inset-0 size-full object-contain p-2 transition-transform group-hover:scale-[1.02]" />
+          </div>
         ) : (
           <div className="grid aspect-[4/3] w-full place-items-center bg-brand-50 font-display text-3xl font-semibold text-brand-600/40" aria-hidden>
             {p.name.slice(0, 1)}
@@ -133,8 +135,8 @@ export async function ProductRow({
   const promo = p.units.map((u) => promos?.get(u.id)).find(Boolean);
   return (
     <div className="flex gap-3 rounded-[1.5rem] bg-surface p-2.5">
-      <Link href={href} className={cn("relative grid size-[5.25rem] shrink-0 place-items-center overflow-hidden rounded-2xl", !photo && tileColor(p.name))}>
-        {photo ? <img src={photo} alt="" className="size-full object-cover" /> : <span className="font-display text-xl font-bold text-night/70">{initials(p.name)}</span>}
+      <Link href={href} className={cn("relative grid size-[5.25rem] shrink-0 place-items-center overflow-hidden rounded-2xl md:size-28", !photo && tileColor(p.name))}>
+        {photo ? <img src={photo} alt="" className="absolute inset-0 size-full bg-white object-contain p-1" /> : <span className="font-display text-xl font-bold text-night/70">{initials(p.name)}</span>}
         {promo && (
           <span title={promo.name} className="absolute bottom-1 left-1 rounded-full bg-night px-1.5 py-0.5 text-[10px] font-bold text-lime">
             {promoLabel(promo) ?? "🎁"}

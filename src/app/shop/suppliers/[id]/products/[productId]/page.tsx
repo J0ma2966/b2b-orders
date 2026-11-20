@@ -10,6 +10,7 @@ import { fileUrl } from "@/lib/storage-url";
 import { allowsFraction } from "@/lib/order-core";
 import { FavoriteButton, ProductBuy, type BuyUnit } from "@/components/orders/shop-forms";
 import { Avatar, BackButton, initials, tileColor } from "@/components/shop/ui";
+import { ProductGallery } from "@/components/shop/product-gallery";
 
 export default async function ShopProductPage({ params }: PageProps<"/shop/suppliers/[id]/products/[productId]">) {
   const [ctx, t] = await Promise.all([requireShop(), getT()]);
@@ -59,20 +60,10 @@ export default async function ShopProductPage({ params }: PageProps<"/shop/suppl
           <BackButton href={base} label={t("Назад")} />
           <FavoriteButton productId={product.id} on={favs.has(product.id)} label={product.name} heart />
         </div>
-        <div className="mx-auto -mt-4 grid aspect-square w-[78%] max-w-80 place-items-center overflow-hidden rounded-full bg-white/40">
-          {photos[0] ? (
-            <img src={photos[0]} alt="" className="size-full object-cover" />
-          ) : (
-            <span className="font-display text-6xl font-bold text-night/40">{initials(product.name)}</span>
-          )}
-        </div>
-        {photos.length > 1 && (
-          <div className="mt-3 flex justify-center gap-2">
-            {photos.slice(1, 5).map((src) => (
-              <img key={src} src={src} alt="" className="size-12 rounded-xl object-cover ring-2 ring-white/60" />
-            ))}
-          </div>
-        )}
+        <ProductGallery
+          photos={photos}
+          fallback={<span className="font-display text-6xl font-bold text-night/40">{initials(product.name)}</span>}
+        />
         <Link href={base} className="mt-3 inline-flex items-center gap-2 rounded-full bg-night py-1.5 pr-4 pl-1.5 text-sm font-bold text-white">
           <Avatar name={supplier.displayName} className="size-8 rounded-full text-[11px]" />
           {supplier.displayName}
