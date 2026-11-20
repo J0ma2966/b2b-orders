@@ -47,6 +47,8 @@ async function open(width, height, mobile) {
 
 // Прокрутить до конца и проверить, что последний элемент списка целиком над панелью и в него можно нажать
 async function checkBottom(page, itemSelector, what) {
+  // Панель уже измерила себя (после загрузки скриптов страницы), иначе отступ ещё прежний
+  await page.waitForFunction(() => document.documentElement.dataset.bottomBar === "1", null, { timeout: 15000 });
   await page.waitForTimeout(400);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.waitForTimeout(400);
