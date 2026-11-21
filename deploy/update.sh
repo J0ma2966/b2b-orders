@@ -31,7 +31,9 @@ as_app git log --oneline "$OLD..$NEW" | head -20
 echo "==> Зависимости, миграции, сборка"
 as_app npm ci --no-audit --no-fund
 as_app npm run db:deploy
-as_app npm run build
+# </dev/null: Next.js не спрашивает в терминале «Upgrade now / Skip» и не меняет пакеты прямо на сервере.
+# Обновления Next.js приходят только через репозиторий (PR в main), как и весь остальной код.
+as_app npm run build </dev/null
 echo "==> Перезапуск"
 systemctl restart b2b-orders
 for _ in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3000/login 2>/dev/null && break; sleep 2; done
