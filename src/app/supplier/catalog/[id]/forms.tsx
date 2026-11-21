@@ -34,7 +34,7 @@ export function EditProductForm({
         <div className="flex flex-wrap gap-2">
           {photos.map((p) => (
             <label key={p} className="relative block">
-              <img src={fileUrl(p)!} alt="" className="size-20 rounded-lg object-cover ring-1 ring-gray-200" />
+              <img src={fileUrl(p)!} alt="" className="size-20 rounded-lg bg-white object-contain ring-1 ring-gray-200" />
               <span className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                 <input type="checkbox" name="removePhoto" value={p} /> {t("убрать")}
               </span>

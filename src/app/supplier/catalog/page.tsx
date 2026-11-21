@@ -59,7 +59,7 @@ export default async function CatalogPage({ searchParams }: PageProps<"/supplier
               return (
                 <li key={p.id}>
                   <Link href={`/supplier/catalog/${p.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                    {photo ? <img src={photo} alt="" className="size-12 shrink-0 rounded-lg object-cover" /> : <div className="size-12 shrink-0 rounded-lg bg-gray-100" />}
+                    {photo ? <img src={photo} alt="" className="size-12 shrink-0 rounded-lg bg-white object-contain ring-1 ring-gray-200" /> : <div className="size-12 shrink-0 rounded-lg bg-gray-100" />}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-medium">{p.name}</span>
