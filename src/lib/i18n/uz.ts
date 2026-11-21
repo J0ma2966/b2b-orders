@@ -1965,6 +1965,9 @@ const uz: Record<string, string> = {
   "Открыть заказ →": "Buyurtmani ochish →",
   "Показаны все: {n}": "Hammasi koʻrsatildi: {n}",
   "Показать ещё": "Yana koʻrsatish",
+  "Открыть фото": "Fotoni ochish",
+  "Фото {n}": "Foto {n}",
+  "Закрыть": "Yopish",
 };
 
 export default uz;
