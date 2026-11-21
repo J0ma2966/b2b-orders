@@ -18,7 +18,7 @@ concurrency:
 jobs:
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -78,6 +78,8 @@ jobs:
           E2E_OUT=/tmp/e2e node tests/e2e/badges.mjs uz
           E2E_OUT=/tmp/e2e node tests/e2e/mobile-fixes.mjs ru
           E2E_OUT=/tmp/e2e node tests/e2e/mobile-fixes.mjs uz
+          E2E_OUT=/tmp/e2e node tests/e2e/bottom-bar.mjs ru
+          E2E_OUT=/tmp/e2e node tests/e2e/bottom-bar.mjs uz
           E2E_OUT=/tmp/e2e node tests/e2e/page-health.mjs
           SHOTS=0 E2E_OUT=/tmp/e2e node tests/e2e/layout-scan.mjs
       - uses: actions/upload-artifact@v4

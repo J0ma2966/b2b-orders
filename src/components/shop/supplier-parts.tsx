@@ -5,6 +5,7 @@ import { getT } from "@/lib/i18n/server";
 import { WEEKDAY_SHORT } from "@/lib/order-core";
 import { supplierTermsForShop } from "@/lib/supplier-terms";
 import { cn } from "@/components/ui";
+import { FixedBottom } from "@/components/ui/fixed-bottom";
 import { BackButton, Chip, Money, Progress, tileColor } from "./ui";
 
 type Supplier = { id: string; displayName: string; phone: string; description: string | null };
@@ -59,7 +60,7 @@ export async function CartSummaryBar({ supplierId, shopId, shopTerritoryId }: { 
   const min = terms.minOrderTotal ?? 0;
   const short = Math.max(0, min - total);
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1000] bg-linear-to-t from-page from-40% to-transparent px-3 pt-6 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+    <FixedBottom className="pointer-events-none fixed inset-x-0 bottom-0 z-[1000] bg-linear-to-t from-page from-40% to-transparent px-3 pt-6 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
       <div className="pointer-events-auto mx-auto max-w-xl rounded-[1.75rem] bg-night p-4 text-white shadow-[0_14px_34px_-10px_rgb(0_0_0/0.45)]">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1 overflow-hidden">
@@ -80,6 +81,6 @@ export async function CartSummaryBar({ supplierId, shopId, shopTerritoryId }: { 
           </>
         )}
       </div>
-    </div>
+    </FixedBottom>
   );
 }

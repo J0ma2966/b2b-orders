@@ -10,6 +10,7 @@ import { FormMessage } from "@/components/ui/form-message";
 import { initialFormState } from "@/lib/forms";
 import { addToCartAction, removeOneFromCartAction, askOwnerAction, cancelOrderAction, checkoutAction, checkoutAllAction, repeatOrderAction, requestCancelAction, setCartQtyAction, setCartQtyByUnitAction, toggleFavoriteAction } from "@/app/shop/orders/actions";
 import { useT } from "@/lib/i18n/client";
+import { FixedBottom } from "@/components/ui/fixed-bottom";
 import { tapHaptic } from "@/lib/native";
 import { formatQty } from "@/lib/catalog";
 
@@ -248,7 +249,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
       )}
       {units.length === 1 && unit.inCart > 0 && <p className="text-sm font-semibold text-brand-700">{t("в корзине {qty}", { qty: `${formatQty(unit.inCart)} ${unit.label}` })}</p>}
       {canOrder && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1000] bg-linear-to-t from-page from-40% to-transparent px-3 pt-6 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+        <FixedBottom className="pointer-events-none fixed inset-x-0 bottom-0 z-[1000] bg-linear-to-t from-page from-40% to-transparent px-3 pt-6 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
           {(state.error || state.ok) && (
             <p role="status" className={cn("animate-rise pointer-events-auto mx-auto mb-2 max-w-xl rounded-2xl px-4 py-2.5 text-sm font-semibold", state.error ? "bg-coral-soft text-red-800" : "bg-night text-lime")}>
               {state.error ? t(state.error) : <span className="flex items-center gap-2"><Check className="size-4" aria-hidden />{t(state.ok!)}</span>}
@@ -288,7 +289,7 @@ export function ProductBuy({ supplierId, units, canOrder }: { supplierId: string
               {max > 0 && valid && <span className="text-sm font-semibold tabular-nums">{money(unit.price * qty)}</span>}
             </button>
           </div>
-        </div>
+        </FixedBottom>
       )}
     </>
   );
