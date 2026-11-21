@@ -156,7 +156,9 @@ cd "$APP_DIR"
 sudo -u "$APP_USER" npm ci --no-audit --no-fund
 sudo -u "$APP_USER" npm run db:deploy
 SEED_OUT="$(sudo -u "$APP_USER" npm run db:seed 2>&1)"; echo "$SEED_OUT" | tail -n 15
-sudo -u "$APP_USER" npm run build
+# </dev/null: Next.js не спрашивает в терминале «Upgrade now / Skip» и не меняет пакеты прямо на сервере.
+# Обновления Next.js приходят только через репозиторий (PR в main), как и весь остальной код.
+sudo -u "$APP_USER" npm run build </dev/null
 ok "сборка готова"
 
 say "Служба systemd"
